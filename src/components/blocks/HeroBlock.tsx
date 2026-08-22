@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
-import { ConstellationField } from '../hero/ConstellationField'
+import { OrbitField } from '../hero/OrbitField'
+import type { Planet } from '../../lib/orbit/types'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
 
@@ -12,12 +13,15 @@ type Props = {
   line2?: string | null
   locationLine?: string | null
   scrollCue?: string | null
-  constellationEnabled?: boolean
+  orbitEnabled?: boolean
   // Required, not optional: a dropped prop must fail loudly rather than
   // silently reverting the hero to frozen defaults.
   separation: SeparationConfig
   ignition: IgnitionConfig
-  floatingWords?: string[]
+  /** Approved businesses, one planet each (docs/CONCEPT-SEMESTA.md §3). */
+  planets?: Planet[]
+  /** Accessible name for the orbit field, localized upstream. */
+  orbitLabel: string
 }
 
 const TYPE_DUR_S = 1.4 // characters finish typing by this mark (owner 2026-07-17: 1.4s reveal / 7s full)
@@ -62,10 +66,11 @@ export function HeroBlock({
   line2,
   locationLine,
   scrollCue,
-  constellationEnabled = true,
+  orbitEnabled = true,
   separation,
   ignition,
-  floatingWords = [],
+  planets = [],
+  orbitLabel,
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
   const cueRef = useRef<HTMLSpanElement>(null)
@@ -110,7 +115,7 @@ export function HeroBlock({
   useEffect(() => {
     if (!headlineDismissed) return
     // headline is dissolving (CSS transition below) — once it's clear of the
-    // layout, let the constellation reclaim the freed space
+    // layout, make the orbit field re-measure against the freed space
     const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 650)
     return () => clearTimeout(t)
   }, [headlineDismissed])
@@ -138,7 +143,12 @@ export function HeroBlock({
         separation={separation}
         ignition={ignition}
       />
-      <ConstellationField words={floatingWords} enabled={constellationEnabled} active={stageLive} />
+      <OrbitField
+        planets={planets}
+        enabled={orbitEnabled}
+        active={stageLive}
+        label={orbitLabel}
+      />
 
       <div
         className={`hero-headline-overlay${headlineStarted ? ' headline-started' : ''}`}
@@ -155,7 +165,6 @@ export function HeroBlock({
         <div className="tt-container" style={{ position: 'relative', height: '100%' }}>
           <h1
             className="tt-display hero-text1"
-            data-constellation-avoid
             style={{
               position: 'absolute',
               top: 'clamp(96px, 14vh, 140px)',
@@ -172,8 +181,7 @@ export function HeroBlock({
           {line2 ? (
             <p
               className="hero-text2"
-              data-constellation-avoid
-              style={{
+                style={{
                 position: 'absolute',
                 bottom: 'calc(8vh + 4.5rem)',
                 right: 0,
@@ -241,6 +249,10 @@ export function HeroBlock({
             display: block;
             position: absolute;
             inset: 0;
+            /* Below the orbit canvas and the far half of every orbit, which
+               both sit at -1: with z-index auto this paper painted over them
+               and swallowed the trails on phones. */
+            z-index: -2;
             background: url('/media/paper-bg-hero.webp') center / cover no-repeat;
             -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
             mask-image: linear-gradient(to bottom, black 90%, transparent 100%);

@@ -1,0 +1,28 @@
+# Everything git detects as text is stored and checked out with LF, whatever
+# the editor or tool that wrote it does. Without this an editor that rewrites
+# files with CRLF makes all 68 source files look modified with zero content
+# change.
+* text=auto eol=lf
+
+# Binary assets — never touch, never diff as text.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.gif    binary
+*.ico    binary
+*.mp4    binary
+*.webm   binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.glb    binary
+*.gltf   binary
+*.wasm   binary
+*.pdf    binary
+
+# Generated — collapse in diffs and reviews.
+package-lock.json    linguist-generated=true -diff
+src/payload-types.ts linguist-generated=true
+public/draco/**      linguist-vendored=true

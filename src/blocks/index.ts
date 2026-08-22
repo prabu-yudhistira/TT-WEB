@@ -12,24 +12,13 @@ export const HeroBlock: Block = {
     { name: 'locationLine', type: 'text', localized: true },
     { name: 'scrollCue', type: 'text', localized: true },
     {
-      name: 'constellationEnabled',
+      name: 'orbitEnabled',
       type: 'checkbox',
       defaultValue: true,
       admin: {
         description:
-          'Floating "margin note" words tethered to the logo by pencil strings (decorative; hero looks complete without them)',
+          'Planets orbiting the logo — one per approved business (Semesta → Businesses). Turning this off leaves the logo alone in the hero; nothing else breaks.',
       },
-    },
-    {
-      name: 'floatingWords',
-      type: 'array',
-      localized: true,
-      maxRows: 18,
-      admin: {
-        description:
-          '8–18 short words orbiting the logo; order = priority (small screens show only the first 8)',
-      },
-      fields: [{ name: 'word', type: 'text', required: true, maxLength: 24 }],
     },
   ],
 }

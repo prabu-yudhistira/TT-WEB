@@ -199,7 +199,7 @@ export function ArchiveCanvas({
                   textDecoration: 'none',
                 }}
               >
-                <PlaceholderFrame label={work.category} />
+                <PlaceholderFrame label={work.category} slug={work.slug} title={work.title} />
                 <p className="tt-display" style={{ marginTop: 8, fontSize: '0.9375rem', color: 'var(--fg)' }}>
                   {work.title}
                 </p>
@@ -211,7 +211,7 @@ export function ArchiveCanvas({
         <div className="tt-container tt-archive-grid" style={{ paddingBottom: 'var(--section-gap)' }}>
           {visible.map((work) => (
             <Link key={work.id} data-archive-card href={`/${locale}/work/${work.slug}`} style={{ textDecoration: 'none' }}>
-              <PlaceholderFrame label={work.category} />
+              <PlaceholderFrame label={work.category} slug={work.slug} title={work.title} />
               <p className="tt-display" style={{ marginTop: 8, fontSize: '0.9375rem', color: 'var(--fg)' }}>
                 {work.title}
               </p>

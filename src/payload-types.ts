@@ -73,6 +73,8 @@ export interface Config {
     services: Service;
     'manifesto-statements': ManifestoStatement;
     pages: Page;
+    cities: City;
+    businesses: Business;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -86,6 +88,8 @@ export interface Config {
     services: ServicesSelect<false> | ServicesSelect<true>;
     'manifesto-statements': ManifestoStatementsSelect<false> | ManifestoStatementsSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    cities: CitiesSelect<false> | CitiesSelect<true>;
+    businesses: BusinessesSelect<false> | BusinessesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -294,18 +298,9 @@ export interface Page {
             locationLine?: string | null;
             scrollCue?: string | null;
             /**
-             * Floating "margin note" words tethered to the logo by pencil strings (decorative; hero looks complete without them)
+             * Planets orbiting the logo — one per approved business (Semesta → Businesses). Turning this off leaves the logo alone in the hero; nothing else breaks.
              */
-            constellationEnabled?: boolean | null;
-            /**
-             * 8–18 short words orbiting the logo; order = priority (small screens show only the first 8)
-             */
-            floatingWords?:
-              | {
-                  word: string;
-                  id?: string | null;
-                }[]
-              | null;
+            orbitEnabled?: boolean | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'hero';
@@ -376,6 +371,80 @@ export interface Page {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cities".
+ */
+export interface City {
+  id: number;
+  name: string;
+  /**
+   * Province or country — shown after the city on a planet label
+   */
+  region?: string | null;
+  /**
+   * Decimal degrees, north positive (Surakarta = -7.5665)
+   */
+  lat: number;
+  /**
+   * Decimal degrees, east positive (Surakarta = 110.8167)
+   */
+  lng: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Each approved row is one planet orbiting the hero logo. Filter by status = pending to work the approval queue.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "businesses".
+ */
+export interface Business {
+  id: number;
+  /**
+   * Shown on hover. 60 characters is a name, not a sentence.
+   */
+  name: string;
+  city: number | City;
+  /**
+   * Decides the planet’s base shape, so two planets never read alike.
+   */
+  kind: 'clinic' | 'food' | 'craft' | 'retail' | 'service' | 'education' | 'other';
+  /**
+   * Optional. Rendered rel="nofollow ugc" — this is the field spam submissions come for.
+   */
+  website?: string | null;
+  /**
+   * Sets how close the planet orbits: the older the business, the tighter its orbit.
+   */
+  foundedYear?: number | null;
+  /**
+   * How the planet is drawn. The submitter picks these.
+   */
+  planet?: {
+    size?: ('small' | 'medium' | 'large') | null;
+    pattern?: ('plain' | 'crosshatch' | 'stipple' | 'ringed') | null;
+    ink?: ('graphite' | 'red' | 'sepia' | 'blue') | null;
+  };
+  /**
+   * The mark the planet leaves behind it.
+   */
+  trail?: {
+    style?: ('line' | 'dots' | 'ticks' | 'none') | null;
+    length?: ('short' | 'medium' | 'long') | null;
+  };
+  /**
+   * Leave empty and the plane is derived from the name — stable, and spread evenly.
+   */
+  orbit?: ('a' | 'b' | 'c') | null;
+  status: 'pending' | 'approved' | 'rejected';
+  /**
+   * Admin-only. Never exposed to the public API.
+   */
+  contactEmail?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -421,6 +490,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'pages';
         value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'cities';
+        value: number | City;
+      } | null)
+    | ({
+        relationTo: 'businesses';
+        value: number | Business;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -602,13 +679,7 @@ export interface PagesSelect<T extends boolean = true> {
               line2?: T;
               locationLine?: T;
               scrollCue?: T;
-              constellationEnabled?: T;
-              floatingWords?:
-                | T
-                | {
-                    word?: T;
-                    id?: T;
-                  };
+              orbitEnabled?: T;
               id?: T;
               blockName?: T;
             };
@@ -667,6 +738,47 @@ export interface PagesSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cities_select".
+ */
+export interface CitiesSelect<T extends boolean = true> {
+  name?: T;
+  region?: T;
+  lat?: T;
+  lng?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "businesses_select".
+ */
+export interface BusinessesSelect<T extends boolean = true> {
+  name?: T;
+  city?: T;
+  kind?: T;
+  website?: T;
+  foundedYear?: T;
+  planet?:
+    | T
+    | {
+        size?: T;
+        pattern?: T;
+        ink?: T;
+      };
+  trail?:
+    | T
+    | {
+        style?: T;
+        length?: T;
+      };
+  orbit?: T;
+  status?: T;
+  contactEmail?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -737,6 +849,15 @@ export interface SiteSetting {
     archive?: string | null;
   };
   archiveCountTemplate?: string | null;
+  /**
+   * Vocabulary band on the manifesto page — 8 to 12 short words reads best. Order is the setting: they are laid out in this order.
+   */
+  marginNotes?:
+    | {
+        word: string;
+        id?: string | null;
+      }[]
+    | null;
   seo?: {
     title?: string | null;
     description?: string | null;
@@ -1020,6 +1141,12 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         archive?: T;
       };
   archiveCountTemplate?: T;
+  marginNotes?:
+    | T
+    | {
+        word?: T;
+        id?: T;
+      };
   seo?:
     | T
     | {

@@ -1,17 +1,34 @@
-/* Bilingual lorem seed (owner 2026-07-12: "fill it with Lorem ipsum", real info later).
-   Run: npm run seed  — idempotent: exits if users already exist. */
+/* Real bilingual seed. Content lives in ./content.ts (sourced from the company
+   strategy report + the actual project repos); this file only maps it onto the
+   Payload schema. Run: npm run seed — idempotent: exits if users already exist. */
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { content } from './content'
 
-const lorem = [
-  'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-  'Sed do eiusmod tempor incididunt ut labore et dolore.',
-  'Ut enim ad minim veniam, quis nostrud exercitation.',
-  'Duis aute irure dolor in reprehenderit in voluptate.',
-  'Excepteur sint occaecat cupidatat non proident.',
-  'Sunt in culpa qui officia deserunt mollit anim.',
-]
-const id = (s: string) => `${s} (ID)` // visibly proves the locale switch until real copy arrives
+/**
+ * Archive drag-canvas layout. Each row is centred on its own item count, so a
+ * short final row sits under the middle of the one above instead of hugging the
+ * left. Cards are 260px wide and anchor from their top-left corner, so half a
+ * card is subtracted to centre the grid on the canvas origin rather than
+ * pushing it right and down (which used to clip the leftmost card off-screen).
+ */
+const CARD_W = 260
+const CARD_H = 200
+const GAP_X = 440
+const GAP_Y = 320
+
+const archiveSlot = (i: number, total: number) => {
+  const cols = total <= 6 ? 3 : 4
+  const rows = Math.ceil(total / cols)
+  const row = Math.floor(i / cols)
+  const col = i % cols
+  const inRow = Math.min(cols, total - row * cols) // last row is usually shorter
+  return {
+    x: (col - (inRow - 1) / 2) * GAP_X - CARD_W / 2 + (((i * 73) % 90) - 45),
+    y: (row - (rows - 1) / 2) * GAP_Y - CARD_H / 2 + (((i * 37) % 70) - 35),
+    scale: 0.85 + ((i * 29) % 31) / 100,
+  }
+}
 
 const run = async () => {
   const payload = await getPayload({ config })
@@ -33,31 +50,39 @@ const run = async () => {
   })
 
   // --- site settings (both locales) ---
+  const { settings } = content
   await payload.updateGlobal({
     slug: 'site-settings',
     locale: 'en',
     data: {
-      siteName: 'TAMPA TARUNO',
-      email: 'yuthista@gmail.com',
-      locationLine: 'Lorem ipsum — GMT+7',
+      siteName: content.siteName,
+      email: content.email,
+      locationLine: settings.locationLine.en,
       timezone: 'Asia/Jakarta',
-      socials: [
-        { label: 'Instagram', url: 'https://instagram.com/' },
-        { label: 'LinkedIn', url: 'https://linkedin.com/' },
-      ],
-      navLabels: { home: 'Homepage', manifesto: 'Manifesto', archive: 'Archive' },
-      archiveCountTemplate: '{{count}} projects in the archive',
-      seo: { title: 'TAMPA TARUNO', description: lorem[0] },
+      socials: content.socials,
+      navLabels: {
+        home: settings.navLabels.home.en,
+        manifesto: settings.navLabels.manifesto.en,
+        archive: settings.navLabels.archive.en,
+      },
+      archiveCountTemplate: settings.archiveCountTemplate.en,
+      marginNotes: settings.marginNotes.en.map((word) => ({ word })),
+      seo: { title: settings.seo.title.en, description: settings.seo.description.en },
     },
   })
   await payload.updateGlobal({
     slug: 'site-settings',
     locale: 'id',
     data: {
-      locationLine: 'Kota Lorem — GMT+7',
-      navLabels: { home: 'Beranda', manifesto: 'Manifesto', archive: 'Arsip' },
-      archiveCountTemplate: '{{count}} proyek dalam arsip',
-      seo: { title: 'TAMPA TARUNO', description: id(lorem[0]) },
+      locationLine: settings.locationLine.id,
+      navLabels: {
+        home: settings.navLabels.home.id,
+        manifesto: settings.navLabels.manifesto.id,
+        archive: settings.navLabels.archive.id,
+      },
+      archiveCountTemplate: settings.archiveCountTemplate.id,
+      marginNotes: settings.marginNotes.id.map((word) => ({ word })),
+      seo: { title: settings.seo.title.id, description: settings.seo.description.id },
     },
   })
 
@@ -138,37 +163,34 @@ const run = async () => {
   })
 
   // --- manifesto statements ---
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < content.manifesto.length; i++) {
+    const s = content.manifesto[i]
     const doc = await payload.create({
       collection: 'manifesto-statements',
       locale: 'en',
-      data: { text: lorem[i], order: i },
+      data: { text: s.en, order: i },
     })
     await payload.update({
       collection: 'manifesto-statements',
       id: doc.id,
       locale: 'id',
-      data: { text: id(lorem[i]) },
+      data: { text: s.id },
     })
   }
 
-  // --- services (structural names kept; tagline/description/capabilities lorem) ---
-  const services = ['Brand Strategy', 'Interface Design', 'Immersive & Motion', 'Engineering']
-  const serviceIcons = ['strategy', 'grid', 'motion', 'code'] as const
-  const serviceCounts = [3, 2, 3, 2]
-  for (let i = 0; i < services.length; i++) {
-    const caps = (n: number, loc: (s: string) => string) =>
-      Array.from({ length: 4 }, (_, k) => ({ item: loc(lorem[(i + k) % 6].slice(0, 42)) }))
+  // --- services ---
+  for (let i = 0; i < content.services.length; i++) {
+    const s = content.services[i]
     const doc = await payload.create({
       collection: 'services',
       locale: 'en',
       data: {
-        name: services[i],
-        tagline: lorem[i % 6].slice(0, 56),
-        description: `${lorem[(i + 1) % 6]} ${lorem[(i + 2) % 6]}`.slice(0, 180),
-        capabilities: caps(i, (s) => s),
-        projectCount: serviceCounts[i],
-        icon: serviceIcons[i],
+        name: s.name.en,
+        tagline: s.tagline.en,
+        description: s.description.en,
+        capabilities: s.capabilities.en.map((item) => ({ item })),
+        projectCount: s.projectCount,
+        icon: s.icon,
         order: i,
       },
     })
@@ -177,45 +199,31 @@ const run = async () => {
       id: doc.id,
       locale: 'id',
       data: {
-        name: services[i],
-        tagline: id(lorem[i % 6].slice(0, 56)),
-        description: id(`${lorem[(i + 1) % 6]} ${lorem[(i + 2) % 6]}`.slice(0, 180)),
-        capabilities: caps(i, id),
+        name: s.name.id,
+        tagline: s.tagline.id,
+        description: s.description.id,
+        capabilities: s.capabilities.id.map((item) => ({ item })),
       },
     })
   }
 
-  // --- works ×12 (5 featured), deterministic archive scatter ---
-  const cats = ['brand', 'web', 'motion', 'engineering'] as const
-  const svcLines = [
-    'Lorem Ipsum, Dolor Sit, Amet Consectetur',
-    'Adipiscing Elit, Sed Eiusmod, Tempor',
-    'Incididunt Labore, Dolore Magna, Aliqua',
-    'Enim Minim, Veniam Quis, Nostrud',
-  ]
-  const industries = ['Lorem Industry', 'Ipsum Sector', 'Dolor Field', 'Amet Domain']
-  const locations = ['Jakarta', 'Bandung', 'Surabaya', 'Yogyakarta']
-  for (let i = 0; i < 12; i++) {
-    const jx = ((i * 73) % 90) - 45 // deterministic jitter
-    const jy = ((i * 37) % 70) - 35
+  // --- works ---
+  for (let i = 0; i < content.works.length; i++) {
+    const wk = content.works[i]
     const doc = await payload.create({
       collection: 'works',
       locale: 'en',
       data: {
-        title: `Lorem Project ${String(i + 1).padStart(2, '0')}`,
-        slug: `lorem-project-${i + 1}`,
-        category: cats[i % 4],
-        year: 2022 + (i % 4),
-        oneLiner: lorem[i % 6],
-        servicesLine: svcLines[i % 4],
-        industry: industries[i % 4],
-        location: locations[i % 4],
-        featured: i < 5,
-        archiveSlot: {
-          x: (i % 4) * 440 - 660 + jx,
-          y: Math.floor(i / 4) * 320 - 320 + jy,
-          scale: 0.85 + ((i * 29) % 31) / 100,
-        },
+        title: wk.title.en,
+        slug: wk.slug,
+        category: wk.category,
+        year: wk.year,
+        oneLiner: wk.oneLiner.en,
+        servicesLine: wk.servicesLine.en,
+        industry: wk.industry.en,
+        location: wk.location.en,
+        featured: wk.featured,
+        archiveSlot: archiveSlot(i, content.works.length),
         order: i,
       },
     })
@@ -224,16 +232,17 @@ const run = async () => {
       id: doc.id,
       locale: 'id',
       data: {
-        title: `Proyek Lorem ${String(i + 1).padStart(2, '0')}`,
-        oneLiner: id(lorem[i % 6]),
-        servicesLine: id(svcLines[i % 4]),
-        industry: id(industries[i % 4]),
-        location: locations[i % 4],
+        title: wk.title.id,
+        oneLiner: wk.oneLiner.id,
+        servicesLine: wk.servicesLine.id,
+        industry: wk.industry.id,
+        location: wk.location.id,
       },
     })
   }
 
   // --- homepage (one shared layout; localized fields inside blocks) ---
+  const { hero, headings } = content
   const home = await payload.create({
     collection: 'pages',
     locale: 'en',
@@ -245,21 +254,17 @@ const run = async () => {
       layout: [
         {
           blockType: 'hero',
-          line1: 'Mitreka Satata',
-          line2: 'Jer Basuki Mawa Bea',
-          locationLine: 'Lorem ipsum — GMT+7',
-          scrollCue: 'Scroll',
-          constellationEnabled: true,
-          floatingWords: [
-            'sketch', 'craft', 'design', 'identity', 'motion', 'detail',
-            'story', 'precision', 'digital', 'atelier', 'jakarta', 'brand',
-          ].map((word) => ({ word })),
+          line1: hero.line1.en,
+          line2: hero.line2.en,
+          locationLine: settings.locationLine.en,
+          scrollCue: hero.scrollCue.en,
+          orbitEnabled: true,
         },
         { blockType: 'manifestoStrip' },
-        { blockType: 'featuredWorks', heading: 'Selected works' },
-        { blockType: 'servicesRows', heading: 'Services' },
-        { blockType: 'archiveTeaser', countTemplate: '{{count}} projects in the archive' },
-        { blockType: 'contactMailto', heading: 'Lorem ipsum dolor?' },
+        { blockType: 'featuredWorks', heading: headings.featuredWorks.en },
+        { blockType: 'servicesRows', heading: headings.services.en },
+        { blockType: 'archiveTeaser', countTemplate: settings.archiveCountTemplate.en },
+        { blockType: 'contactMailto', heading: headings.contact.en },
       ],
     },
   })
@@ -267,19 +272,15 @@ const run = async () => {
   const created = await payload.findByID({ collection: 'pages', id: home.id, depth: 0 })
   const idValues: Record<string, Record<string, unknown>> = {
     hero: {
-      line1: 'Mitreka Satata',
-      line2: 'Jer Basuki Mawa Bea',
-      locationLine: 'Kota Lorem — GMT+7',
-      scrollCue: 'Gulir',
-      floatingWords: [
-        'sketsa', 'kriya', 'desain', 'identitas', 'gerak', 'detail',
-        'cerita', 'presisi', 'digital', 'atelier', 'jakarta', 'merek',
-      ].map((word) => ({ word })),
+      line1: hero.line1.id,
+      line2: hero.line2.id,
+      locationLine: settings.locationLine.id,
+      scrollCue: hero.scrollCue.id,
     },
-    featuredWorks: { heading: 'Karya pilihan' },
-    servicesRows: { heading: 'Layanan' },
-    archiveTeaser: { countTemplate: '{{count}} proyek dalam arsip' },
-    contactMailto: { heading: 'Lorem ipsum dolor? (ID)' },
+    featuredWorks: { heading: headings.featuredWorks.id },
+    servicesRows: { heading: headings.services.id },
+    archiveTeaser: { countTemplate: settings.archiveCountTemplate.id },
+    contactMailto: { heading: headings.contact.id },
   }
   await payload.update({
     collection: 'pages',
@@ -287,7 +288,7 @@ const run = async () => {
     locale: 'id',
     draft: false,
     data: {
-      title: 'Beranda',
+      title: settings.navLabels.home.id,
       _status: 'published',
       layout: (created.layout || []).map((b: any) => ({
         ...b,
@@ -296,7 +297,10 @@ const run = async () => {
     },
   })
 
-  payload.logger.info('Seed complete: admin user, settings, 6 statements, 4 services, 12 works, homepage (en+id).')
+  payload.logger.info(
+    `Seed complete: admin user, settings, ${content.manifesto.length} statements, ` +
+      `${content.services.length} services, ${content.works.length} works, homepage (en+id).`
+  )
   process.exit(0)
 }
 

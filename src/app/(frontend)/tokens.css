@@ -27,7 +27,13 @@
   /* --- Layout --- */
   --max-w: 1440px;
   --gutter: clamp(16px, 2.5vw, 40px);
-  --section-gap: clamp(120px, 15vw, 260px);
+  /* Applied as paddingBlock, so between two stacked sections the reader sees
+     TWICE this. At the old clamp(120px, 15vw, 260px) that was 384px of empty
+     paper between blocks on a 1280px screen — more than the Archive teaser's
+     own 184px of content. Halved 2026-08-18 on the owner's "too much gap"
+     note; adjacent sections now sit ~180px apart there, still an editorial
+     rest rather than a dense stack. */
+  --section-gap: clamp(64px, 7vw, 128px);
 
   /* --- Z scale --- */
   --z-bg-shader: -1;

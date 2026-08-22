@@ -236,7 +236,12 @@ export function FeaturedWorks({
                   }
                 }}
               >
-                <PlaceholderFrame aspectRatio="1 / 1" label={work.category} />
+                <PlaceholderFrame
+                  aspectRatio="1 / 1"
+                  label={work.category}
+                  slug={work.slug}
+                  title={work.title}
+                />
               </div>
             </div>
           )

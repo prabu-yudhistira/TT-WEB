@@ -7,6 +7,14 @@ import { SplitText } from 'gsap/SplitText'
 
 gsap.registerPlugin(ScrollTrigger, SplitText)
 
+// Pinned scroll distance per statement, as a percentage of viewport height.
+// ScrollTrigger reserves this by padding the pin-spacer, so it is real page
+// height: at 100 the six seeded statements pinned the manifesto for 4320px on
+// a 720px-tall window — 53% of the whole homepage spent on one block, which is
+// what read as dead space. At 60 the words still fill in comfortably ahead of
+// the handoff. Lower this to tighten further, raise it to slow the scrub down.
+const SCROLL_PER_STATEMENT_VH = 60
+
 /**
  * Poetic manifesto scrub (spec base §1.2/§3.3): each statement pins as it
  * passes center, its words fill in (opacity 0.12->1) with scroll progress,
@@ -43,7 +51,7 @@ export function ManifestoStrip({ statements }: { statements: string[] }) {
       const trigger = ScrollTrigger.create({
         trigger: wrap,
         start: 'top top',
-        end: `+=${n * 100}%`,
+        end: `+=${n * SCROLL_PER_STATEMENT_VH}%`,
         pin: true,
         scrub: 0.4,
         onUpdate: (self) => {

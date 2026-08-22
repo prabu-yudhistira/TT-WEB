@@ -1,4 +1,11 @@
-import { getWorks, getServices, getManifesto, getHeroEffects, type Locale } from '../../lib/cms'
+import {
+  getWorks,
+  getServices,
+  getManifesto,
+  getHeroEffects,
+  getPlanets,
+  type Locale,
+} from '../../lib/cms'
 import type { Page, SiteSetting } from '../../payload-types'
 import { HeroBlock } from './HeroBlock'
 import { ManifestoStrip } from './ManifestoStrip'
@@ -10,6 +17,13 @@ import { resolveSeparation } from '../../lib/three/shatter/resolveSeparation'
 import { resolveIgnition } from '../../lib/three/ignition/resolveIgnition'
 
 type Blocks = NonNullable<Page['layout']>
+
+// Screen-reader name for the hero's orbit field. Not CMS-managed: it is an
+// accessibility label, not copy, and it must never be empty.
+const ORBIT_LABEL: Record<Locale, string> = {
+  en: 'Businesses orbiting the Tampa Taruno logo',
+  id: 'Usaha yang mengorbit logo Tampa Taruno',
+}
 
 export async function RenderBlocks({
   blocks,
@@ -26,7 +40,7 @@ export async function RenderBlocks({
         blocks.map(async (block) => {
           switch (block.blockType) {
             case 'hero': {
-              const effects = await getHeroEffects()
+              const [effects, planets] = await Promise.all([getHeroEffects(), getPlanets()])
               return (
                 <HeroBlock
                   key={block.id}
@@ -34,12 +48,11 @@ export async function RenderBlocks({
                   line2={block.line2}
                   locationLine={block.locationLine}
                   scrollCue={block.scrollCue}
-                  constellationEnabled={block.constellationEnabled ?? true}
+                  orbitEnabled={block.orbitEnabled ?? true}
                   separation={resolveSeparation(effects)}
                   ignition={resolveIgnition(effects)}
-                  floatingWords={(block.floatingWords || [])
-                    .map((w) => w.word)
-                    .filter((w): w is string => !!w)}
+                  planets={planets}
+                  orbitLabel={ORBIT_LABEL[locale]}
                 />
               )
             }

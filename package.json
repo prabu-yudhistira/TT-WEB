@@ -10,9 +10,12 @@
     "payload": "payload",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap",
-    "seed": "node --env-file=.env --import tsx src/seed/index.ts",
+    "db:push": "PAYLOAD_DEV_PUSH=true node --env-file=.env --import tsx src/seed/push.ts",
+    "seed": "PAYLOAD_DEV_PUSH=true node --env-file=.env --import tsx src/seed/index.ts",
     "seed:verify": "node --env-file=.env --import tsx src/seed/verify.ts",
-    "verify:config": "node --import tsx src/lib/three/shatter/resolveSeparation.check.ts && node --import tsx src/lib/three/ignition/resolveIgnition.check.ts && node --import tsx src/lib/three/ignition/cage.check.ts && node --import tsx src/lib/three/ignition/ignitionMaterial.check.ts && node --import tsx src/lib/three/ignition/IgnitionController.check.ts"
+    "seed:semesta": "PAYLOAD_DEV_PUSH=true node --env-file=.env --import tsx src/seed/semesta.ts",
+    "seed:planets-demo": "PAYLOAD_DEV_PUSH=true node --env-file=.env --import tsx src/seed/planetsDemo.ts",
+    "verify:config": "node --import tsx src/lib/three/shatter/resolveSeparation.check.ts && node --import tsx src/lib/three/ignition/resolveIgnition.check.ts && node --import tsx src/lib/three/ignition/cage.check.ts && node --import tsx src/lib/three/ignition/ignitionMaterial.check.ts && node --import tsx src/lib/three/ignition/IgnitionController.check.ts && node --import tsx src/lib/orbit/placement.check.ts && node --import tsx src/lib/map/projection.check.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

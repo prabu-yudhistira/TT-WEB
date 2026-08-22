@@ -34,7 +34,7 @@ function makePencilMatcap(): THREE.Texture {
   g.fillRect(0, 0, 512, 512)
   gr = g.createRadialGradient(256, 256, 150, 256, 256, 256) // rim shadow
   gr.addColorStop(0, 'rgba(38,37,33,0)')
-  gr.addColorStop(1, 'rgba(38,37,33,0.42)')
+  gr.addColorStop(1, 'rgba(38,37,33,0.30)')
   g.fillStyle = gr
   g.fillRect(0, 0, 512, 512)
   const t = new THREE.CanvasTexture(cv)
@@ -42,10 +42,15 @@ function makePencilMatcap(): THREE.Texture {
   return t
 }
 
+// Tuned against the original clip's own third act rather than picked by eye:
+// mean colour of the mark at 7.5s is red #83484B / graphite #5E534E (paper
+// excluded). The previous values rendered noticeably darker and far more
+// saturated than that, which made the handoff out of the drawn phase read as a
+// colour jump. Re-measure with the compare harness before changing these.
 export function makePencilMaterials(): LogoMaterials {
   const matcap = makePencilMatcap()
   return {
-    'logo-black': new THREE.MeshMatcapMaterial({ matcap, color: 0x565349 }),
-    'logo-red': new THREE.MeshMatcapMaterial({ matcap, color: 0xa8544e }),
+    'logo-black': new THREE.MeshMatcapMaterial({ matcap, color: 0x635a58 }),
+    'logo-red': new THREE.MeshMatcapMaterial({ matcap, color: 0x8f4f57 }),
   }
 }

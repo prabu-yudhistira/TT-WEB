@@ -1,11 +1,19 @@
-// Neutral placeholder card for work covers until real imagery (H4) arrives
-// (spec §6.4): paper card with a watermark logo, driven by tokens only.
+import { WorkMark } from '../work/WorkMark'
+
+// Paper card for work covers, still standing in for real project photography
+// (H4). Pass `slug` and `title` and it carries that project's own mark instead
+// of the studio watermark — see components/work/WorkMark.tsx. Without them it
+// falls back to the watermark, which is what the decorative frames want.
 export function PlaceholderFrame({
   aspectRatio = '3 / 2',
   label,
+  slug,
+  title,
 }: {
   aspectRatio?: string
   label?: string
+  slug?: string
+  title?: string
 }) {
   return (
     <div
@@ -22,11 +30,15 @@ export function PlaceholderFrame({
         placeItems: 'center',
       }}
     >
-      <span
-        aria-hidden
-        className="tt-logo"
-        style={{ width: '22%', aspectRatio: '1532 / 1427', opacity: 0.14 }}
-      />
+      {slug ? (
+        <WorkMark slug={slug} title={title ?? ''} />
+      ) : (
+        <span
+          aria-hidden
+          className="tt-logo"
+          style={{ width: '22%', aspectRatio: '1532 / 1427', opacity: 0.14 }}
+        />
+      )}
       {label ? (
         <span
           style={{
