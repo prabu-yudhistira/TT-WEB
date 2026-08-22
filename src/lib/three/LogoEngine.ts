@@ -362,9 +362,22 @@ export class LogoEngine {
     return body
   }
 
-  /** Disable pointer/drag reactivity (reduced-motion): idle spin only. */
+  /**
+   * Disable pointer/drag reactivity AND the idle spin (reduced motion).
+   *
+   * `prefers-reduced-motion` asks for no continuous animation at all, so the
+   * mark is held at its frontal pose rather than left turning — a perpetually
+   * rotating element is exactly what the preference exists to stop.
+   *
+   * resetPose() here is the belt to tick()'s braces: the reduced-motion path
+   * reaches the mesh through finishIgnitionNow(), which — unlike
+   * startIgnition() — does NOT reset the pose, so a caller that disables
+   * interactivity after some spin has already accumulated would otherwise
+   * freeze the mark at that arbitrary angle.
+   */
   setInteractive(v: boolean) {
     this.interactive = v
+    if (!v) this.resetPose()
   }
 
   /**
@@ -673,7 +686,11 @@ export class LogoEngine {
     const dt = Math.min(0.05, (t - this.prev) / 1000)
     this.prev = t
 
-    if (!this.dragging) {
+    // `interactive` gates the entire rotation model, not just the pointer
+    // handlers that read it elsewhere — under reduced motion the idle spin
+    // below would otherwise keep turning the mark forever, against the
+    // preference the visitor set at the OS level.
+    if (!this.dragging && this.interactive) {
       if (Math.abs(this.vel) > 0.0004) {
         this.spinY += this.vel
         this.vel *= 0.94 // inertia

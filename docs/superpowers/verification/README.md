@@ -39,6 +39,7 @@ as real-device performance.
 | `t9-sheet.mjs` | Captures the transition via CDP screencast and tiles it into one contact sheet. |
 | `t9-draco-stall.mjs` | **The regression test that matters most** — stalls the `.glb` so `startIgnition()` lands before `load()` resolves, then asserts the bridge still completes. |
 | `t9-reduced-motion.mjs` | Asserts the reduced-motion path reaches the solid logo with no cage, and still fires `cue`/`done`. |
+| `t9-reduced-motion-pose.mjs` | Asserts reduced motion holds the mark **completely still** and **frontal**. Guards the bug where `interactive` gated only the pointer handlers, leaving the idle spin turning at an arbitrary angle. |
 | `t9-ring-profile.mjs` | Profiles ring/core ink across captured frames. Used to calibrate the thresholds the other tests assert on. |
 
 ## Two traps, both already paid for
@@ -51,6 +52,13 @@ already cost one session a false diagnosis.
 **Tile frames before looking at them.** Single screenshots have hidden real
 defects on this project twice — the ~70° oblique handoff, and the
 sphere-projection chords — both obvious the moment frames were laid side by side.
+
+**Hide the floating words before measuring the mark's geometry.** They sit
+inside the centred crop, so an ink *bounding box* swallows them and reports the
+mark as far wider than it is (measured: 1.61 vs a true 1.21). `inkFraction` and
+`meanAbsDiff` tolerate them because they average over the crop; anything
+measuring an extent does not. `handoff-frontal.mjs` and
+`t9-reduced-motion-pose.mjs` both hide them first.
 
 ## Choosing a metric
 
