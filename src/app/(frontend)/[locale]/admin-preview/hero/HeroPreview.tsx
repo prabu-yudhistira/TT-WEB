@@ -21,6 +21,7 @@ type HeroBlockShape = {
 }
 
 type Props = {
+  pageId: string | number
   savedSeparation: SeparationConfig
   savedIgnition: IgnitionConfig
   savedLine1: string
@@ -55,8 +56,16 @@ export default function HeroPreview(props: Props) {
 
   // One subscription. Payload posts whichever document the parent edit screen
   // is editing; `source` says which that is.
+  //
+  // `initialData` must carry the real page id: Payload's own mergeData() does
+  // not merge locally — every live update round-trips through a real server
+  // endpoint (POST /api/{collection}/{id} with a GET method-override), and
+  // for the `pages` collection that id comes from initialData.id. An empty
+  // {} here resolved to /api/pages/undefined and every page-sourced live
+  // edit would have failed silently. hero-effects is a global (looked up by
+  // slug, not id) so this is unused on that path, but harmless to include.
   const { data } = useLivePreview<Record<string, unknown>>({
-    initialData: {},
+    initialData: { id: props.pageId },
     serverURL,
     depth: 2,
   })
@@ -70,14 +79,21 @@ export default function HeroPreview(props: Props) {
   let constellationEnabled = props.savedConstellationEnabled
   let words = props.savedWords
 
-  const hasLive = data && Object.keys(data).length > 0
+  // `initialData` seeds `id` so mergeData() has a real endpoint to hit (see
+  // the useLivePreview call above) — which means `data` always has at LEAST
+  // that one key, even before any live message arrives. A generic
+  // "Object.keys(data).length > 0" check would therefore read as "live" from
+  // the very first render. Checking for a key that only a REAL payload of
+  // that shape would carry avoids that false positive.
+  const hasLiveEffects = source === 'hero-effects' && ('timing' in data || 'separationEnabled' in data)
+  const hasLivePage = source === 'page' && 'layout' in data
 
-  if (hasLive && source === 'hero-effects') {
+  if (hasLiveEffects) {
     separation = resolveSeparation(data as HeroEffectsInput)
     ignition = resolveIgnition(data as HeroEffectsIgnitionInput)
   }
 
-  if (hasLive && source === 'page') {
+  if (hasLivePage) {
     const layout = (data as { layout?: HeroBlockShape[] }).layout
     const hero = Array.isArray(layout) ? layout.find((b) => b?.blockType === 'hero') : undefined
     if (hero) {

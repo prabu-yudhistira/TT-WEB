@@ -28,12 +28,14 @@ export default async function HeroPreviewPage({
   if (!isLocale(locale)) notFound()
 
   const [effects, page] = await Promise.all([getHeroEffects(), getPage('home', locale)])
+  if (!page) notFound()
 
-  const hero = (page?.layout || []).find((b) => b.blockType === 'hero')
+  const hero = (page.layout || []).find((b) => b.blockType === 'hero')
   if (!hero || hero.blockType !== 'hero') notFound()
 
   return (
     <HeroPreview
+      pageId={page.id}
       savedSeparation={resolveSeparation(effects)}
       savedIgnition={resolveIgnition(effects)}
       savedLine1={hero.line1}
