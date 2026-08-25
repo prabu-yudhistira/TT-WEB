@@ -41,6 +41,8 @@ as real-device performance.
 | `t9-reduced-motion.mjs` | Asserts the reduced-motion path reaches the solid logo with no cage, and still fires `cue`/`done`. |
 | `t9-reduced-motion-pose.mjs` | Asserts reduced motion holds the mark **completely still** and **frontal**. Guards the bug where `interactive` gated only the pointer handlers, leaving the idle spin turning at an arbitrary angle. |
 | `t9-ring-profile.mjs` | Profiles ring/core ink across captured frames. Used to calibrate the thresholds the other tests assert on. |
+| `preview-live-update.mjs` | Proves a Hero Effects edit reaches the admin preview iframe **without saving**, and that a mismatched-shape message is ignored when the URL's `?source=` doesn't match it. |
+| `preview-context-leak.mjs` | Clicks the preview's "Replay intro" 25× and asserts the WebGL context is still live — regression guard for the context exhaustion fixed in `9190364`. |
 
 ## Two traps, both already paid for
 
@@ -59,6 +61,31 @@ mark as far wider than it is (measured: 1.61 vs a true 1.21). `inkFraction` and
 `meanAbsDiff` tolerate them because they average over the crop; anything
 measuring an extent does not. `handoff-frontal.mjs` and
 `t9-reduced-motion-pose.mjs` both hide them first.
+
+**Payload's live-preview `postMessage` requires `collectionSlug` or
+`globalSlug`, or it silently discards the message.** `handleMessage()`
+(`@payloadcms/live-preview`) returns `initialData` unchanged if both are
+missing — no error, no console warning, the preview just never updates. Get
+the envelope shape from the real sender
+(`@payloadcms/ui`'s `LivePreviewWindow` source), not from the docs' minimal
+example. Confirmed in `preview-live-update.mjs`.
+
+**`mergeData()` is not a local merge — it is a real server round-trip.**
+Every live update POSTs to `/api/globals/{slug}` or `/api/pages/{initialData.id}`
+(method-overridden to GET) and returns *that response* as the new data. For
+the collection case this means `useLivePreview`'s `initialData` must carry a
+real `id`, or the endpoint resolves to `/api/{collection}/undefined` and every
+live edit fails silently. Caught by reading `mergeData.js` directly, not by
+the failure showing up as an error anywhere.
+
+**Isolate a "did the guard hold" check from the hero's own idle animation.**
+A before/after screenshot pair a few seconds apart shows a large delta from
+ordinary idle-spin and floating-word drift alone, regardless of whether the
+thing under test changed anything — a first version of
+`preview-live-update.mjs`'s cross-source check failed this way (delta 29.8,
+*larger* than the real effect). Emulating `prefers-reduced-motion` first
+(same technique as `t9-reduced-motion-pose.mjs`) freezes the confound and
+turns "should be identical" into a clean `0.000`.
 
 ## Choosing a metric
 

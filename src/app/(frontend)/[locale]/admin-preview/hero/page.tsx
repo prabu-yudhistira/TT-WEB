@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import { getHeroEffects, getPage } from '@/lib/cms'
 import { isLocale } from '@/lib/i18n'
 import { resolveIgnition } from '@/lib/three/ignition/resolveIgnition'
@@ -34,18 +35,25 @@ export default async function HeroPreviewPage({
   if (!hero || hero.blockType !== 'hero') notFound()
 
   return (
-    <HeroPreview
-      pageId={page.id}
-      savedSeparation={resolveSeparation(effects)}
-      savedIgnition={resolveIgnition(effects)}
-      savedLine1={hero.line1}
-      savedLine2={hero.line2}
-      savedLocationLine={hero.locationLine}
-      savedScrollCue={hero.scrollCue}
-      savedConstellationEnabled={hero.constellationEnabled ?? true}
-      savedWords={(hero.floatingWords || [])
-        .map((w) => w.word)
-        .filter((w): w is string => !!w)}
-    />
+    // HeroPreview reads the ?source= param via useSearchParams(), which
+    // requires a Suspense boundary or the production build fails to
+    // statically prerender this page (missing-suspense-with-csr-bailout) --
+    // caught by `next build`, not `next dev`, which is why it wasn't seen
+    // until this project's own build-verification step ran.
+    <Suspense fallback={null}>
+      <HeroPreview
+        pageId={page.id}
+        savedSeparation={resolveSeparation(effects)}
+        savedIgnition={resolveIgnition(effects)}
+        savedLine1={hero.line1}
+        savedLine2={hero.line2}
+        savedLocationLine={hero.locationLine}
+        savedScrollCue={hero.scrollCue}
+        savedConstellationEnabled={hero.constellationEnabled ?? true}
+        savedWords={(hero.floatingWords || [])
+          .map((w) => w.word)
+          .filter((w): w is string => !!w)}
+      />
+    </Suspense>
   )
 }
