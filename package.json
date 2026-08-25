@@ -19,6 +19,7 @@
     "@payloadcms/db-sqlite": "^3.0.0",
     "@payloadcms/next": "^3.0.0",
     "@payloadcms/richtext-lexical": "^3.0.0",
+    "@payloadcms/ui": "3.86.0",
     "@react-three/fiber": "^9.6.1",
     "graphql": "^16.9.0",
     "gsap": "^3.15.0",
