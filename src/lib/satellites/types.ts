@@ -168,36 +168,37 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   // the dust-free default started at.
   SAT_SIZE: 4,
   SAT_COLOR: '#8E1114',
-  // The owner's own hue choices and order, converted to what a coloured pencil
-  // actually lays down on cream paper (owner's call 2026-08-26): hue kept and
-  // warmed a few degrees toward the paper's cast, saturation capped at 0.52
-  // because pigment on paper never reaches a screen primary, lightness held in
-  // 0.30–0.46 where it holds against #F6F1E7 without going muddy. Pure black
-  // becomes graphite for the same reason. The saturated originals are one click
-  // away in the bench if this reads too soft.
+  // Saturated, and deliberately so.
+  //
+  // A muted coloured-pencil conversion of these exact hues was derived, built
+  // and shown (see the spec's palette section for the HSL rule); the owner
+  // compared both on the running hero and chose the saturated originals. So the
+  // hero does carry colours outside the site's Atelier palette, knowingly. The
+  // pencil set is still one click away in the bench.
   //
   // Indices past the word list are unused; words past this list fall back to
   // SAT_COLOR.
   SAT_COLORS: [
+    '#000000',
+    '#ffd500',
+    '#f96d3e',
+    '#23e126',
+    '#0f8a75',
+    '#04b1b4',
+    '#13118d',
     '#2B2A27',
-    '#b2a438',
-    '#b25d38',
-    '#3fb238',
-    '#287e6a',
-    '#2e928d',
-    '#292d81',
-    '#2B2A27',
-    '#8f592d',
-    '#347425',
-    '#29812d',
-    '#8a329e',
-    '#95342f',
+    '#b04803',
+    '#145c0a',
+    '#118d1f',
+    '#b400cc',
+    '#bd0000',
   ],
   SAT_ALPHA: 0.95,
-  SAT_RADIUS_MIN: 0.74,
-  // Above 1 deliberately: satellites orbit BEYOND the nominal outer radius, so
-  // the widest of them leave the frame edge on a landscape window.
-  SAT_RADIUS_MAX: 1.28,
+  // Tightened 2026-08-26 after measuring frame overflow: the band now sits
+  // wholly INSIDE the outer radius, where it previously ran to 1.28 and put the
+  // widest orbits at ~2x half the viewport's short side.
+  SAT_RADIUS_MIN: 0.5,
+  SAT_RADIUS_MAX: 0.8,
   SAT_TILT_SPREAD: 15,
   SAT_SPEED_SCALE: 0.8,
   // Back on, but tight — 1.1x the sphere reads as a thin outline hugging the
@@ -205,7 +206,7 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   SAT_RING: 1.1,
   SAT_SHADE: 1,
   SAT_STREAK: 1,
-  SAT_DEPTH_SCALE: 1,
+  SAT_DEPTH_SCALE: 0.9,
 
   LABEL_MODE: 'always',
   LABEL_SIZE: 12,

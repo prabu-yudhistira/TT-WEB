@@ -37,7 +37,8 @@ Anything in this document that was *not* validated on screen is marked as such.
 | Orbit width | **Wide** — deliberately overflowing the frame on desktop. |
 | Labels | **Always visible**, not hover-revealed. |
 | Hold coupling | **Freeze + shake.** Holding the mark stops the orbits and sets the satellites trembling. |
-| Palette | **Coloured-pencil conversion** of the owner's own hue picks — see §6. |
+| Palette | **Saturated**, the owner's own picks. A muted coloured-pencil conversion was built and compared on the running hero; the owner chose the originals. See §6. |
+| Orbit band | **Tightened to 0.5–0.8** after frame-overflow was measured, so the belt fits the frame. |
 | Mobile | **Its own radii**, so the belt fits a portrait frame. |
 | Architecture | **2D canvas, not three.js.** See §4. |
 
@@ -124,31 +125,57 @@ Frozen in `DEFAULT_SATELLITES`. Tuned live and handed back by the owner.
 | Geometry | `INNER_RADIUS 3` · `OUTER_RADIUS 1.6` · `TILT 20°` · `TILT_SIDEWAY 160°` · `PERSPECTIVE 1300` |
 | Mobile geometry | `MOBILE_INNER_RADIUS 1.5` · `MOBILE_OUTER_RADIUS 0.78` |
 | Motion | `ORBIT_SPEED 2.2` · `ORBIT_DIR -1` (CCW) · `SAT_SPEED_SCALE 0.8` · `TRAIL 42` |
-| Satellites | `SAT_SIZE 4` · `SAT_ALPHA 0.95` · `SAT_SHADE 1` · `SAT_DEPTH_SCALE 1` · `SAT_STREAK 1` · `SAT_RING 1.1` |
-| Orbit band | `SAT_RADIUS_MIN 0.74` · `SAT_RADIUS_MAX 1.28` · `SAT_TILT_SPREAD 15°` |
+| Satellites | `SAT_SIZE 4` · `SAT_ALPHA 0.95` · `SAT_SHADE 1` · `SAT_DEPTH_SCALE 0.9` · `SAT_STREAK 1` · `SAT_RING 1.1` |
+| Orbit band | `SAT_RADIUS_MIN 0.5` · `SAT_RADIUS_MAX 0.8` · `SAT_TILT_SPREAD 15°` |
 | Labels | `LABEL_MODE always` · `LABEL_SIZE 12` · `LABEL_COLOR #2B2A27` · `LABEL_OFFSET 14` |
 | Hold | `HOLD_FREEZE true` · `HOLD_SHAKE_PX 3` · `HOLD_SHAKE_SPEED 1.1` |
 | Behaviour | `ENTRANCE_MS 1600` · `SCROLL_FADE_VH 0.6` · `SEED 20260826` |
 | Dust | `DUST_COUNT 0` — retained, off |
 
-Two values deserve flagging to whoever tunes this next:
+**`OUTER_RADIUS 1.6` sits exactly on the bench slider's ceiling.** The owner may have wanted
+wider and been unable to ask for it. Widen the range before this becomes a CMS field, or the
+trap that left the ignition's `wireSpeed` pinned at its CMS max of 6 across three sessions
+repeats here.
 
-- **`OUTER_RADIUS 1.6` sits exactly on the bench slider's ceiling.** The owner may have
-  wanted wider and been unable to ask for it. Widen the range before this becomes a CMS
-  field, or the same trap that left `wireSpeed` pinned at its CMS max of 6 on the ignition
-  repeats here.
-- **`SAT_RADIUS_MAX 1.28` is deliberately above 1**, so the widest orbits sit *outside* the
-  nominal outer radius and leave frame.
+Note that `OUTER_RADIUS` is now a *scaffold* rather than a visible edge: the satellite band
+occupies 0.5–0.8 of it, so nothing actually orbits at 1.6. It still sets the scale, and it
+still feeds the Keplerian speed falloff, so it is not inert.
 
-### Frame overflow is intentional, but text must not be cut
+### How the frame-fit was settled
 
-At these radii a large part of the belt is off-frame at any instant — measured 73–77% of
-satellites on screen on desktop. A sphere leaving frame reads as depth and is wanted.
+An earlier approved band ran to `SAT_RADIUS_MAX 1.28`, putting the widest orbits at roughly
+2× half the viewport's short side. Measured consequences: 73–77% of satellites on screen on
+desktop, 50% on a phone, and words sliced by the frame edge — 3.9 of 12 labels on a laptop,
+7 of 12 on a phone. The owner tightened the band to 0.5–0.8 after seeing those numbers.
 
-A **word** sliced by the frame edge reads as a rendering bug, and that was happening to 3.9
-of 12 labels on a laptop and 7 of 12 on a phone. Labels therefore fade out over the last
-48 px before any edge, using a width cached at style time rather than measured per frame.
-After the fix: 0.1, 0.1 and 0 clipped labels at 1600×900, 2560×1080 and 390×844.
+Current measured state:
+
+| Viewport | Satellites on screen | Clipped words | Overlapping label pairs |
+|---|---|---|---|
+| 1600×900 | 100% | 0 | 0 |
+| 2560×1080 | 99% | 0 | 0 |
+| 390×844 | 100% | 0 | 0 |
+
+Two mechanisms hold that, and both must survive the rewrite:
+
+1. **Edge fade.** Labels fade out over the last 48 px before any frame edge. A sphere leaving
+   frame reads as depth; half a word reads as a rendering bug.
+2. **Overlap suppression.** Labels are placed nearest-first, and any whose box intersects an
+   already-placed one is dropped for that frame. Physically right — the nearer object wins —
+   and it is the difference between a readable hero and an unreadable pile: without it, twelve
+   always-on labels average 5.9 overlapping pairs on a 390 px frame, worst case 11.
+
+   Cost: not every word is on screen simultaneously. Measured 11.5 of 12 visible on a laptop,
+   8 of 12 on a phone, rotating as the satellites orbit, so every word still gets its turn.
+   **If the owner ever requires all words visible at once, this is the constraint to revisit,
+   not the geometry.**
+
+Both mechanisms need the label's **measured** box. Two bugs found building this, worth not
+repeating: satellites inherit their cached label width from the previous array on re-seed, so
+any satellite past the old list length carries width 0 — a zero-width box never collides, which
+silently defeats suppression. And the box height is the element's line-height, roughly 1.35×
+the font size, not `LABEL_SIZE`; guessing the shorter value let labels one line apart pass the
+overlap test while visibly colliding.
 
 ## 6. Palette
 
@@ -157,12 +184,21 @@ The site was deliberately reduced to a single Atelier palette — paper `#F6F1E7
 The owner's tuned satellite colours were thirteen saturated screen hues, which is a different
 visual language from everything else on the page.
 
-Resolved by keeping the owner's hue choices and their order, and converting them to what a
-coloured pencil actually lays down on cream paper. This reconciles the two: *coloured pencils
-on paper* is the Atelier concept, and the hero video is already drawn in coloured pencil. The
-difference was saturation, not the idea.
+**Outcome: the saturated hues ship.** A muted coloured-pencil conversion was derived, built
+and put on the running hero; the owner compared both and chose the originals. So the hero
+knowingly carries colours outside the Atelier palette. That is the owner's call on their own
+brand, made with both versions on screen rather than from a description, and it is recorded
+here so a future session does not "fix" it back.
 
-Conversion, applied in HSL and reproducible rather than hand-picked:
+The consequence to watch, since it was raised and accepted rather than dismissed: the hero
+becomes the only place on the site using non-Atelier colour, so other pages may start to look
+washed out beside it. If that shows up later, the pencil set below is the ready-made answer.
+
+### The coloured-pencil alternative (built, not shipped)
+
+Kept because it is the obvious first move if the saturated version ever needs softening, and
+because re-deriving it should not need guesswork. Applied in HSL, reproducible rather than
+hand-picked:
 
 - hue kept, warmed 3–4° toward the paper's own cast
 - saturation capped at **0.52** — pigment on paper never reaches a screen primary
@@ -177,7 +213,8 @@ Conversion, applied in HSL and reproducible rather than hand-picked:
 #bd0000 → #95342f
 ```
 
-The saturated originals stay one click away in the bench for comparison.
+Both sets are one click apart in the bench (`pencil` / `saturated`), so the comparison can be
+remade at any time rather than argued from memory.
 
 ## 7. CMS design
 
@@ -257,13 +294,17 @@ avoidance or to document the constraint.**
 - **No WebGL:** the field is 2D canvas and survives a failed `LogoEngine` independently. It
   should keep running; verify it does.
 
-**⚠ Open defect, found while measuring and not yet fixed.** Under reduced motion at
-1440×900 the field renders **76 px of ink total** — effectively one satellite. The static
-frame draws satellites at their seeded angles, and at the approved wide radii nearly all of
-them fall outside the viewport. A reduced-motion visitor therefore sees an essentially empty
-hero. The build must decide what a static satellite field should look like: most likely its
-own narrower radii, chosen so the still composition actually reads, rather than reusing the
-animated geometry. This needs an owner opinion, since it is a visual question.
+**A reduced-motion defect was found and is now resolved.** Under the earlier wide band the
+static field rendered **76 px of ink total** at 1440×900 — effectively one satellite, because
+the static frame draws satellites at their seeded angles and nearly all of them fell outside
+the viewport. A reduced-motion visitor saw an empty hero.
+
+Tightening the orbit band fixed it as a side effect: **3,634 px** of ink at the same viewport,
+still byte-stable across 1.8 s. No separate reduced-motion geometry is needed.
+
+Keep the regression: assert both that the field is byte-stable AND that its ink is
+non-trivial. Byte-stability alone passes happily on a blank canvas, which is exactly how this
+defect stayed invisible until ink was measured.
 
 ## 10. Verification
 
@@ -278,7 +319,7 @@ Scripts written for the prototype, to be promoted into
 |---|---|
 | `capture-satellites.mjs` | fps, per-canvas ink, ink changes between frames, label count, console errors |
 | `check-orbit-hold.mjs` | orbit direction by cross-product sign; freeze + shake against the real charge |
-| `check-onscreen.mjs` | on-screen fraction and clipped-label count across three viewports |
+| `check-onscreen.mjs` | on-screen fraction, clipped-label count and overlapping-label pairs across three viewports |
 | `check-words.mjs` | satellite count tracks the word list, including 0 and above the old cap |
 | `check-save.mjs` | bench state survives reload; partial saves load without undefined knobs |
 | `check-degradation.mjs` | reduced motion byte-stable; mobile animating |

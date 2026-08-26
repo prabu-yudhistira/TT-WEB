@@ -36,8 +36,9 @@ type Sat = Dust & {
   /** Own inclination offset from the disk plane, radians. */
   tiltOffset: number
   el: HTMLDivElement | null
-  /** Cached label width. Measured when styled, never per frame. */
+  /** Cached label box. Measured when styled, never per frame. */
   labelW: number
+  labelH: number
 }
 
 type Projected = { x: number; y: number; z: number; scale: number }
@@ -278,9 +279,15 @@ export class SatelliteEngine {
         py: NaN,
         el: prev[i]?.el ?? null,
         labelW: prev[i]?.labelW ?? 0,
+        labelH: prev[i]?.labelH ?? 0,
       }
     }
     this.bindLabelElements()
+    // Re-measure AFTER rebinding. Fresh satellites inherit labelW from the
+    // previous array, so any satellite past the old list length would carry a
+    // width of 0 — a zero-width collision box, which never collides, which
+    // silently defeats the overlap suppression below.
+    this.styleLabels()
   }
 
   // ── labels ──────────────────────────────────────────────────────────
@@ -317,8 +324,12 @@ export class SatelliteEngine {
       s.el.style.fontSize = `${c.LABEL_SIZE}px`
       s.el.style.color = c.LABEL_COLOR
       s.el.style.letterSpacing = '0.04em'
-      // One layout read here rather than one per label per frame.
+      // One layout read here rather than one per label per frame. Height must
+      // be measured too, not assumed to equal LABEL_SIZE: a div's box is its
+      // line-height, ~1.3x the font size, and the shorter guess let labels one
+      // line apart pass the overlap test while visibly colliding.
       s.labelW = s.el.offsetWidth || c.LABEL_SIZE * 4
+      s.labelH = s.el.offsetHeight || c.LABEL_SIZE * 1.35
     }
   }
 
@@ -576,7 +587,15 @@ export class SatelliteEngine {
     }
 
     // ── labels ──
-    for (const { i, q, alpha } of placed) {
+    // Nearest-first, so that when two words collide the one in front keeps its
+    // label. Physically the right way round, and it means the survivor is the
+    // one already drawing the eye. Without this, 12 always-on labels average
+    // ~5.9 overlapping pairs on a 390px frame (worst case 11) — an unreadable
+    // pile. Desktop barely needs it; mobile cannot do without it.
+    const order = [...placed].sort((a, b) => a.q.z - b.q.z)
+    const taken: { l: number; r: number; t: number; b: number }[] = []
+
+    for (const { i, q, alpha } of order) {
       const s = this.sats[i]
       if (!s.el) continue
       let show = c.LABEL_MODE === 'always' ? alpha : c.LABEL_MODE === 'hover' && i === nearest ? alpha : 0
@@ -596,9 +615,18 @@ export class SatelliteEngine {
         lx - EDGE_FADE_PX,
         this.W - (lx + s.labelW) - EDGE_FADE_PX,
         ly - EDGE_FADE_PX,
-        this.H - (ly + c.LABEL_SIZE) - EDGE_FADE_PX,
+        this.H - (ly + s.labelH) - EDGE_FADE_PX,
       )
       if (room < 0) show *= clamp01(1 + room / EDGE_FADE_PX)
+
+      if (show > 0.05) {
+        const box = { l: lx, r: lx + s.labelW, t: ly, b: ly + s.labelH }
+        const hit = taken.some(
+          (o) => box.l < o.r && o.l < box.r && box.t < o.b && o.t < box.b,
+        )
+        if (hit) show = 0
+        else taken.push(box)
+      }
       s.el.style.opacity = show.toFixed(3)
       s.el.style.transform = `translate3d(${(q.x + c.LABEL_OFFSET).toFixed(1)}px, ${(q.y - c.LABEL_SIZE / 2).toFixed(1)}px, 0)`
     }
