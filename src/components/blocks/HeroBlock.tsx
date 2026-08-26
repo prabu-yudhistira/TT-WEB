@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
 import { ConstellationField } from '../hero/ConstellationField'
+import { SatelliteField } from '../hero/SatelliteField'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
 
@@ -76,6 +77,20 @@ export function HeroBlock({
   const onStageLive = useCallback(() => setStageLive(true), [])
   const onIntroPlayStart = useCallback(() => setVideoStarted(true), [])
 
+  // PROTOTYPE (sub-project 3, 2026-08-26) — orbiting satellites, opt-in only.
+  //   ?satellites=1     satellites instead of the constellation
+  //   ?satellites=both  both at once, for comparison
+  // Read after mount rather than during render: the server has no query string,
+  // so branching on it inline would be a hydration mismatch. With no param the
+  // hero renders exactly as it does today, which is what keeps this prototype
+  // free to sit on the homepage while it is being judged.
+  const [satMode, setSatMode] = useState<'off' | 'only' | 'both'>('off')
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('satellites')
+    if (v === 'both') setSatMode('both')
+    else if (v && v !== '0' && v !== 'false') setSatMode('only')
+  }, [])
+
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced) {
@@ -132,13 +147,23 @@ export function HeroBlock({
           one continuous page. Bottom 10% fades out to blend into the site's
           paper-tile background. Owner request 2026-07-17. */}
       <div className="tt-hero-paper" aria-hidden />
+      {/* Before <LogoStage> deliberately: the satellites' back canvas and
+          LogoStage are both at z-index 0, so the logo has to come later in the
+          DOM to paint over the particles orbiting behind it. */}
+      {satMode !== 'off' ? (
+        <SatelliteField words={floatingWords} active={stageLive} />
+      ) : null}
       <LogoStage
         onLive={onStageLive}
         onIntroPlayStart={onIntroPlayStart}
         separation={separation}
         ignition={ignition}
       />
-      <ConstellationField words={floatingWords} enabled={constellationEnabled} active={stageLive} />
+      <ConstellationField
+        words={floatingWords}
+        enabled={constellationEnabled && satMode !== 'only'}
+        active={stageLive}
+      />
 
       <div
         className={`hero-headline-overlay${headlineStarted ? ' headline-started' : ''}`}
