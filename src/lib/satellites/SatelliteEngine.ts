@@ -42,6 +42,31 @@ type Projected = { x: number; y: number; z: number; scale: number }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
+type Rgb = { r: number; g: number; b: number }
+
+function hexToRgb(hex: string): Rgb {
+  const h = hex.replace('#', '')
+  if (h.length === 3) {
+    return {
+      r: parseInt(h[0] + h[0], 16),
+      g: parseInt(h[1] + h[1], 16),
+      b: parseInt(h[2] + h[2], 16),
+    }
+  }
+  return {
+    r: parseInt(h.slice(0, 2), 16) || 0,
+    g: parseInt(h.slice(2, 4), 16) || 0,
+    b: parseInt(h.slice(4, 6), 16) || 0,
+  }
+}
+
+/** Mix toward white (t > 0) or black (t < 0). */
+function shift({ r, g, b }: Rgb, t: number): string {
+  const to = t >= 0 ? 255 : 0
+  const k = Math.abs(t)
+  return `rgb(${Math.round(r + (to - r) * k)},${Math.round(g + (to - g) * k)},${Math.round(b + (to - b) * k)})`
+}
+
 export class SatelliteEngine {
   private back: HTMLCanvasElement
   private front: HTMLCanvasElement
@@ -431,19 +456,42 @@ export class SatelliteEngine {
     let nearestD2 = c.LABEL_HOVER_RADIUS * c.LABEL_HOVER_RADIUS
     const placed: { i: number; q: Projected; alpha: number }[] = []
 
+    const satRgb = hexToRgb(c.SAT_COLOR)
+
     for (let i = 0; i < this.sats.length; i++) {
       const s = this.sats[i]
       const q = this.project(s.radius, s.angle, s.height, tiltRad + s.tiltOffset)
       const depth = Math.max(0.4, 1 - ((q.z + this.outerR) / (2 * this.outerR)) * 0.45)
       const a = c.SAT_ALPHA * depth * globalAlpha
       const ctx = q.z >= 0 ? bctx : fctx
-      const r = Math.max(0.5, c.SAT_SIZE * q.scale)
+
+      // Beyond the perspective divide: with no dust left, exaggerated near/far
+      // sizing is what tells the eye these are orbiting in depth rather than
+      // sliding around a flat ellipse.
+      const depthScale = 1 + (q.scale - 1) * (1 + c.SAT_DEPTH_SCALE * 4)
+      const r = Math.max(0.5, c.SAT_SIZE * Math.max(0.15, depthScale))
+
+      const prevX = s.px
+      const prevY = s.py
+      s.px = q.x
+      s.py = q.y
+
+      // Trail first, so the sphere sits on top of its own wake.
+      const dx = q.x - prevX
+      const dy = q.y - prevY
+      if (c.SAT_STREAK > 0 && prevX === prevX && dx * dx + dy * dy < 40000) {
+        ctx.globalAlpha = a * 0.55
+        ctx.strokeStyle = c.SAT_COLOR
+        ctx.lineCap = 'round'
+        ctx.lineWidth = r * 1.15
+        ctx.beginPath()
+        ctx.moveTo(q.x - dx * c.SAT_STREAK, q.y - dy * c.SAT_STREAK)
+        ctx.lineTo(q.x, q.y)
+        ctx.stroke()
+      }
 
       ctx.globalAlpha = a
-      ctx.fillStyle = c.SAT_COLOR
-      ctx.beginPath()
-      ctx.arc(q.x, q.y, r, 0, Math.PI * 2)
-      ctx.fill()
+      this.drawSphere(ctx, q.x, q.y, r, satRgb, c.SAT_SHADE)
 
       if (c.SAT_RING > 0) {
         ctx.globalAlpha = a * 0.45
@@ -479,6 +527,63 @@ export class SatelliteEngine {
       }
       s.el.style.opacity = show.toFixed(3)
       s.el.style.transform = `translate3d(${(q.x + c.LABEL_OFFSET).toFixed(1)}px, ${(q.y - c.LABEL_SIZE / 2).toFixed(1)}px, 0)`
+    }
+  }
+
+  /**
+   * A satellite as a lit sphere rather than a flat disc.
+   *
+   * Same construction the reference uses for its event horizon: a radial
+   * gradient whose focus is offset toward the light (upper-left, matching the
+   * hero's own key light), a darkened terminator at the far edge, a rim light
+   * just inside the silhouette, and a small specular. On cream paper the
+   * highlight has to stay well short of white or the sphere reads as a hole
+   * punched in the page.
+   */
+  private drawSphere(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    rgb: Rgb,
+    shade: number,
+  ) {
+    if (shade <= 0.001 || r < 1.2) {
+      ctx.fillStyle = shift(rgb, 0)
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+      return
+    }
+
+    const g = ctx.createRadialGradient(x - r * 0.38, y - r * 0.42, r * 0.04, x, y, r)
+    g.addColorStop(0, shift(rgb, 0.62 * shade))
+    g.addColorStop(0.42, shift(rgb, 0.12 * shade))
+    g.addColorStop(0.82, shift(rgb, -0.3 * shade))
+    g.addColorStop(1, shift(rgb, -0.5 * shade))
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Rim light along the shadowed edge — what separates a sphere from a
+    // gradient-filled circle at small sizes.
+    if (r > 2.5) {
+      const rim = ctx.createRadialGradient(x, y, r * 0.86, x, y, r)
+      rim.addColorStop(0, 'rgba(255,255,255,0)')
+      rim.addColorStop(1, `rgba(255,255,255,${0.3 * shade})`)
+      ctx.fillStyle = rim
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+
+      const prev = ctx.globalAlpha
+      ctx.globalAlpha = prev * 0.75 * shade
+      ctx.fillStyle = shift(rgb, 0.85)
+      ctx.beginPath()
+      ctx.arc(x - r * 0.36, y - r * 0.4, Math.max(0.5, r * 0.16), 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = prev
     }
   }
 

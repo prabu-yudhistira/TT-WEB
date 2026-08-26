@@ -64,6 +64,20 @@ export type SatelliteConfig = {
   SAT_SPEED_SCALE: number
   /** Ring drawn around each satellite, as a multiple of SAT_SIZE. 0 = none. */
   SAT_RING: number
+  /**
+   * 0 = flat filled disc, 1 = fully modelled sphere (offset highlight, dark
+   * terminator, rim light, specular). This is the reference's own centre-sphere
+   * technique applied per satellite.
+   */
+  SAT_SHADE: number
+  /** Same as DUST_STREAK, for the satellites' own trails. */
+  SAT_STREAK: number
+  /**
+   * Extra size falloff with depth, beyond the perspective divide. 0 = only the
+   * projection scales them; higher exaggerates near/far, which is the cheapest
+   * strong 3D cue when there is no dust left to carry the disk.
+   */
+  SAT_DEPTH_SCALE: number
 
   // ── labels ────────────────────────────────────────────────────────
   LABEL_MODE: LabelMode
@@ -94,7 +108,10 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   TILT_SIDEWAY: 160,
   PERSPECTIVE: 1300,
 
-  DUST_COUNT: 520,
+  // Owner's call 2026-08-26, after seeing the dense version live: no dust, the
+  // satellites carry the whole effect on their own. The slider is kept so the
+  // field can be brought back without a code change.
+  DUST_COUNT: 0,
   DUST_SIZE: 2.6,
   // Graphite, not white: the reference's glow is additive light on near-black
   // and simply cannot be reproduced as ink on #F6F1E7 paper. Density and trail
@@ -109,14 +126,21 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   DUST_STREAK: 1,
 
   SAT_ENABLED: true,
-  SAT_SIZE: 5.5,
+  // Bigger than the dust-era default: with nothing else on screen these have to
+  // carry the composition themselves, and a sphere needs pixels to read as one.
+  SAT_SIZE: 11,
   SAT_COLOR: '#8E1114',
-  SAT_ALPHA: 0.9,
-  SAT_RADIUS_MIN: 0.55,
+  SAT_ALPHA: 0.95,
+  SAT_RADIUS_MIN: 0.5,
   SAT_RADIUS_MAX: 1,
   SAT_TILT_SPREAD: 14,
   SAT_SPEED_SCALE: 0.8,
-  SAT_RING: 2.4,
+  // Off by default now — the ring read as a bubble around a flat dot, and a
+  // shaded sphere does not need the extra outline to look solid.
+  SAT_RING: 0,
+  SAT_SHADE: 1,
+  SAT_STREAK: 1,
+  SAT_DEPTH_SCALE: 0.45,
 
   LABEL_MODE: 'hover',
   LABEL_SIZE: 13,
