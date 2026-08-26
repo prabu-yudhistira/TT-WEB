@@ -28,6 +28,12 @@ export const HeroBlock: Block = {
       admin: {
         description:
           '8–18 short words orbiting the logo; order = priority (small screens show only the first 8)',
+        // UI-only swap: one textarea instead of 18 collapsible rows. The stored
+        // shape is unchanged — delete this `components` block and Payload's
+        // stock array editor returns with every word intact.
+        components: {
+          Field: '@/components/admin/FloatingWordsField#FloatingWordsField',
+        },
       },
       fields: [{ name: 'word', type: 'text', required: true, maxLength: 24 }],
     },

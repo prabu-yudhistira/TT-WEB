@@ -17,6 +17,7 @@ export default function LogoCanvas({
   onIgnitionCue,
   onIgnitionDone,
   onLogoHover,
+  releaseContextOnUnmount = false,
 }: {
   onReady?: () => void
   config?: SeparationConfig
@@ -28,9 +29,21 @@ export default function LogoCanvas({
   onIgnitionDone?: () => void
   /** fires when the cursor moves onto or off the mark, for the click-and-hold hint */
   onLogoHover?: (over: boolean) => void
+  /**
+   * Release the WebGL context when this unmounts, not just the GPU resources.
+   *
+   * Off by default because it PERMANENTLY poisons the canvas element — a
+   * reused canvas would fail its next context creation outright. Only turn it
+   * on where the canvas is discarded too (a `key`ed element), which is what
+   * the admin preview does when replaying: without it, each replay leaks a
+   * context and the browser's ~16 cap is reached in seconds.
+   */
+  releaseContextOnUnmount?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<LogoEngine | null>(null)
+  const releaseRef = useRef(releaseContextOnUnmount)
+  releaseRef.current = releaseContextOnUnmount
 
   // The engine is created once, in a mount-only effect, so the subscription it
   // makes would otherwise capture whatever callback identities existed on the
@@ -94,7 +107,7 @@ export default function LogoCanvas({
       window.removeEventListener('resize', onResize)
       offIgnition()
       offHover()
-      engine.dispose()
+      engine.dispose(releaseRef.current)
       engineRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

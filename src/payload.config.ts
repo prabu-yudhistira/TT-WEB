@@ -23,6 +23,20 @@ export default buildConfig({
   admin: {
     user: 'users',
     importMap: { baseDir: path.resolve(dirname) },
+    // Renders the hero-only preview route in an iframe beside the edit form and
+    // pushes UNSAVED form state into it. The `source` marker tells that route
+    // which document is live, because the posted payload does not say — see
+    // src/lib/livePreview/source.ts.
+    livePreview: {
+      globals: ['hero-effects'],
+      collections: ['pages'],
+      url: ({ locale, globalConfig }) => {
+        const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+        const code = locale?.code || 'en'
+        const source = globalConfig ? 'hero-effects' : 'page'
+        return `${base}/${code}/admin-preview/hero?source=${source}`
+      },
+    },
   },
   editor: lexicalEditor(),
   collections: [Users, Media, Works, Services, ManifestoStatements, Pages],
