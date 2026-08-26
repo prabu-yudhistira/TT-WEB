@@ -36,11 +36,16 @@ type Sat = Dust & {
   /** Own inclination offset from the disk plane, radians. */
   tiltOffset: number
   el: HTMLDivElement | null
+  /** Cached label width. Measured when styled, never per frame. */
+  labelW: number
 }
 
 type Projected = { x: number; y: number; z: number; scale: number }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+/** Distance from a frame edge over which a label fades out entirely. */
+const EDGE_FADE_PX = 48
 
 type Rgb = { r: number; g: number; b: number }
 
@@ -268,6 +273,7 @@ export class SatelliteEngine {
         px: NaN,
         py: NaN,
         el: prev[i]?.el ?? null,
+        labelW: prev[i]?.labelW ?? 0,
       }
     }
     this.bindLabelElements()
@@ -307,6 +313,8 @@ export class SatelliteEngine {
       s.el.style.fontSize = `${c.LABEL_SIZE}px`
       s.el.style.color = c.LABEL_COLOR
       s.el.style.letterSpacing = '0.04em'
+      // One layout read here rather than one per label per frame.
+      s.labelW = s.el.offsetWidth || c.LABEL_SIZE * 4
     }
   }
 
@@ -573,6 +581,20 @@ export class SatelliteEngine {
       if (q.z >= 0 && Math.abs(q.x - this.cx) < this.W * 0.09 && Math.abs(q.y - this.cy) < this.H * 0.16) {
         show *= 0.15
       }
+
+      // Fade out before the word would be sliced by a frame edge. A sphere
+      // leaving frame reads as depth; half a word reads as a rendering bug.
+      // At the approved radii ~4 of 12 labels sit on an edge at any moment on a
+      // laptop and 7 of 12 on a phone, so this is not an edge case.
+      const lx = q.x + c.LABEL_OFFSET
+      const ly = q.y - c.LABEL_SIZE / 2
+      const room = Math.min(
+        lx - EDGE_FADE_PX,
+        this.W - (lx + s.labelW) - EDGE_FADE_PX,
+        ly - EDGE_FADE_PX,
+        this.H - (ly + c.LABEL_SIZE) - EDGE_FADE_PX,
+      )
+      if (room < 0) show *= clamp01(1 + room / EDGE_FADE_PX)
       s.el.style.opacity = show.toFixed(3)
       s.el.style.transform = `translate3d(${(q.x + c.LABEL_OFFSET).toFixed(1)}px, ${(q.y - c.LABEL_SIZE / 2).toFixed(1)}px, 0)`
     }

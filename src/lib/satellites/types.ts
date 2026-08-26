@@ -114,15 +114,22 @@ export type SatelliteConfig = {
 }
 
 /**
- * Starting point, not a proposal. Values are a first guess at translating a
- * white-on-black reference onto cream paper; the bench at /dev/satellites
- * exists precisely because these are expected to be wrong.
+ * OWNER-APPROVED VALUES, tuned live at /dev/satellites and handed back
+ * 2026-08-26. These are no longer a guess — they are the look that was signed
+ * off, and the spec is written around them. Change them only on the owner's
+ * say-so.
+ *
+ * Character of the approved setting: a wide, slow, sparse belt sitting well
+ * clear of the mark, with small multi-coloured spheres carrying always-visible
+ * words, and a restrained shake on hold.
  */
 export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
-  INNER_RADIUS: 1.15,
-  // Owner 2026-08-26: wider. Fraction of half the viewport's smaller side, so
-  // 1.05 pushes the belt past the short edge on a landscape window.
-  OUTER_RADIUS: 1.05,
+  // 3x the mark's half-height: the belt clears the logo by a wide margin
+  // instead of hugging it.
+  INNER_RADIUS: 3,
+  // At the bench slider's ceiling — see the spec's open question on whether
+  // this range needs widening before it becomes a CMS field.
+  OUTER_RADIUS: 1.6,
   TILT: 20,
   TILT_SIDEWAY: 160,
   PERSPECTIVE: 1300,
@@ -132,60 +139,62 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   // field can be brought back without a code change.
   DUST_COUNT: 0,
   DUST_SIZE: 2.6,
-  // Graphite, not white: the reference's glow is additive light on near-black
-  // and simply cannot be reproduced as ink on #F6F1E7 paper. Density and trail
-  // length have to carry the effect instead of luminance.
   DUST_COLOR: '#2B2A27',
   DUST_ALPHA: 0.34,
   DUST_THICKNESS: 16,
   DUST_CLUSTER: 2,
-  ORBIT_SPEED: 4,
-  ORBIT_DIR: -1, // owner 2026-08-26: counter-clockwise
+  ORBIT_SPEED: 2.2,
+  ORBIT_DIR: -1, // counter-clockwise
   PULL_SPEED: 0,
   TRAIL: 42,
   DUST_STREAK: 1,
 
   SAT_ENABLED: true,
-  // Bigger than the dust-era default: with nothing else on screen these have to
-  // carry the composition themselves, and a sphere needs pixels to read as one.
-  SAT_SIZE: 11,
+  // Small — the approved look is a scattering of beads, not the large spheres
+  // the dust-free default started at.
+  SAT_SIZE: 4,
   SAT_COLOR: '#8E1114',
-  // Starts as the brand pair alternating — red-pencil and graphite. The bench
-  // gives every satellite its own picker on top of this.
+  // Owner-picked, one per satellite. NOTE: this is a deliberate departure from
+  // the site's single Atelier palette (paper / graphite / red-pencil) — see the
+  // spec's palette section. Indices beyond the word list are unused; indices the
+  // list overruns fall back to SAT_COLOR.
   SAT_COLORS: [
-    '#8E1114',
+    '#000000',
+    '#ffd500',
+    '#f96d3e',
+    '#23e126',
+    '#0f8a75',
+    '#04b1b4',
+    '#13118d',
     '#2B2A27',
-    '#8E1114',
-    '#2B2A27',
-    '#8E1114',
-    '#2B2A27',
-    '#8E1114',
-    '#2B2A27',
-    '#8E1114',
-    '#2B2A27',
-    '#8E1114',
-    '#2B2A27',
+    '#b04803',
+    '#145c0a',
+    '#118d1f',
+    '#b400cc',
+    '#bd0000',
   ],
   SAT_ALPHA: 0.95,
-  SAT_RADIUS_MIN: 0.5,
-  SAT_RADIUS_MAX: 1,
-  SAT_TILT_SPREAD: 14,
+  SAT_RADIUS_MIN: 0.74,
+  // Above 1 deliberately: satellites orbit BEYOND the nominal outer radius, so
+  // the widest of them leave the frame edge on a landscape window.
+  SAT_RADIUS_MAX: 1.28,
+  SAT_TILT_SPREAD: 15,
   SAT_SPEED_SCALE: 0.8,
-  // Off by default now — the ring read as a bubble around a flat dot, and a
-  // shaded sphere does not need the extra outline to look solid.
-  SAT_RING: 0,
+  // Back on, but tight — 1.1x the sphere reads as a thin outline hugging the
+  // bead rather than the detached bubble that 2.4x produced.
+  SAT_RING: 1.1,
   SAT_SHADE: 1,
   SAT_STREAK: 1,
-  SAT_DEPTH_SCALE: 0.45,
+  SAT_DEPTH_SCALE: 1,
 
-  LABEL_MODE: 'hover',
-  LABEL_SIZE: 13,
+  LABEL_MODE: 'always',
+  LABEL_SIZE: 12,
   LABEL_COLOR: '#2B2A27',
   LABEL_OFFSET: 14,
   LABEL_HOVER_RADIUS: 90,
 
   HOLD_FREEZE: true,
-  HOLD_SHAKE_PX: 7,
+  HOLD_SHAKE_PX: 3,
   HOLD_SHAKE_SPEED: 1.1, // matches ShatterController's own VIBRATE_PHASE_STEP
 
   ENTRANCE_MS: 1600,
