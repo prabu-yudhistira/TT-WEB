@@ -84,6 +84,11 @@ export function HeroBlock({
   // so branching on it inline would be a hydration mismatch. With no param the
   // hero renders exactly as it does today, which is what keeps this prototype
   // free to sit on the homepage while it is being judged.
+  const chargeRef = useRef<(() => number) | null>(null)
+  const onChargeSource = useCallback((get: (() => number) | null) => {
+    chargeRef.current = get
+  }, [])
+
   const [satMode, setSatMode] = useState<'off' | 'only' | 'both'>('off')
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get('satellites')
@@ -151,13 +156,14 @@ export function HeroBlock({
           LogoStage are both at z-index 0, so the logo has to come later in the
           DOM to paint over the particles orbiting behind it. */}
       {satMode !== 'off' ? (
-        <SatelliteField words={floatingWords} active={stageLive} />
+        <SatelliteField words={floatingWords} active={stageLive} chargeRef={chargeRef} />
       ) : null}
       <LogoStage
         onLive={onStageLive}
         onIntroPlayStart={onIntroPlayStart}
         separation={separation}
         ignition={ignition}
+        onChargeSource={onChargeSource}
       />
       <ConstellationField
         words={floatingWords}

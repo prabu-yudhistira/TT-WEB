@@ -98,6 +98,16 @@ export class SatelliteEngine {
   private scrollAlpha = 1
   private pointer = { x: 0, y: 0, inside: false }
 
+  /**
+   * Pulled from LogoEngine.getCharge() every frame: 0 at rest, rising to 1 over
+   * the separation's CHARGE_MS while the mark is held, easing back on release.
+   * Pull rather than push because the charge is a continuous value the logo
+   * already maintains — mirroring it into React state would just add lag and a
+   * re-render per frame.
+   */
+  private chargeSource: () => number = () => 0
+  private shakePhase = 0
+
   private onScroll = () => {
     const span = this.cfg.SCROLL_FADE_VH * window.innerHeight
     this.scrollAlpha = span > 0 ? clamp01(1 - window.scrollY / span) : 1
@@ -123,6 +133,16 @@ export class SatelliteEngine {
     if (!b || !f) throw new Error('SatelliteEngine: 2D context unavailable')
     this.bctx = b
     this.fctx = f
+
+    // Dev handle, mirroring the shatter bench's window.__ttShatter. Lets a
+    // verification script read real screen positions instead of inferring
+    // rotation direction from screenshots.
+    ;(window as unknown as Record<string, unknown>).__ttSatellites = () => ({
+      cx: this.cx,
+      cy: this.cy,
+      charge: this.chargeSource(),
+      sats: this.sats.map((s) => ({ x: s.px, y: s.py })),
+    })
 
     window.addEventListener('scroll', this.onScroll, { passive: true })
     window.addEventListener('pointermove', this.onPointerMove, { passive: true })
@@ -153,6 +173,11 @@ export class SatelliteEngine {
     this.buildLabels()
     this.seed()
     if (this.reduced) this.drawStatic()
+  }
+
+  /** Hand the engine a way to read the logo's separation charge each frame. */
+  setChargeSource(get: (() => number) | null) {
+    this.chargeSource = get ?? (() => 0)
   }
 
   setActive(v: boolean) {
@@ -358,26 +383,35 @@ export class SatelliteEngine {
       : 0
     const globalAlpha = entrance * this.scrollAlpha
 
+    const charge = clamp01(this.chargeSource())
+    if (charge > 0) this.shakePhase += c.HOLD_SHAKE_SPEED * dt
+
     if (globalAlpha > 0.001) {
-      this.step(dt)
-      this.draw(globalAlpha)
+      this.step(dt, charge)
+      this.draw(globalAlpha, charge)
     } else {
-      this.step(dt)
+      this.step(dt, charge)
       this.hideLabels()
     }
 
     this.raf = requestAnimationFrame(this.frame)
   }
 
-  private step(dt: number) {
+  private step(dt: number, charge: number) {
     const c = this.cfg
     const tiltRad = (c.TILT * Math.PI) / 180
+
+    // Orbits ease to a standstill as the charge builds, reaching a full stop at
+    // half charge (~475ms into a hold) so it reads as a decisive halt rather
+    // than a gradual slowdown that is still creeping when the blast fires.
+    const motion = c.HOLD_FREEZE ? Math.max(0, 1 - charge * 2) : 1
+    const dir = c.ORBIT_DIR < 0 ? -1 : 1
 
     for (const p of this.dust) {
       // v ~ 1/sqrt(r): the Keplerian falloff from the reference. Without it the
       // field rotates rigidly and reads as a spinning texture, not an orbit.
       const speedFactor = Math.sqrt(this.innerR / Math.max(p.radius, 10))
-      p.angle += c.ORBIT_SPEED * speedFactor * p.speedOffset * 0.012 * dt
+      p.angle += dir * motion * c.ORBIT_SPEED * speedFactor * p.speedOffset * 0.012 * dt
       if (c.PULL_SPEED > 0) {
         p.radius -= (c.PULL_SPEED / 2) * speedFactor * p.speedOffset * dt
         if (p.radius < this.innerR) {
@@ -391,12 +425,13 @@ export class SatelliteEngine {
 
     for (const s of this.sats) {
       const speedFactor = Math.sqrt(this.innerR / Math.max(s.radius, 10))
-      s.angle += c.ORBIT_SPEED * c.SAT_SPEED_SCALE * speedFactor * s.speedOffset * 0.012 * dt
+      s.angle +=
+        dir * motion * c.ORBIT_SPEED * c.SAT_SPEED_SCALE * speedFactor * s.speedOffset * 0.012 * dt
     }
     void tiltRad
   }
 
-  private draw(globalAlpha: number) {
+  private draw(globalAlpha: number, charge = 0) {
     const c = this.cfg
     const tiltRad = (c.TILT * Math.PI) / 180
     const bctx = this.bctx
@@ -456,11 +491,22 @@ export class SatelliteEngine {
     let nearestD2 = c.LABEL_HOVER_RADIUS * c.LABEL_HOVER_RADIUS
     const placed: { i: number; q: Projected; alpha: number }[] = []
 
-    const satRgb = hexToRgb(c.SAT_COLOR)
+    const shakeAmp = charge * c.HOLD_SHAKE_PX
 
     for (let i = 0; i < this.sats.length; i++) {
       const s = this.sats[i]
+      const satColor = c.SAT_COLORS?.[i] || c.SAT_COLOR
+      const satRgb = hexToRgb(satColor)
       const q = this.project(s.radius, s.angle, s.height, tiltRad + s.tiltOffset)
+
+      // Held: each satellite trembles about its frozen position. The phase
+      // offset is the golden angle so twelve of them never march in step.
+      if (shakeAmp > 0.01) {
+        const ph = this.shakePhase + i * 2.399
+        q.x += Math.sin(ph) * shakeAmp
+        q.y += Math.cos(ph * 1.31) * shakeAmp
+      }
+
       const depth = Math.max(0.4, 1 - ((q.z + this.outerR) / (2 * this.outerR)) * 0.45)
       const a = c.SAT_ALPHA * depth * globalAlpha
       const ctx = q.z >= 0 ? bctx : fctx
@@ -479,9 +525,11 @@ export class SatelliteEngine {
       // Trail first, so the sphere sits on top of its own wake.
       const dx = q.x - prevX
       const dy = q.y - prevY
-      if (c.SAT_STREAK > 0 && prevX === prevX && dx * dx + dy * dy < 40000) {
+      // Suppressed while shaking: joining a jitter to the last jitter draws a
+      // scribble, not a wake.
+      if (c.SAT_STREAK > 0 && shakeAmp <= 0.01 && prevX === prevX && dx * dx + dy * dy < 40000) {
         ctx.globalAlpha = a * 0.55
-        ctx.strokeStyle = c.SAT_COLOR
+        ctx.strokeStyle = satColor
         ctx.lineCap = 'round'
         ctx.lineWidth = r * 1.15
         ctx.beginPath()
@@ -495,7 +543,7 @@ export class SatelliteEngine {
 
       if (c.SAT_RING > 0) {
         ctx.globalAlpha = a * 0.45
-        ctx.strokeStyle = c.SAT_COLOR
+        ctx.strokeStyle = satColor
         ctx.lineWidth = Math.max(0.6, 1 * q.scale)
         ctx.beginPath()
         ctx.arc(q.x, q.y, r * c.SAT_RING, 0, Math.PI * 2)

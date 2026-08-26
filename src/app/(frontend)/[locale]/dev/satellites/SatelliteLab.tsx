@@ -68,6 +68,8 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     title: 'motion',
     rows: [
       { key: 'ORBIT_SPEED', label: 'Orbit speed', min: 0, max: 20, step: 0.1 },
+      { key: 'HOLD_SHAKE_PX', label: 'Hold shake px', min: 0, max: 40, step: 0.5 },
+      { key: 'HOLD_SHAKE_SPEED', label: 'Hold shake speed', min: 0.1, max: 4, step: 0.05 },
       { key: 'PULL_SPEED', label: 'Inward pull', min: 0, max: 20, step: 0.1 },
       { key: 'SAT_SPEED_SCALE', label: 'Satellite speed ×', min: 0.1, max: 3, step: 0.05 },
     ],
@@ -195,6 +197,10 @@ export default function SatelliteLab({
   const [copied, setCopied] = useState(false)
   const activeRef = useRef(active)
   activeRef.current = active
+  const chargeRef = useRef<(() => number) | null>(null)
+  const onChargeSource = useCallback((get: (() => number) | null) => {
+    chargeRef.current = get
+  }, [])
 
   const words = useMemo(() => SAMPLE_WORDS.slice(0, wordCount), [wordCount])
 
@@ -232,7 +238,7 @@ export default function SatelliteLab({
     <div style={{ minHeight: '100dvh', background: 'var(--bg, #F6F1E7)', position: 'relative' }}>
       {/* DOM order is load-bearing: the back canvas and the logo are both at
           z 0, so the logo must come LATER to paint over it. */}
-      <SatelliteField words={words} config={cfg} active={active} />
+      <SatelliteField words={words} config={cfg} active={active} chargeRef={chargeRef} />
 
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: showLogo ? 1 : 0 }}>
         <LogoCanvas
@@ -240,8 +246,9 @@ export default function SatelliteLab({
           ignition={ignition}
           ignite
           armed
-          onReady={() => setStatus('logo ready')}
+          onReady={() => setStatus('logo ready — press and hold the mark')}
           onIgnitionCue={() => setActive(true)}
+          onChargeSource={onChargeSource}
         />
       </div>
 
@@ -314,6 +321,22 @@ export default function SatelliteLab({
           />
           <span>show satellites</span>
         </label>
+        <label style={{ display: 'flex', gap: 6, marginBottom: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={cfg.ORBIT_DIR < 0}
+            onChange={(e) => set('ORBIT_DIR', e.target.checked ? -1 : 1)}
+          />
+          <span>counter-clockwise</span>
+        </label>
+        <label style={{ display: 'flex', gap: 6, marginBottom: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={cfg.HOLD_FREEZE}
+            onChange={(e) => set('HOLD_FREEZE', e.target.checked)}
+          />
+          <span>freeze + shake on hold</span>
+        </label>
 
         <label style={{ display: 'block', marginBottom: 8 }}>
           <span style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -360,6 +383,69 @@ export default function SatelliteLab({
             />
           </label>
         ))}
+
+        <div style={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          per-satellite colour
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '2px 8px',
+            marginBottom: 10,
+          }}
+        >
+          {words.map((w, i) => (
+            <label
+              key={`${w}-${i}`}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              title={w}
+            >
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 84,
+                }}
+              >
+                {i + 1}. {w}
+              </span>
+              <input
+                type="color"
+                value={cfg.SAT_COLORS[i] ?? cfg.SAT_COLOR}
+                onChange={(e) => {
+                  const next = [...cfg.SAT_COLORS]
+                  while (next.length < words.length) next.push(cfg.SAT_COLOR)
+                  next[i] = e.target.value
+                  set('SAT_COLORS', next)
+                }}
+                style={{ width: 30, height: 18, padding: 0, border: 'none', background: 'none' }}
+              />
+            </label>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          <button
+            type="button"
+            onClick={() => set('SAT_COLORS', words.map(() => cfg.SAT_COLOR))}
+            style={btn('rgba(43,42,39,0.35)')}
+          >
+            all → base
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              set(
+                'SAT_COLORS',
+                words.map((_, i) => (i % 2 ? '#2B2A27' : '#8E1114')),
+              )
+            }
+            style={btn('rgba(43,42,39,0.35)')}
+          >
+            alternate
+          </button>
+        </div>
 
         {GROUPS.map((g) => (
           <div key={g.title} style={{ marginTop: 12 }}>

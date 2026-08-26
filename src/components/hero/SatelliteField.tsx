@@ -27,12 +27,20 @@ export function SatelliteField({
   config = DEFAULT_SATELLITES,
   active,
   enabled = true,
+  chargeRef,
 }: {
   words: string[]
   config?: SatelliteConfig
   /** Entrance trigger — the hero passes the sketch-video → 3D handoff. */
   active: boolean
   enabled?: boolean
+  /**
+   * Holds LogoEngine.getCharge, so the field can read the separation's charge
+   * each frame and freeze/shake with it. A ref rather than a value: the charge
+   * changes every frame, and re-rendering React at 60Hz to carry a number the
+   * canvas loop can simply pull would be pure overhead.
+   */
+  chargeRef?: React.MutableRefObject<(() => number) | null>
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const backRef = useRef<HTMLCanvasElement>(null)
@@ -56,6 +64,12 @@ export function SatelliteField({
       return
     }
     engineRef.current = engine
+
+    // Indirect through the ref on every call: LogoCanvas may not have built its
+    // engine yet when this mounts, and a getter captured once would stay stuck
+    // at zero. Same class of bug as the setShatterArmed race the 2026-08-09
+    // review caught.
+    engine.setChargeSource(() => chargeRef?.current?.() ?? 0)
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     engine.setConfig(config)

@@ -17,6 +17,7 @@ export default function LogoCanvas({
   onIgnitionCue,
   onIgnitionDone,
   onLogoHover,
+  onChargeSource,
   releaseContextOnUnmount = false,
 }: {
   onReady?: () => void
@@ -29,6 +30,14 @@ export default function LogoCanvas({
   onIgnitionDone?: () => void
   /** fires when the cursor moves onto or off the mark, for the click-and-hold hint */
   onLogoHover?: (over: boolean) => void
+  /**
+   * Publishes a getter for the separation's charge (0 at rest, 1 at full hold),
+   * and null on unmount. Exists so effects outside the 3D scene can react
+   * continuously to the hold gesture without mirroring a per-frame value
+   * through React state. This is the consumer the sub-project 1 spec left the
+   * onShatter/getCharge seam open for.
+   */
+  onChargeSource?: (get: (() => number) | null) => void
   /**
    * Release the WebGL context when this unmounts, not just the GPU resources.
    *
@@ -51,9 +60,11 @@ export default function LogoCanvas({
   const cueRef = useRef(onIgnitionCue)
   const doneRef = useRef(onIgnitionDone)
   const hoverRef = useRef(onLogoHover)
+  const chargeSrcRef = useRef(onChargeSource)
   cueRef.current = onIgnitionCue
   doneRef.current = onIgnitionDone
   hoverRef.current = onLogoHover
+  chargeSrcRef.current = onChargeSource
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -82,6 +93,10 @@ export default function LogoCanvas({
 
     const offHover = engine.onLogoHover((over) => hoverRef.current?.(over))
 
+    // Safe to publish before load() resolves: getCharge() returns 0 while the
+    // controller is still null rather than throwing.
+    chargeSrcRef.current?.(() => engine.getCharge())
+
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     engine.setInteractive(!reduced)
 
@@ -107,6 +122,7 @@ export default function LogoCanvas({
       window.removeEventListener('resize', onResize)
       offIgnition()
       offHover()
+      chargeSrcRef.current?.(null)
       engine.dispose(releaseRef.current)
       engineRef.current = null
     }

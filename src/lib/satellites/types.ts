@@ -39,6 +39,8 @@ export type SatelliteConfig = {
   /** How tightly dust clusters toward the inner edge. 1 = even, 3 = very tight. */
   DUST_CLUSTER: number
   ORBIT_SPEED: number
+  /** +1 clockwise on screen, -1 counter-clockwise. */
+  ORBIT_DIR: number
   /** Inward drift. The reference's accretion; 0 keeps orbits stable. */
   PULL_SPEED: number
   /** 0 = no trail (clear every frame), 50 = longest streaks. */
@@ -53,7 +55,10 @@ export type SatelliteConfig = {
   // ── satellites (word carriers) ────────────────────────────────────
   SAT_ENABLED: boolean
   SAT_SIZE: number
+  /** Fallback colour, used for any satellite index SAT_COLORS does not cover. */
   SAT_COLOR: string
+  /** Per-satellite colours by index. Shorter than the word list is fine. */
+  SAT_COLORS: string[]
   SAT_ALPHA: number
   /** Satellite orbit band, as fractions of OUTER_RADIUS. */
   SAT_RADIUS_MIN: number
@@ -88,6 +93,18 @@ export type SatelliteConfig = {
   /** Cursor proximity that reveals a word in 'hover' mode, in px. */
   LABEL_HOVER_RADIUS: number
 
+  // ── hold coupling ─────────────────────────────────────────────────
+  /**
+   * While the mark is pressed and held, freeze the orbits. The logo's own
+   * separation charge drives this — LogoEngine.getCharge() rises 0→1 over
+   * CHARGE_MS — so the two effects share one gesture rather than competing.
+   */
+  HOLD_FREEZE: boolean
+  /** Shake amplitude in px at full charge. */
+  HOLD_SHAKE_PX: number
+  /** Radians of phase advance per frame while shaking. */
+  HOLD_SHAKE_SPEED: number
+
   // ── behaviour ─────────────────────────────────────────────────────
   /** Entrance fade, ms. */
   ENTRANCE_MS: number
@@ -103,7 +120,9 @@ export type SatelliteConfig = {
  */
 export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   INNER_RADIUS: 1.15,
-  OUTER_RADIUS: 0.78,
+  // Owner 2026-08-26: wider. Fraction of half the viewport's smaller side, so
+  // 1.05 pushes the belt past the short edge on a landscape window.
+  OUTER_RADIUS: 1.05,
   TILT: 20,
   TILT_SIDEWAY: 160,
   PERSPECTIVE: 1300,
@@ -121,6 +140,7 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   DUST_THICKNESS: 16,
   DUST_CLUSTER: 2,
   ORBIT_SPEED: 4,
+  ORBIT_DIR: -1, // owner 2026-08-26: counter-clockwise
   PULL_SPEED: 0,
   TRAIL: 42,
   DUST_STREAK: 1,
@@ -130,6 +150,22 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   // carry the composition themselves, and a sphere needs pixels to read as one.
   SAT_SIZE: 11,
   SAT_COLOR: '#8E1114',
+  // Starts as the brand pair alternating — red-pencil and graphite. The bench
+  // gives every satellite its own picker on top of this.
+  SAT_COLORS: [
+    '#8E1114',
+    '#2B2A27',
+    '#8E1114',
+    '#2B2A27',
+    '#8E1114',
+    '#2B2A27',
+    '#8E1114',
+    '#2B2A27',
+    '#8E1114',
+    '#2B2A27',
+    '#8E1114',
+    '#2B2A27',
+  ],
   SAT_ALPHA: 0.95,
   SAT_RADIUS_MIN: 0.5,
   SAT_RADIUS_MAX: 1,
@@ -147,6 +183,10 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   LABEL_COLOR: '#2B2A27',
   LABEL_OFFSET: 14,
   LABEL_HOVER_RADIUS: 90,
+
+  HOLD_FREEZE: true,
+  HOLD_SHAKE_PX: 7,
+  HOLD_SHAKE_SPEED: 1.1, // matches ShatterController's own VIBRATE_PHASE_STEP
 
   ENTRANCE_MS: 1600,
   SCROLL_FADE_VH: 0.6,
