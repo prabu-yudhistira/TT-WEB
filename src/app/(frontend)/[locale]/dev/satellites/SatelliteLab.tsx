@@ -24,6 +24,26 @@ const LogoCanvas = dynamic(() => import('@/components/three/LogoCanvas'), { ssr:
 const FALLBACK_WORDS = ['Strategy', 'Interface', 'Motion', 'Craft', 'Systems', 'Identity']
 
 /**
+ * The owner's original saturated picks, kept so the pencil conversion can be
+ * compared against its source in one click rather than from memory.
+ */
+const SATURATED_COLORS = [
+  '#000000',
+  '#ffd500',
+  '#f96d3e',
+  '#23e126',
+  '#0f8a75',
+  '#04b1b4',
+  '#13118d',
+  '#2B2A27',
+  '#b04803',
+  '#145c0a',
+  '#118d1f',
+  '#b400cc',
+  '#bd0000',
+]
+
+/**
  * One word per line, blank lines dropped — the same convention as the CMS's own
  * constellation editor (FloatingWordsField, shipped in PR #2), so whatever is
  * tuned here transfers to /admin without re-learning a second format.
@@ -556,15 +576,17 @@ export default function SatelliteLab({
           </button>
           <button
             type="button"
-            onClick={() =>
-              set(
-                'SAT_COLORS',
-                words.map((_, i) => (i % 2 ? '#2B2A27' : '#8E1114')),
-              )
-            }
+            onClick={() => set('SAT_COLORS', [...DEFAULT_SATELLITES.SAT_COLORS])}
             style={btn('rgba(43,42,39,0.35)')}
           >
-            alternate
+            pencil
+          </button>
+          <button
+            type="button"
+            onClick={() => set('SAT_COLORS', [...SATURATED_COLORS])}
+            style={btn('rgba(43,42,39,0.35)')}
+          >
+            saturated
           </button>
         </div>
 

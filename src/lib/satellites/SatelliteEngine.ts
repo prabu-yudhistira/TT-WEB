@@ -221,14 +221,18 @@ export class SatelliteEngine {
     // The orbital centre IS the 3D mark, so it has to track the mark's real
     // on-screen box — including the object-fit:cover correction that only
     // matters on windows wider than 16:9.
-    const box = logoScreenBox(W, H, window.innerWidth < 640)
+    const mobile = window.innerWidth < 640
+    const box = logoScreenBox(W, H, mobile)
     this.cx = box.cx
     this.cy = box.cy
-    this.innerR = Math.max(8, box.hh * this.cfg.INNER_RADIUS)
-    this.outerR = Math.max(
-      this.innerR + 12,
-      (Math.min(W, H) / 2) * this.cfg.OUTER_RADIUS,
-    )
+    const innerFrac = mobile ? this.cfg.MOBILE_INNER_RADIUS : this.cfg.INNER_RADIUS
+    const outerFrac = mobile ? this.cfg.MOBILE_OUTER_RADIUS : this.cfg.OUTER_RADIUS
+    this.innerR = Math.max(8, box.hh * innerFrac)
+    // Floor keeps outerR strictly above innerR: dust seeds across
+    // innerR..outerR, and an inverted span would place particles inside the
+    // orbit floor. Reachable on a tall narrow window, where INNER_RADIUS 3 of a
+    // tall mark can exceed a radius measured off the short side.
+    this.outerR = Math.max(this.innerR + 12, (Math.min(W, H) / 2) * outerFrac)
 
     if (changed || this.dust.length === 0) this.seed()
     if (this.reduced) this.drawStatic()

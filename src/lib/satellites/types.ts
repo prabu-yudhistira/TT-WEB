@@ -22,6 +22,14 @@ export type SatelliteConfig = {
   INNER_RADIUS: number
   /** Outermost orbit, as a fraction of half the viewport's smaller side. */
   OUTER_RADIUS: number
+  /**
+   * Separate radii below 640px. The desktop values put the widest orbits at
+   * ~2x half a portrait frame's short side, leaving only about half the belt on
+   * screen and half the words never seen on a phone. The codebase already
+   * splits the logo's own scale this way via CALIB.MOBILE_HEIGHT_FRAC.
+   */
+  MOBILE_INNER_RADIUS: number
+  MOBILE_OUTER_RADIUS: number
   /** Disk inclination (deg) — 0 is edge-on, 90 is face-on. */
   TILT: number
   /** Roll of the whole disk around the view axis (deg). */
@@ -130,6 +138,12 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   // At the bench slider's ceiling — see the spec's open question on whether
   // this range needs widening before it becomes a CMS field.
   OUTER_RADIUS: 1.6,
+  // Sized so the widest orbit (OUTER x SAT_RADIUS_MAX) lands just inside a
+  // 390px-wide frame, and the innermost still clears the mobile mark. Chosen to
+  // keep the same innerR/radius ratio as desktop, so the orbital speed feels
+  // identical rather than merely looking similar.
+  MOBILE_INNER_RADIUS: 1.5,
+  MOBILE_OUTER_RADIUS: 0.78,
   TILT: 20,
   TILT_SIDEWAY: 160,
   PERSPECTIVE: 1300,
@@ -154,24 +168,30 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   // the dust-free default started at.
   SAT_SIZE: 4,
   SAT_COLOR: '#8E1114',
-  // Owner-picked, one per satellite. NOTE: this is a deliberate departure from
-  // the site's single Atelier palette (paper / graphite / red-pencil) — see the
-  // spec's palette section. Indices beyond the word list are unused; indices the
-  // list overruns fall back to SAT_COLOR.
+  // The owner's own hue choices and order, converted to what a coloured pencil
+  // actually lays down on cream paper (owner's call 2026-08-26): hue kept and
+  // warmed a few degrees toward the paper's cast, saturation capped at 0.52
+  // because pigment on paper never reaches a screen primary, lightness held in
+  // 0.30–0.46 where it holds against #F6F1E7 without going muddy. Pure black
+  // becomes graphite for the same reason. The saturated originals are one click
+  // away in the bench if this reads too soft.
+  //
+  // Indices past the word list are unused; words past this list fall back to
+  // SAT_COLOR.
   SAT_COLORS: [
-    '#000000',
-    '#ffd500',
-    '#f96d3e',
-    '#23e126',
-    '#0f8a75',
-    '#04b1b4',
-    '#13118d',
     '#2B2A27',
-    '#b04803',
-    '#145c0a',
-    '#118d1f',
-    '#b400cc',
-    '#bd0000',
+    '#b2a438',
+    '#b25d38',
+    '#3fb238',
+    '#287e6a',
+    '#2e928d',
+    '#292d81',
+    '#2B2A27',
+    '#8f592d',
+    '#347425',
+    '#29812d',
+    '#8a329e',
+    '#95342f',
   ],
   SAT_ALPHA: 0.95,
   SAT_RADIUS_MIN: 0.74,
