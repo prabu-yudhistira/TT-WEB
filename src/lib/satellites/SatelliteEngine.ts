@@ -3,7 +3,7 @@ import { logoScreenBox } from '../three/calibration'
 import { DEFAULT_SATELLITES, type SatelliteConfig } from './types'
 
 /**
- * PROTOTYPE — see ./types.ts. Throwaway.
+ * Hero orbiting satellites — simulation and rendering.
  *
  * Two stacked canvases with the logo's own WebGL canvas sandwiched between
  * them. Particles with z >= 0 (behind the orbital centre) draw on the back

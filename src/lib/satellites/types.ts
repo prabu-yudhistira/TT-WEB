@@ -1,16 +1,13 @@
 /**
- * PROTOTYPE — hero orbiting satellites (sub-project 3, 2026-08-26 attempt).
+ * Hero orbiting satellites — configuration.
  *
- * THROWAWAY CODE. This exists to put the effect on screen so the owner can
- * judge how it LOOKS before anything is specced or built properly. The
- * 2026-08-10 orbiting-orbs build passed every technical gate and was rejected
- * on visual taste after 7 of 10 tasks; this pass deliberately inverts that
- * order. Nothing here is CMS-backed and nothing touches the database.
+ * Sub-project 3 of the hero-effects upgrade.
+ * Spec: docs/superpowers/specs/2026-08-26-hero-satellites-design.md
  *
- * Ported from _ASSETS/Web-components/Black Hole — Originkit.js, with the
- * central sphere removed (the 3D logo is the centre) and two particle
- * populations instead of one: DUST (many, tiny, atmospheric) and SATELLITES
- * (few, larger, each carrying one CMS word).
+ * Ported from _ASSETS/Web-components/Black Hole — Originkit.js with the central
+ * sphere removed (the 3D logo is the centre). Two particle populations: DUST
+ * (retained, defaulted off) and SATELLITES (shaded spheres, each carrying one
+ * CMS word).
  */
 
 export type LabelMode = 'hover' | 'always' | 'none'
