@@ -153,6 +153,7 @@ export function HeroBlock({
         config={satellites}
         active={stageLive}
         chargeRef={chargeRef}
+        enabled={satellites.SAT_ENABLED}
       />
       <LogoStage
         onLive={onStageLive}
