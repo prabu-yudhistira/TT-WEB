@@ -36,6 +36,30 @@ const parseWords = (text: string): string[] =>
     .map((w) => w.trim())
     .filter(Boolean)
 
+/**
+ * Bench state persists to localStorage, not to the CMS.
+ *
+ * The shatter and ignition benches POST to /api/globals/hero-effects because
+ * those features have fields there. The satellites deliberately have none — the
+ * prototype makes zero schema changes so rollback stays "delete the branch" —
+ * so there is nothing to write. Losing a tuning session to a page reload is a
+ * real cost though, hence this.
+ */
+const STORE_KEY = 'tt-satellites-proto-v1'
+
+type Saved = { cfg: Partial<SatelliteConfig>; wordText: string; at: number }
+
+function loadSaved(): Saved | null {
+  try {
+    const raw = localStorage.getItem(STORE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Saved
+    return parsed && typeof parsed === 'object' && parsed.cfg ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 type NumKey = {
   [K in keyof SatelliteConfig]: SatelliteConfig[K] extends number ? K : never
 }[keyof SatelliteConfig]
@@ -200,6 +224,8 @@ export default function SatelliteLab({
   )
   const [status, setStatus] = useState('loading logo…')
   const [copied, setCopied] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [dirty, setDirty] = useState(false)
   const activeRef = useRef(active)
   activeRef.current = active
   const chargeRef = useRef<(() => number) | null>(null)
@@ -211,7 +237,41 @@ export default function SatelliteLab({
 
   const set = useCallback(<K extends keyof SatelliteConfig>(k: K, v: SatelliteConfig[K]) => {
     setCfg((c) => ({ ...c, [k]: v }))
+    setDirty(true)
   }, [])
+
+  // Restore after mount, never during render: the server has no localStorage,
+  // so seeding state from it inline would be a hydration mismatch. Merged OVER
+  // the current defaults rather than replacing them, so a save taken before a
+  // new knob existed still loads instead of arriving with that knob undefined.
+  useEffect(() => {
+    const saved = loadSaved()
+    if (!saved) return
+    setCfg((c) => ({ ...c, ...saved.cfg }))
+    if (typeof saved.wordText === 'string') setWordText(saved.wordText)
+    setSavedAt(saved.at)
+    setDirty(false)
+  }, [])
+
+  const save = useCallback(() => {
+    try {
+      const at = Date.now()
+      localStorage.setItem(STORE_KEY, JSON.stringify({ cfg, wordText, at } satisfies Saved))
+      setSavedAt(at)
+      setDirty(false)
+    } catch (err) {
+      console.error('bench: could not save', err)
+      setStatus('save failed — see console')
+    }
+  }, [cfg, wordText])
+
+  const clearSaved = useCallback(() => {
+    localStorage.removeItem(STORE_KEY)
+    setSavedAt(null)
+    setDirty(false)
+    setCfg({ ...DEFAULT_SATELLITES })
+    setWordText((initialWords.length ? initialWords : FALLBACK_WORDS).join('\n'))
+  }, [initialWords])
 
   // Entrance rides the real ignition cue, exactly as the hero's words do. The
   // timeout is a bench-only safety net so a disabled or failed ignition still
@@ -277,12 +337,28 @@ export default function SatelliteLab({
         <strong style={{ display: 'block', marginBottom: 8 }}>SATELLITES — prototype bench</strong>
         <div style={{ marginBottom: 10, opacity: 0.75 }}>{status}</div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          <button type="button" onClick={replayEntrance} style={btn('#8E1114')}>
-            replay entrance
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <button type="button" onClick={save} style={btn(dirty ? '#8E1114' : 'rgba(43,42,39,0.55)')}>
+            {dirty ? 'save •' : 'save'}
           </button>
           <button type="button" onClick={copyJson} style={btn('rgba(43,42,39,0.55)')}>
             {copied ? 'copied' : 'copy json'}
+          </button>
+          <button type="button" onClick={clearSaved} style={btn('rgba(43,42,39,0.25)')}>
+            reset
+          </button>
+        </div>
+        <div style={{ marginBottom: 8, opacity: 0.7 }}>
+          {dirty
+            ? 'unsaved changes'
+            : savedAt
+              ? `saved ${new Date(savedAt).toLocaleTimeString()} — restores on reload`
+              : 'saves to this browser, not the CMS'}
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <button type="button" onClick={replayEntrance} style={btn('rgba(43,42,39,0.35)')}>
+            replay entrance
           </button>
         </div>
 
@@ -295,20 +371,17 @@ export default function SatelliteLab({
               key={p.name}
               type="button"
               title={p.note}
-              onClick={() => setCfg((c) => ({ ...c, ...p.patch }))}
+              onClick={() => {
+                setCfg((c) => ({ ...c, ...p.patch }))
+                setDirty(true)
+              }}
               style={btn('rgba(43,42,39,0.35)')}
             >
               {p.name}
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setCfg({ ...DEFAULT_SATELLITES })}
-          style={{ ...btn('rgba(43,42,39,0.2)'), width: '100%', marginBottom: 10 }}
-        >
-          reset
-        </button>
+        <div style={{ marginBottom: 10 }} />
 
         <label style={{ display: 'flex', gap: 6, marginBottom: 6, cursor: 'pointer' }}>
           <input
@@ -356,7 +429,10 @@ export default function SatelliteLab({
           </span>
           <textarea
             value={wordText}
-            onChange={(e) => setWordText(e.target.value)}
+            onChange={(e) => {
+              setWordText(e.target.value)
+              setDirty(true)
+            }}
             spellCheck={false}
             rows={8}
             placeholder="one word per line"
@@ -378,16 +454,20 @@ export default function SatelliteLab({
           <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setWordText((initialWords.length ? initialWords : FALLBACK_WORDS).join('\n'))
-              }
+                setDirty(true)
+              }}
               style={btn('rgba(43,42,39,0.35)')}
             >
               reset words
             </button>
             <button
               type="button"
-              onClick={() => setWordText('')}
+              onClick={() => {
+                setWordText('')
+                setDirty(true)
+              }}
               style={btn('rgba(43,42,39,0.2)')}
             >
               clear
