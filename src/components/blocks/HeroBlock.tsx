@@ -7,6 +7,7 @@ import { ConstellationField } from '../hero/ConstellationField'
 import { SatelliteField } from '../hero/SatelliteField'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
+import type { SatelliteConfig } from '../../lib/satellites/types'
 
 type Props = {
   line1: string
@@ -18,6 +19,7 @@ type Props = {
   // silently reverting the hero to frozen defaults.
   separation: SeparationConfig
   ignition: IgnitionConfig
+  satellites: SatelliteConfig
   floatingWords?: string[]
 }
 
@@ -66,6 +68,7 @@ export function HeroBlock({
   constellationEnabled = true,
   separation,
   ignition,
+  satellites,
   floatingWords = [],
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
@@ -77,23 +80,13 @@ export function HeroBlock({
   const onStageLive = useCallback(() => setStageLive(true), [])
   const onIntroPlayStart = useCallback(() => setVideoStarted(true), [])
 
-  // PROTOTYPE (sub-project 3, 2026-08-26) — orbiting satellites, opt-in only.
-  //   ?satellites=1     satellites instead of the constellation
-  //   ?satellites=both  both at once, for comparison
-  // Read after mount rather than during render: the server has no query string,
-  // so branching on it inline would be a hydration mismatch. With no param the
-  // hero renders exactly as it does today, which is what keeps this prototype
-  // free to sit on the homepage while it is being judged.
+  // Holds LogoEngine.getCharge so the satellites can read the separation's
+  // charge each frame and freeze/shake with it. A ref rather than state: the
+  // charge changes every frame, and re-rendering at 60Hz to carry one number
+  // the canvas loop can pull directly would be pure overhead.
   const chargeRef = useRef<(() => number) | null>(null)
   const onChargeSource = useCallback((get: (() => number) | null) => {
     chargeRef.current = get
-  }, [])
-
-  const [satMode, setSatMode] = useState<'off' | 'only' | 'both'>('off')
-  useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get('satellites')
-    if (v === 'both') setSatMode('both')
-    else if (v && v !== '0' && v !== 'false') setSatMode('only')
   }, [])
 
   useEffect(() => {
@@ -155,9 +148,12 @@ export function HeroBlock({
       {/* Before <LogoStage> deliberately: the satellites' back canvas and
           LogoStage are both at z-index 0, so the logo has to come later in the
           DOM to paint over the particles orbiting behind it. */}
-      {satMode !== 'off' ? (
-        <SatelliteField words={floatingWords} active={stageLive} chargeRef={chargeRef} />
-      ) : null}
+      <SatelliteField
+        words={floatingWords}
+        config={satellites}
+        active={stageLive}
+        chargeRef={chargeRef}
+      />
       <LogoStage
         onLive={onStageLive}
         onIntroPlayStart={onIntroPlayStart}
@@ -165,11 +161,7 @@ export function HeroBlock({
         ignition={ignition}
         onChargeSource={onChargeSource}
       />
-      <ConstellationField
-        words={floatingWords}
-        enabled={constellationEnabled && satMode !== 'only'}
-        active={stageLive}
-      />
+      <ConstellationField words={floatingWords} enabled={constellationEnabled} active={stageLive} />
 
       <div
         className={`hero-headline-overlay${headlineStarted ? ' headline-started' : ''}`}

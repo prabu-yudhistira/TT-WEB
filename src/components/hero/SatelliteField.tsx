@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 import { SatelliteEngine } from '../../lib/satellites/SatelliteEngine'
-import { DEFAULT_SATELLITES, type SatelliteConfig } from '../../lib/satellites/types'
+import { type SatelliteConfig } from '../../lib/satellites/types'
 
 /**
- * PROTOTYPE — hero orbiting satellites. Throwaway; see lib/satellites/types.ts.
+ * Hero orbiting satellites — React wrapper.
  *
  * Renders TWO canvases at different z-indexes so the logo's own WebGL canvas
  * can sit between them:
@@ -24,13 +24,18 @@ import { DEFAULT_SATELLITES, type SatelliteConfig } from '../../lib/satellites/t
  */
 export function SatelliteField({
   words,
-  config = DEFAULT_SATELLITES,
+  config,
   active,
   enabled = true,
   chargeRef,
 }: {
   words: string[]
-  config?: SatelliteConfig
+  /**
+   * Required, not optional: a dropped prop must fail loudly rather than
+   * silently reverting the field to frozen defaults. Same hardening the
+   * 2026-08-09 review applied to HeroBlock's `separation`.
+   */
+  config: SatelliteConfig
   /** Entrance trigger — the hero passes the sketch-video → 3D handoff. */
   active: boolean
   enabled?: boolean
