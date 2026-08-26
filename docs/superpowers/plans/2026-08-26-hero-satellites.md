@@ -23,6 +23,17 @@
 - **Not localized.** Satellite appearance is numbers and hex; identical in EN and ID. Only `floatingWords` is localized, and it already exists.
 - **Colour belongs to the orbit slot, not the word** (spec §7.2). Satellite *i* takes colour *i*. Reordering words does not reorder colours.
 - **Standing gates before any commit that touches app code:** `npx tsc --noEmit` clean and `npm run verify:config` green.
+- **Writing to `hero-effects` over REST requires auth.** `access: { read: () => true }` opens reads only; an unauthenticated `POST` returns **403** (verified 2026-08-26). Reads are open, so `curl` GET needs nothing. For writes, log in first and send the token. The dev bench is unaffected — it runs in the browser and rides the admin session cookie via `credentials: 'same-origin'`.
+
+  ```bash
+  TT_TOKEN=$(curl -s -X POST "http://localhost:3000/api/users/login" \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@tampa-taruno.local","password":"tampataruno-2026"}' \
+    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).token))")
+  ```
+
+  Then add `-H "Authorization: JWT $TT_TOKEN"` to every write. Those are the seeded local dev
+  credentials; they are already recorded in `_HANDOFF/HANDOFF.md` and are not production secrets.
 - **Approved config values are frozen in `DEFAULT_SATELLITES`.** Do not change them. They were tuned live and signed off.
 
 ---
@@ -1318,15 +1329,21 @@ cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && npm run seed && rm -rf .next/cache
 
 Restart the dev server, then prove the value is being read rather than defaulted — change one field to something unmistakable and confirm it takes effect:
 
+Get a token first — an unauthenticated write is silently a 403 (see Global Constraints):
+
 ```bash
-curl -s -X POST "http://localhost:3000/api/globals/hero-effects" -H "Content-Type: application/json" -d '{"satelliteLook":{"size":18}}' > /dev/null
+TT_TOKEN=$(curl -s -X POST "http://localhost:3000/api/users/login" -H "Content-Type: application/json" -d '{"email":"admin@tampa-taruno.local","password":"tampataruno-2026"}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).token))")
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://localhost:3000/api/globals/hero-effects" -H "Content-Type: application/json" -H "Authorization: JWT $TT_TOKEN" -d '{"satelliteLook":{"size":18}}'
 rm -rf "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT/.next/cache"
 ```
+
+Expect `200`. A `403` means the token was not picked up — do not carry on and interpret an
+unchanged page as "the wiring is broken".
 
 Reload `http://localhost:3000/en` in headless Chrome and confirm the satellites are visibly larger, then put it back:
 
 ```bash
-curl -s -X POST "http://localhost:3000/api/globals/hero-effects" -H "Content-Type: application/json" -d '{"satelliteLook":{"size":4}}' > /dev/null
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://localhost:3000/api/globals/hero-effects" -H "Content-Type: application/json" -H "Authorization: JWT $TT_TOKEN" -d '{"satelliteLook":{"size":4}}'
 rm -rf "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT/.next/cache"
 ```
 
@@ -1393,18 +1410,44 @@ Create `docs/superpowers/verification/satellites-kill-switch.mjs`:
 //   node docs/superpowers/verification/satellites-kill-switch.mjs
 
 import puppeteer from 'puppeteer-core'
+import { rm } from 'node:fs/promises'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const API = 'http://localhost:3000/api/globals/hero-effects'
+const LOGIN = 'http://localhost:3000/api/users/login'
 const PAGE = 'http://localhost:3000/en'
+
+// Reads on this global are open; writes are not. An unauthenticated POST
+// returns 403, and without this the OFF probe would "pass" simply because
+// nothing ever changed.
+const EMAIL = process.env.TT_ADMIN_EMAIL ?? 'admin@tampa-taruno.local'
+const PASSWORD = process.env.TT_ADMIN_PASSWORD ?? 'tampataruno-2026'
+
+const login = async () => {
+  const r = await fetch(LOGIN, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+  })
+  if (!r.ok) throw new Error(`login failed: ${r.status} — is the dev server seeded?`)
+  const { token } = await r.json()
+  if (!token) throw new Error('login returned no token')
+  return token
+}
+
+const token = await login()
 
 const setEnabled = async (v) => {
   const r = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
     body: JSON.stringify({ satellitesEnabled: v }),
   })
   if (!r.ok) throw new Error(`POST failed: ${r.status}`)
+  // Reads go through unstable_cache, which persists to disk and survives a
+  // dev-server restart. Without clearing it the next probe sees the OLD value
+  // and the two polarities look identical.
+  await rm('.next/cache', { recursive: true, force: true })
 }
 
 const browser = await puppeteer.launch({
@@ -1463,9 +1506,10 @@ console.log(failures ? `\n${failures} check(s) failed.` : '\nKill switch verifie
 process.exit(failures ? 1 : 0)
 ```
 
-- [ ] **Step 3: Run it, clearing the cache between polarities**
+- [ ] **Step 3: Run it**
 
-The script POSTs to the API, so the disk cache must be cleared or the page will serve the previous value.
+`setEnabled` clears `.next/cache` itself after each write, so the two polarities cannot read
+the same cached value.
 
 ```bash
 cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && rm -rf .next/cache && node docs/superpowers/verification/satellites-kill-switch.mjs
@@ -1473,13 +1517,16 @@ cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && rm -rf .next/cache && node docs/sup
 
 Expected: all 8 `ok`. If the OFF probe still finds canvases, the switch is gating parameters rather than the component — go back to Step 1 rather than relaxing the assertion.
 
-If OFF passes only because the cache was stale, you will see it: the ON probe will also report 0 canvases. Re-run with `rm -rf .next/cache` between probes if the values look pinned.
-
-- [ ] **Step 4: Restore the switch and commit**
+The script leaves the switch ON, so no restore step is needed. Confirm it:
 
 ```bash
-curl -s -X POST "http://localhost:3000/api/globals/hero-effects" -H "Content-Type: application/json" -d '{"satellitesEnabled":true}' > /dev/null
-cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && rm -rf .next/cache && npx tsc --noEmit
+curl -s "http://localhost:3000/api/globals/hero-effects" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log('satellitesEnabled:',JSON.parse(s).satellitesEnabled))"
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && npx tsc --noEmit
 git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" add src/components docs/superpowers/verification
 git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" commit -m "feat(hero): satellites kill switch removes the field, verified both polarities"
 ```
