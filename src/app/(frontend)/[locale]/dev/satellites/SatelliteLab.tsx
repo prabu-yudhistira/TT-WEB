@@ -20,20 +20,21 @@ const LogoCanvas = dynamic(() => import('@/components/three/LogoCanvas'), { ssr:
  * zero database or schema changes, so rollback is "delete the branch".
  */
 
-const SAMPLE_WORDS = [
-  'Strategy',
-  'Interface',
-  'Motion',
-  'Craft',
-  'Systems',
-  'Identity',
-  'Narrative',
-  'Precision',
-  'Material',
-  'Depth',
-  'Signal',
-  'Form',
-]
+// Used only when the homepage has no hero words to seed from.
+const FALLBACK_WORDS = ['Strategy', 'Interface', 'Motion', 'Craft', 'Systems', 'Identity']
+
+/**
+ * One word per line, blank lines dropped — the same convention as the CMS's own
+ * constellation editor (FloatingWordsField, shipped in PR #2), so whatever is
+ * tuned here transfers to /admin without re-learning a second format.
+ *
+ * The satellite count IS the word count: add a line, get a satellite.
+ */
+const parseWords = (text: string): string[] =>
+  text
+    .split('\n')
+    .map((w) => w.trim())
+    .filter(Boolean)
 
 type NumKey = {
   [K in keyof SatelliteConfig]: SatelliteConfig[K] extends number ? K : never
@@ -185,14 +186,18 @@ const btn = (bg: string): React.CSSProperties => ({
 export default function SatelliteLab({
   separation,
   ignition,
+  initialWords,
 }: {
   separation: SeparationConfig
   ignition: IgnitionConfig
+  initialWords: string[]
 }) {
   const [cfg, setCfg] = useState<SatelliteConfig>({ ...DEFAULT_SATELLITES })
   const [active, setActive] = useState(false)
   const [showLogo, setShowLogo] = useState(true)
-  const [wordCount, setWordCount] = useState(12)
+  const [wordText, setWordText] = useState(
+    (initialWords.length ? initialWords : FALLBACK_WORDS).join('\n'),
+  )
   const [status, setStatus] = useState('loading logo…')
   const [copied, setCopied] = useState(false)
   const activeRef = useRef(active)
@@ -202,7 +207,7 @@ export default function SatelliteLab({
     chargeRef.current = get
   }, [])
 
-  const words = useMemo(() => SAMPLE_WORDS.slice(0, wordCount), [wordCount])
+  const words = useMemo(() => parseWords(wordText), [wordText])
 
   const set = useCallback(<K extends keyof SatelliteConfig>(k: K, v: SatelliteConfig[K]) => {
     setCfg((c) => ({ ...c, [k]: v }))
@@ -338,21 +343,57 @@ export default function SatelliteLab({
           <span>freeze + shake on hold</span>
         </label>
 
-        <label style={{ display: 'block', marginBottom: 8 }}>
-          <span style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Words / satellites</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{wordCount}</span>
+        <div style={{ marginBottom: 10 }}>
+          <span
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}
+          >
+            <span style={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              words
+            </span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {words.length} satellite{words.length === 1 ? '' : 's'}
+            </span>
           </span>
-          <input
-            type="range"
-            min={0}
-            max={SAMPLE_WORDS.length}
-            step={1}
-            value={wordCount}
-            onChange={(e) => setWordCount(Number(e.target.value))}
-            style={{ width: '100%' }}
+          <textarea
+            value={wordText}
+            onChange={(e) => setWordText(e.target.value)}
+            spellCheck={false}
+            rows={8}
+            placeholder="one word per line"
+            style={{
+              width: '100%',
+              marginTop: 3,
+              font: 'inherit',
+              color: 'inherit',
+              background: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(43,42,39,0.25)',
+              borderRadius: 3,
+              padding: '4px 6px',
+              resize: 'vertical',
+            }}
           />
-        </label>
+          <div style={{ opacity: 0.6, marginTop: 2 }}>
+            one per line — the count follows the list
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+            <button
+              type="button"
+              onClick={() =>
+                setWordText((initialWords.length ? initialWords : FALLBACK_WORDS).join('\n'))
+              }
+              style={btn('rgba(43,42,39,0.35)')}
+            >
+              reset words
+            </button>
+            <button
+              type="button"
+              onClick={() => setWordText('')}
+              style={btn('rgba(43,42,39,0.2)')}
+            >
+              clear
+            </button>
+          </div>
+        </div>
 
         <label style={{ display: 'block', marginBottom: 10 }}>
           <span>Labels</span>
