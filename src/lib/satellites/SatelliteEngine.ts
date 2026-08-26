@@ -1,6 +1,7 @@
 import { mulberry32 } from '../three/shatter/types'
 import { logoScreenBox } from '../three/calibration'
 import { DEFAULT_SATELLITES, type SatelliteConfig } from './types'
+import { placeLabels, EDGE_FADE_PX, type LabelCandidate } from './labels'
 
 /**
  * Hero orbiting satellites — simulation and rendering.
@@ -44,9 +45,6 @@ type Sat = Dust & {
 type Projected = { x: number; y: number; z: number; scale: number }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
-
-/** Distance from a frame edge over which a label fades out entirely. */
-const EDGE_FADE_PX = 48
 
 type Rgb = { r: number; g: number; b: number }
 
@@ -587,48 +585,40 @@ export class SatelliteEngine {
     }
 
     // ── labels ──
-    // Nearest-first, so that when two words collide the one in front keeps its
-    // label. Physically the right way round, and it means the survivor is the
-    // one already drawing the eye. Without this, 12 always-on labels average
-    // ~5.9 overlapping pairs on a 390px frame (worst case 11) — an unreadable
-    // pile. Desktop barely needs it; mobile cannot do without it.
-    const order = [...placed].sort((a, b) => a.q.z - b.q.z)
-    const taken: { l: number; r: number; t: number; b: number }[] = []
-
-    for (const { i, q, alpha } of order) {
+    // Edge fade and overlap suppression live in ./labels.ts as pure geometry —
+    // two bugs hid in them while they were tangled with canvas calls here.
+    const candidates: LabelCandidate[] = []
+    for (const { i, q, alpha } of placed) {
       const s = this.sats[i]
       if (!s.el) continue
-      let show = c.LABEL_MODE === 'always' ? alpha : c.LABEL_MODE === 'hover' && i === nearest ? alpha : 0
+      let a =
+        c.LABEL_MODE === 'always' ? alpha : c.LABEL_MODE === 'hover' && i === nearest ? alpha : 0
       // A satellite on the far side, currently behind the mark, should not have
       // its word floating over the logo's face.
-      if (q.z >= 0 && Math.abs(q.x - this.cx) < this.W * 0.09 && Math.abs(q.y - this.cy) < this.H * 0.16) {
-        show *= 0.15
+      if (
+        q.z >= 0 &&
+        Math.abs(q.x - this.cx) < this.W * 0.09 &&
+        Math.abs(q.y - this.cy) < this.H * 0.16
+      ) {
+        a *= 0.15
       }
+      candidates.push({
+        index: i,
+        x: q.x + c.LABEL_OFFSET,
+        y: q.y - c.LABEL_SIZE / 2,
+        w: s.labelW,
+        h: s.labelH,
+        z: q.z,
+        alpha: a,
+      })
+    }
 
-      // Fade out before the word would be sliced by a frame edge. A sphere
-      // leaving frame reads as depth; half a word reads as a rendering bug.
-      // At the approved radii ~4 of 12 labels sit on an edge at any moment on a
-      // laptop and 7 of 12 on a phone, so this is not an edge case.
-      const lx = q.x + c.LABEL_OFFSET
-      const ly = q.y - c.LABEL_SIZE / 2
-      const room = Math.min(
-        lx - EDGE_FADE_PX,
-        this.W - (lx + s.labelW) - EDGE_FADE_PX,
-        ly - EDGE_FADE_PX,
-        this.H - (ly + s.labelH) - EDGE_FADE_PX,
-      )
-      if (room < 0) show *= clamp01(1 + room / EDGE_FADE_PX)
-
-      if (show > 0.05) {
-        const box = { l: lx, r: lx + s.labelW, t: ly, b: ly + s.labelH }
-        const hit = taken.some(
-          (o) => box.l < o.r && o.l < box.r && box.t < o.b && o.t < box.b,
-        )
-        if (hit) show = 0
-        else taken.push(box)
-      }
-      s.el.style.opacity = show.toFixed(3)
-      s.el.style.transform = `translate3d(${(q.x + c.LABEL_OFFSET).toFixed(1)}px, ${(q.y - c.LABEL_SIZE / 2).toFixed(1)}px, 0)`
+    for (const p of placeLabels(candidates, this.W, this.H, EDGE_FADE_PX)) {
+      const s = this.sats[p.index]
+      const cand = candidates.find((k) => k.index === p.index)
+      if (!s.el || !cand) continue
+      s.el.style.opacity = p.opacity.toFixed(3)
+      s.el.style.transform = `translate3d(${cand.x.toFixed(1)}px, ${cand.y.toFixed(1)}px, 0)`
     }
   }
 
