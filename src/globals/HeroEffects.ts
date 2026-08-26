@@ -470,5 +470,232 @@ export const HeroEffects: GlobalConfig = {
         { name: 'emberOpacity', type: 'number', defaultValue: 0.95, min: 0, max: 1 },
       ],
     },
+    {
+      name: 'satellitesEnabled',
+      type: 'checkbox',
+      defaultValue: true,
+      admin: {
+        description:
+          'Coloured spheres orbiting the logo, each carrying one of the hero words. Turning this off removes them entirely — the hero keeps the logo, the video and the headline.',
+      },
+    },
+    {
+      name: 'satelliteField',
+      type: 'group',
+      label: 'Satellites — field',
+      admin: { description: 'Where the belt sits relative to the mark' },
+      fields: [
+        {
+          name: 'innerRadius',
+          type: 'number',
+          defaultValue: 3,
+          min: 0.4,
+          max: 6,
+          admin: { description: 'Orbit floor, as a multiple of the logo’s on-screen half-height' },
+        },
+        {
+          name: 'outerRadius',
+          type: 'number',
+          defaultValue: 1.6,
+          min: 0.2,
+          max: 3,
+          admin: {
+            description:
+              'Reference radius, as a fraction of half the viewport’s smaller side. Satellites orbit inside a band of this — see “band inner/outer” below.',
+          },
+        },
+        { name: 'mobileInnerRadius', type: 'number', defaultValue: 1.5, min: 0.4, max: 6 },
+        {
+          name: 'mobileOuterRadius',
+          type: 'number',
+          defaultValue: 0.78,
+          min: 0.2,
+          max: 3,
+          admin: {
+            description:
+              'Used below 640px. The desktop value leaves only about half the belt on a portrait screen.',
+          },
+        },
+        {
+          name: 'tilt',
+          type: 'number',
+          defaultValue: 20,
+          min: 0,
+          max: 90,
+          admin: { description: 'Inclination in degrees. 0 is edge-on, 90 is face-on.' },
+        },
+        { name: 'tiltSideway', type: 'number', defaultValue: 160, min: 0, max: 360 },
+        {
+          name: 'perspective',
+          type: 'number',
+          defaultValue: 1300,
+          min: 300,
+          max: 4000,
+          admin: { description: 'Lower is a stronger perspective' },
+        },
+      ],
+    },
+    {
+      name: 'satelliteMotion',
+      type: 'group',
+      label: 'Satellites — motion',
+      fields: [
+        { name: 'orbitSpeed', type: 'number', defaultValue: 2.2, min: 0, max: 20 },
+        {
+          name: 'orbitCcw',
+          type: 'checkbox',
+          defaultValue: true,
+          admin: { description: 'Counter-clockwise on screen. Off runs them clockwise.' },
+        },
+        { name: 'speedScale', type: 'number', defaultValue: 0.8, min: 0.1, max: 3 },
+        {
+          name: 'trail',
+          type: 'number',
+          defaultValue: 42,
+          min: 0,
+          max: 50,
+          admin: { description: '0 leaves no trail, 50 is the longest streak' },
+        },
+      ],
+    },
+    {
+      name: 'satelliteLook',
+      type: 'group',
+      label: 'Satellites — look',
+      fields: [
+        { name: 'size', type: 'number', defaultValue: 4, min: 1, max: 40 },
+        { name: 'alpha', type: 'number', defaultValue: 0.95, min: 0.05, max: 1 },
+        {
+          name: 'shade',
+          type: 'number',
+          defaultValue: 1,
+          min: 0,
+          max: 1,
+          admin: { description: '0 is a flat disc, 1 is a fully modelled sphere' },
+        },
+        {
+          name: 'depthScale',
+          type: 'number',
+          defaultValue: 0.9,
+          min: 0,
+          max: 2,
+          admin: { description: 'Extra near/far size difference beyond the perspective divide' },
+        },
+        { name: 'streak', type: 'number', defaultValue: 1, min: 0, max: 1 },
+        {
+          name: 'ring',
+          type: 'number',
+          defaultValue: 1.1,
+          min: 0,
+          max: 6,
+          admin: { description: 'Outline radius as a multiple of the sphere. 0 removes it.' },
+        },
+        {
+          name: 'bandInner',
+          type: 'number',
+          defaultValue: 0.5,
+          min: 0.1,
+          max: 1.4,
+          admin: { description: 'Innermost satellite orbit, as a fraction of the outer radius' },
+        },
+        { name: 'bandOuter', type: 'number', defaultValue: 0.8, min: 0.1, max: 1.4 },
+        {
+          name: 'tiltSpread',
+          type: 'number',
+          defaultValue: 15,
+          min: 0,
+          max: 120,
+          admin: {
+            description:
+              'Per-satellite inclination variation, in degrees. 0 is one shared plane.',
+          },
+        },
+        {
+          name: 'baseColor',
+          type: 'text',
+          defaultValue: '#8E1114',
+          validate: hexColour,
+          admin: { description: 'Used for any satellite the colour list below does not cover' },
+        },
+      ],
+    },
+    {
+      name: 'satelliteColors',
+      type: 'array',
+      label: 'Satellites — colours, in orbit order',
+      admin: {
+        description:
+          'Colour belongs to the ORBIT SLOT, not to the word: the first row colours the first satellite regardless of which word it carries, and regardless of language. Reordering the hero words does NOT reorder these. Extra rows are ignored; satellites past the last row use the base colour above.',
+      },
+      fields: [{ name: 'color', type: 'text', required: true, validate: hexColour }],
+    },
+    {
+      name: 'satelliteLabels',
+      type: 'group',
+      label: 'Satellites — words',
+      admin: {
+        description:
+          'The words themselves are the hero block’s “floating words” on the Home page, and the number of satellites follows that list.',
+      },
+      fields: [
+        {
+          name: 'mode',
+          type: 'select',
+          defaultValue: 'always',
+          options: [
+            { label: 'Always visible', value: 'always' },
+            { label: 'On hover (nearest)', value: 'hover' },
+            { label: 'Hidden', value: 'none' },
+          ],
+        },
+        { name: 'size', type: 'number', defaultValue: 12, min: 8, max: 32 },
+        { name: 'color', type: 'text', defaultValue: '#2B2A27', validate: hexColour },
+        { name: 'offset', type: 'number', defaultValue: 14, min: 0, max: 60 },
+        { name: 'hoverRadius', type: 'number', defaultValue: 90, min: 20, max: 300 },
+      ],
+    },
+    {
+      name: 'satelliteHold',
+      type: 'group',
+      label: 'Satellites — press and hold',
+      admin: {
+        description:
+          'What the satellites do while a visitor holds the logo. Shares the same gesture as the hold-to-separate effect above.',
+      },
+      fields: [
+        {
+          name: 'freeze',
+          type: 'checkbox',
+          defaultValue: true,
+          admin: { description: 'Stop orbiting and tremble in place while the logo is held' },
+        },
+        { name: 'shakePx', type: 'number', defaultValue: 3, min: 0, max: 40 },
+        { name: 'shakeSpeed', type: 'number', defaultValue: 1.1, min: 0.1, max: 4 },
+      ],
+    },
+    {
+      name: 'satelliteBehaviour',
+      type: 'group',
+      label: 'Satellites — behaviour',
+      fields: [
+        { name: 'entranceMs', type: 'number', defaultValue: 1600, min: 0, max: 5000 },
+        {
+          name: 'scrollFadeVh',
+          type: 'number',
+          defaultValue: 0.6,
+          min: 0,
+          max: 3,
+          admin: {
+            description: 'Screens of scrolling over which the field dissolves. 0 never fades.',
+          },
+        },
+        {
+          name: 'seed',
+          type: 'number',
+          defaultValue: 20260826,
+          admin: { description: 'Changing this reshuffles the starting arrangement' },
+        },
+      ],
+    },
   ],
 }
