@@ -298,7 +298,7 @@ export interface Page {
              */
             constellationEnabled?: boolean | null;
             /**
-             * 8–18 short words orbiting the logo; order = priority (small screens show only the first 8)
+             * 8–18 short words orbiting the logo, one satellite each — on every screen size. Colours are set per orbit slot under Hero Effects → Satellites.
              */
             floatingWords?:
               | {
