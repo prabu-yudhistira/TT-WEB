@@ -1,4 +1,4 @@
-import type { GlobalConfig } from 'payload'
+import type { Field, GlobalConfig } from 'payload'
 import { globalRevalidateHook } from '../lib/revalidate'
 
 // Payload has no native colour field; validate a 6-digit hex string instead.
@@ -6,6 +6,32 @@ const hexColour = (value: unknown) =>
   typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
     ? true
     : 'Use a 6-digit hex colour, e.g. #B4571C'
+
+/**
+ * One hex colour field, with a native colour picker rendered under the text
+ * input. `afterInput` rather than a replacement `Field`, so Payload's own
+ * label / description / validation / error rendering all stay stock — see
+ * src/components/admin/ColourSwatch.tsx.
+ *
+ * Every colour on this global goes through here so none of them can drift
+ * apart: a hex box with a swatch on one field and without on the next is the
+ * kind of inconsistency that looks like a bug.
+ */
+const colourField = (
+  name: string,
+  defaultValue?: string,
+  opts: { description?: string; required?: boolean } = {},
+): Field => ({
+  name,
+  type: 'text',
+  ...(defaultValue === undefined ? {} : { defaultValue }),
+  ...(opts.required ? { required: true } : {}),
+  validate: hexColour,
+  admin: {
+    ...(opts.description === undefined ? {} : { description: opts.description }),
+    components: { afterInput: ['@/components/admin/ColourSwatch#ColourSwatch'] },
+  },
+})
 
 /**
  * Physics and material settings for the hero logo: the hold-to-separate
@@ -103,20 +129,12 @@ export const HeroEffects: GlobalConfig = {
         { name: 'shineWidth', type: 'number', defaultValue: 0.05, min: 0.05, max: 1 },
         { name: 'shineSpeed', type: 'number', defaultValue: 0.9, min: 0, max: 3 },
         { name: 'shineChargeBoost', type: 'number', defaultValue: 1, min: 0, max: 4 },
-        {
-          name: 'shineWarm',
-          type: 'text',
-          defaultValue: '#B4571C',
-          validate: hexColour,
-          admin: { description: 'Warm end of the light wash, 6-digit hex' },
-        },
-        {
-          name: 'shineBright',
-          type: 'text',
-          defaultValue: '#FFF8E0',
-          validate: hexColour,
-          admin: { description: 'Hot end of the light wash, 6-digit hex' },
-        },
+        colourField('shineWarm', '#B4571C', {
+          description: 'Warm end of the light wash, 6-digit hex',
+        }),
+        colourField('shineBright', '#FFF8E0', {
+          description: 'Hot end of the light wash, 6-digit hex',
+        }),
       ],
     },
     {
@@ -296,22 +314,14 @@ export const HeroEffects: GlobalConfig = {
       label: 'Ignition — colour',
       admin: { description: 'The graphite-to-hot ramp, and the dark mass that makes red readable' },
       fields: [
-        {
-          name: 'coldColor',
-          type: 'text',
-          defaultValue: '#2B2A27',
-          validate: hexColour,
-          admin: { description: 'Unlit cage — matches the pencil in the sketch video' },
-        },
-        { name: 'warmColor', type: 'text', defaultValue: '#8E1114', validate: hexColour },
-        { name: 'hotColor', type: 'text', defaultValue: '#C8341A', validate: hexColour },
-        {
-          name: 'crestColor',
-          type: 'text',
-          defaultValue: '#FFF8E0',
-          validate: hexColour,
-          admin: { description: 'The very peak of the charge. Kept small and brief.' },
-        },
+        colourField('coldColor', '#2B2A27', {
+          description: 'Unlit cage — matches the pencil in the sketch video',
+        }),
+        colourField('warmColor', '#8E1114'),
+        colourField('hotColor', '#C8341A'),
+        colourField('crestColor', '#FFF8E0', {
+          description: 'The very peak of the charge. Kept small and brief.',
+        }),
         {
           name: 'darkMassOpacity',
           type: 'number',
@@ -610,13 +620,9 @@ export const HeroEffects: GlobalConfig = {
               'Per-satellite inclination variation, in degrees. 0 is one shared plane.',
           },
         },
-        {
-          name: 'baseColor',
-          type: 'text',
-          defaultValue: '#8E1114',
-          validate: hexColour,
-          admin: { description: 'Used for any satellite the colour list below does not cover' },
-        },
+        colourField('baseColor', '#8E1114', {
+          description: 'Used for any satellite the colour list below does not cover',
+        }),
       ],
     },
     {
@@ -627,7 +633,7 @@ export const HeroEffects: GlobalConfig = {
         description:
           'Colour belongs to the ORBIT SLOT, not to the word: the first row colours the first satellite regardless of which word it carries, and regardless of language. Reordering the hero words does NOT reorder these. Extra rows are ignored; satellites past the last row use the base colour above.',
       },
-      fields: [{ name: 'color', type: 'text', required: true, validate: hexColour }],
+      fields: [colourField('color', undefined, { required: true })],
     },
     {
       name: 'satelliteLabels',
@@ -649,7 +655,7 @@ export const HeroEffects: GlobalConfig = {
           ],
         },
         { name: 'size', type: 'number', defaultValue: 12, min: 8, max: 32 },
-        { name: 'color', type: 'text', defaultValue: '#2B2A27', validate: hexColour },
+        colourField('color', '#2B2A27'),
         { name: 'offset', type: 'number', defaultValue: 14, min: 0, max: 60 },
         { name: 'hoverRadius', type: 'number', defaultValue: 90, min: 20, max: 300 },
       ],
