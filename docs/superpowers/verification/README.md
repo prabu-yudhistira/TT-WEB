@@ -47,6 +47,7 @@ as real-device performance.
 | `satellites-orbit-hold.mjs` | Orbit direction via the sign of the cross product of consecutive position vectors (screenshots are easy to get backwards through a tilted perspective projection); freeze + shake driven by the **real** `LogoEngine.getCharge()`, not a re-implementation. |
 | `satellites-onscreen.mjs` | What fraction of the belt is on screen, and whether any label is clipped by a frame edge or overlaps another, at 1600×900 / 2560×1080 / 390×844. End-to-end proof for the placement rules unit-tested in `lib/satellites/labels.check.ts`. |
 | `satellites-degradation.mjs` | Reduced motion is byte-stable **and** non-trivially inked (a `MIN_STATIC_INK` floor — see the trap below); mobile is animating. |
+| `satellites-preview-live.mjs` | Proves a Satellites edit in `/admin` reaches the hero preview iframe **without saving** — the same real `postMessage` → `mergeData()` round-trip `preview-live-update.mjs` exercises, satellites-specific. |
 
 ## Two traps, both already paid for
 
@@ -101,17 +102,33 @@ force-kill, a production build run against a directory a dev server still has
 open. If a verification run needs `npm run build`, expect to restart `npm run
 dev` clean afterwards before trusting any subsequent browser check.
 
-**A single transient label-overlap reading did not reproduce.** One run of
-`satellites-onscreen.mjs`, taken on the very first request after the `.next`
-wipe above, reported one overlapping label pair at 1600×900
-(`avgLabelOverlaps 0.25`, one sample of eight). 60 dense samples over the next
-12s found none, and an immediate clean re-run of the same script passed 0
-overlaps at all three viewports. The placement algorithm has 14 passing unit
-assertions in `labels.check.ts` covering exactly the "two labels collide"
-case, including with cached-width edge cases. Logged as cold-start dev-server
-compile jitter, not a defect — but if this recurs **after a clean, warm
-server**, that changes the diagnosis; don't dismiss it a second time on the
-strength of this note alone.
+**A single transient label-overlap reading did not reproduce — since confirmed
+clean on a genuinely warm server.** One run of `satellites-onscreen.mjs`,
+taken on the very first request after the `.next` wipe above, reported one
+overlapping label pair at 1600×900 (`avgLabelOverlaps 0.25`, one sample of
+eight). At the time: 60 dense samples over the next 12s found none, and an
+immediate re-run of the same script passed 0 overlaps at all three viewports.
+Left as an open question pending a genuinely cold-start-free run. That run
+happened during Task 10 (`ConstellationField`'s removal, on a freshly wiped
+`.next` restarted cleanly and confirmed warm with two 200s before any browser
+check ran) — 0 overlaps at all three viewports, no recurrence. Closed: the
+placement algorithm's 14 passing unit assertions in `labels.check.ts` were
+right, and the one FAIL was dev-server compile jitter, not a defect.
+
+**A magic-ratio threshold against a continuously-orbiting scene is not
+reproducible.** `satellites-preview-live.mjs` first compared total canvas ink
+before/after a live edit against a hardcoded "5x" jump, under normal motion.
+It failed once, post-`ConstellationField`-removal, at a ~4.7x jump — not
+because the live edit stopped working, but because baseline ink itself swings
+close to 2x between arbitrary moments: with several satellites orbiting
+independently, how many happen to be near-camera at the instant of
+measurement (their apparent radius is boosted up to ~4.6x by
+`SAT_DEPTH_SCALE`) genuinely varies that much. Fixed the same way as the
+cross-source check below — `prefers-reduced-motion: reduce` freezes the scene
+to one static, byte-identical frame (`SatelliteEngine.drawStatic()` never
+loops), which removes the confound rather than trying to out-guess it with a
+looser threshold. Reproduced identically (`3890 → 3890 → 74806`) across
+repeated runs afterward.
 
 **Isolate a "did the guard hold" check from the hero's own idle animation.**
 A before/after screenshot pair a few seconds apart shows a large delta from

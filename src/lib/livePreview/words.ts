@@ -1,10 +1,16 @@
 /**
- * Conversion between the constellation word textarea (one word per line) and
- * Payload's array-row shape for `floatingWords`.
+ * Conversion between the hero word textarea (one word per line) and Payload's
+ * array-row shape for `floatingWords`.
  *
  * Limits mirror the field's own contract in src/blocks/index.ts exactly:
- * maxRows 18, and 24 characters per word. Order is priority — small screens
- * render only the first 8 (see ConstellationField's MOBILE_MAX_WORDS).
+ * maxRows 18, and 24 characters per word.
+ *
+ * Order used to matter for a mobile word cap when ConstellationField rendered
+ * this field (its own MOBILE_MAX_WORDS truncated to the first 8 on small
+ * screens, now removed along with that component). The satellites that
+ * replaced it have no such cap — every word gets its own satellite on every
+ * breakpoint — so order here is purely the editor's own priority, not a
+ * truncation boundary.
  */
 
 /** Payload's `maxRows` on the floatingWords field. */

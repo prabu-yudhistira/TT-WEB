@@ -52,12 +52,13 @@ export type LogoScreenBox = { cx: number; cy: number; hw: number; hh: number }
 /**
  * Where the 3D mark actually lands on screen, in CSS pixels.
  *
- * This is the same computation ConstellationField does inline to place its
- * string anchors — mobile swaps HEIGHT_FRAC, and desktop multiplies by the
- * video's object-fit:cover factor exactly as LogoEngine.applyCalibration does.
- * Getting either wrong makes an overlay drift off the mark on anything that
- * isn't a 16:9 window, which is why it lives here rather than being re-derived
- * per consumer.
+ * Used by the orbiting satellites to place their orbit centre. Mobile swaps
+ * HEIGHT_FRAC, and desktop multiplies by the video's object-fit:cover factor
+ * exactly as LogoEngine.applyCalibration does. Getting either wrong makes an
+ * overlay drift off the mark on anything that isn't a 16:9 window, which is
+ * why it lives here rather than being re-derived per consumer — the
+ * since-removed ConstellationField used to duplicate this same computation
+ * inline before this helper existed.
  */
 export function logoScreenBox(
   viewportW: number,

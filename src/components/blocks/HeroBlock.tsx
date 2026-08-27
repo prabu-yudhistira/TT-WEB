@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
-import { ConstellationField } from '../hero/ConstellationField'
 import { SatelliteField } from '../hero/SatelliteField'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
@@ -162,7 +161,6 @@ export function HeroBlock({
         ignition={ignition}
         onChargeSource={onChargeSource}
       />
-      <ConstellationField words={floatingWords} enabled={constellationEnabled} active={stageLive} />
 
       <div
         className={`hero-headline-overlay${headlineStarted ? ' headline-started' : ''}`}

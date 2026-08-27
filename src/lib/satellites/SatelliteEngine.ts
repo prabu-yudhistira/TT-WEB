@@ -18,9 +18,9 @@ import { placeLabels, EDGE_FADE_PX, type LabelCandidate } from './labels'
  * _HANDOFF/HANDOFF.md). Trails are free here too — one destination-out fill
  * per frame, versus a render target in WebGL.
  *
- * Runs one rAF loop writing DOM styles imperatively, matching
- * ConstellationField's established pattern: React renders the labels once and
- * never again.
+ * Runs one rAF loop writing DOM styles imperatively — the same pattern the
+ * since-removed ConstellationField established: React renders the labels
+ * once and never again.
  */
 
 type Dust = {
