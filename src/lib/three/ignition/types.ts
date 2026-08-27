@@ -112,7 +112,12 @@ export const DEFAULT_IGNITION: Readonly<IgnitionConfig> = Object.freeze({
   /** red-pencil token */
   WARM_COLOR: 0x8e1114,
   HOT_COLOR: 0xc8341a,
-  /** already the SHINE_BRIGHT token. Kept small and brief. */
+  /**
+   * Already the SHINE_BRIGHT token. Kept small and brief. Reads gold, not red
+   * — flagged three times across three sessions as possibly wanting to move
+   * toward WARM_COLOR/HOT_COLOR; owner accepted 2026-08-27, final. Do not
+   * re-flag.
+   */
   CREST_COLOR: 0xfff8e0,
   CORE_STRENGTH: 1,
   /** hot-core radius as a fraction of logo height */
@@ -175,9 +180,10 @@ export const DEFAULT_IGNITION: Readonly<IgnitionConfig> = Object.freeze({
    */
   WIRE_JITTER: 0.07,
   /**
-   * Owner-tuned to 6, which is the CMS/bench maximum. Worth widening the range
-   * if it ever wants to go faster — a value sitting exactly on its cap usually
-   * means the cap is the constraint, not the preference.
+   * Owner-tuned to 6, the CMS/bench maximum. Sat exactly on that cap for
+   * three sessions before the owner was asked directly whether they wanted
+   * it widened — 2026-08-27: no, 6 is correct as-is. Do not re-flag or widen
+   * the range without a new owner request.
    */
   WIRE_SPEED: 6,
   /**
