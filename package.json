@@ -12,7 +12,7 @@
     "generate:importmap": "payload generate:importmap",
     "seed": "node --env-file=.env --import tsx src/seed/index.ts",
     "seed:verify": "node --env-file=.env --import tsx src/seed/verify.ts",
-    "verify:config": "node --import tsx src/lib/three/shatter/resolveSeparation.check.ts && node --import tsx src/lib/three/ignition/resolveIgnition.check.ts && node --import tsx src/lib/three/ignition/cage.check.ts && node --import tsx src/lib/three/ignition/ignitionMaterial.check.ts && node --import tsx src/lib/three/ignition/IgnitionController.check.ts && node --import tsx src/lib/livePreview/words.check.ts && node --import tsx src/lib/livePreview/source.check.ts"
+    "verify:config": "node --import tsx src/lib/three/shatter/resolveSeparation.check.ts && node --import tsx src/lib/three/ignition/resolveIgnition.check.ts && node --import tsx src/lib/three/ignition/cage.check.ts && node --import tsx src/lib/three/ignition/ignitionMaterial.check.ts && node --import tsx src/lib/three/ignition/IgnitionController.check.ts && node --import tsx src/lib/livePreview/words.check.ts && node --import tsx src/lib/livePreview/source.check.ts && node --import tsx src/lib/satellites/types.check.ts && node --import tsx src/lib/satellites/labels.check.ts && node --import tsx src/lib/satellites/resolveSatellites.check.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

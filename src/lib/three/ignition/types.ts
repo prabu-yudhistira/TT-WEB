@@ -72,9 +72,11 @@ export const DEFAULT_IGNITION: Readonly<IgnitionConfig> = Object.freeze({
   /** fraction at which the charge front finishes crossing the geometry */
   FRONT_END: 0.78,
   /**
-   * Fraction at which `cue` fires. Sub-project 3's orbs enter here, and
-   * ConstellationField's entrance (onLive) moves here too — it lands just as
-   * the front finishes, so the energy disperses INTO the orbiting bodies.
+   * Fraction at which `cue` fires — LogoStage's onLive, which drives the
+   * orbiting satellites' entrance (HeroBlock's stageLive, threaded into
+   * SatelliteField's `active` prop). Lands just as the front finishes, so the
+   * energy disperses INTO the orbiting bodies. The since-removed
+   * ConstellationField's entrance used to key off the same signal.
    */
   CUE_FRAC: 0.73,
   /** seed position offset from the logo's centre, as fractions of logo height */

@@ -34,11 +34,14 @@ export function LogoStage({
   onIntroPlayStart,
   separation,
   ignition,
+  onChargeSource,
 }: {
   onLive?: () => void
   onIntroPlayStart?: () => void
   separation: SeparationConfig
   ignition: IgnitionConfig
+  /** See LogoCanvas — publishes the separation charge to effects outside the scene. */
+  onChargeSource?: (get: (() => number) | null) => void
 }) {
   const [introDone, setIntroDone] = useState(false)
   const [canvasReady, setCanvasReady] = useState(false)
@@ -100,6 +103,7 @@ export function LogoStage({
           onIgnitionCue={onCue}
           onIgnitionDone={onDone}
           onLogoHover={setLogoHover}
+          onChargeSource={onChargeSource}
         />
       </div>
       <SketchIntro

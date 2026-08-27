@@ -8,6 +8,7 @@ import { ArchiveTeaser } from './ArchiveTeaser'
 import { ContactMailto } from './ContactMailto'
 import { resolveSeparation } from '../../lib/three/shatter/resolveSeparation'
 import { resolveIgnition } from '../../lib/three/ignition/resolveIgnition'
+import { resolveSatellites } from '../../lib/satellites/resolveSatellites'
 
 type Blocks = NonNullable<Page['layout']>
 
@@ -37,6 +38,7 @@ export async function RenderBlocks({
                   constellationEnabled={block.constellationEnabled ?? true}
                   separation={resolveSeparation(effects)}
                   ignition={resolveIgnition(effects)}
+                  satellites={resolveSatellites(effects)}
                   floatingWords={(block.floatingWords || [])
                     .map((w) => w.word)
                     .filter((w): w is string => !!w)}

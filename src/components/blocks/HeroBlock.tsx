@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
-import { ConstellationField } from '../hero/ConstellationField'
+import { SatelliteField } from '../hero/SatelliteField'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
+import type { SatelliteConfig } from '../../lib/satellites/types'
 
 type Props = {
   line1: string
@@ -17,6 +18,7 @@ type Props = {
   // silently reverting the hero to frozen defaults.
   separation: SeparationConfig
   ignition: IgnitionConfig
+  satellites: SatelliteConfig
   floatingWords?: string[]
 }
 
@@ -65,6 +67,7 @@ export function HeroBlock({
   constellationEnabled = true,
   separation,
   ignition,
+  satellites,
   floatingWords = [],
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
@@ -75,6 +78,15 @@ export function HeroBlock({
   const [headlineDismissed, setHeadlineDismissed] = useState(false)
   const onStageLive = useCallback(() => setStageLive(true), [])
   const onIntroPlayStart = useCallback(() => setVideoStarted(true), [])
+
+  // Holds LogoEngine.getCharge so the satellites can read the separation's
+  // charge each frame and freeze/shake with it. A ref rather than state: the
+  // charge changes every frame, and re-rendering at 60Hz to carry one number
+  // the canvas loop can pull directly would be pure overhead.
+  const chargeRef = useRef<(() => number) | null>(null)
+  const onChargeSource = useCallback((get: (() => number) | null) => {
+    chargeRef.current = get
+  }, [])
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -132,13 +144,23 @@ export function HeroBlock({
           one continuous page. Bottom 10% fades out to blend into the site's
           paper-tile background. Owner request 2026-07-17. */}
       <div className="tt-hero-paper" aria-hidden />
+      {/* Before <LogoStage> deliberately: the satellites' back canvas and
+          LogoStage are both at z-index 0, so the logo has to come later in the
+          DOM to paint over the particles orbiting behind it. */}
+      <SatelliteField
+        words={floatingWords}
+        config={satellites}
+        active={stageLive}
+        chargeRef={chargeRef}
+        enabled={satellites.SAT_ENABLED}
+      />
       <LogoStage
         onLive={onStageLive}
         onIntroPlayStart={onIntroPlayStart}
         separation={separation}
         ignition={ignition}
+        onChargeSource={onChargeSource}
       />
-      <ConstellationField words={floatingWords} enabled={constellationEnabled} active={stageLive} />
 
       <div
         className={`hero-headline-overlay${headlineStarted ? ' headline-started' : ''}`}

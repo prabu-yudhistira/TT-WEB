@@ -43,3 +43,35 @@ export function videoCoverScale(viewportW: number, viewportH: number): number {
   if (!(viewportW > 0) || !(viewportH > 0)) return 1
   return Math.max(1, viewportW / viewportH / VIDEO_ASPECT)
 }
+
+/** Logo bbox aspect, from _ASSETS/logo/logo-bbox.json. */
+export const LOGO_ASPECT = 1532 / 1427
+
+export type LogoScreenBox = { cx: number; cy: number; hw: number; hh: number }
+
+/**
+ * Where the 3D mark actually lands on screen, in CSS pixels.
+ *
+ * Used by the orbiting satellites to place their orbit centre. Mobile swaps
+ * HEIGHT_FRAC, and desktop multiplies by the video's object-fit:cover factor
+ * exactly as LogoEngine.applyCalibration does. Getting either wrong makes an
+ * overlay drift off the mark on anything that isn't a 16:9 window, which is
+ * why it lives here rather than being re-derived per consumer — the
+ * since-removed ConstellationField used to duplicate this same computation
+ * inline before this helper existed.
+ */
+export function logoScreenBox(
+  viewportW: number,
+  viewportH: number,
+  mobile = viewportW < 640,
+): LogoScreenBox {
+  const heightFrac = mobile ? CALIB.MOBILE_HEIGHT_FRAC : CALIB.HEIGHT_FRAC
+  const cover = mobile ? 1 : videoCoverScale(viewportW, viewportH)
+  const lh = heightFrac * viewportH * cover
+  return {
+    cx: CALIB.CENTER_X * viewportW,
+    cy: viewportH / 2 + (CALIB.CENTER_Y - 0.5) * viewportH * cover,
+    hw: (lh * LOGO_ASPECT) / 2,
+    hh: lh / 2,
+  }
+}

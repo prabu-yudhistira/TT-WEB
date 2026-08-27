@@ -993,6 +993,120 @@ export interface HeroEffect {
     emberTwinkle?: number | null;
     emberOpacity?: number | null;
   };
+  /**
+   * Coloured spheres orbiting the logo, each carrying one of the hero words. Turning this off removes them entirely — the hero keeps the logo, the video and the headline.
+   */
+  satellitesEnabled?: boolean | null;
+  /**
+   * Where the belt sits relative to the mark
+   */
+  satelliteField?: {
+    /**
+     * Orbit floor, as a multiple of the logo’s on-screen half-height
+     */
+    innerRadius?: number | null;
+    /**
+     * Reference radius, as a fraction of half the viewport’s smaller side. Satellites orbit inside a band of this — see “band inner/outer” below.
+     */
+    outerRadius?: number | null;
+    mobileInnerRadius?: number | null;
+    /**
+     * Used below 640px. The desktop value leaves only about half the belt on a portrait screen.
+     */
+    mobileOuterRadius?: number | null;
+    /**
+     * Inclination in degrees. 0 is edge-on, 90 is face-on.
+     */
+    tilt?: number | null;
+    tiltSideway?: number | null;
+    /**
+     * Lower is a stronger perspective
+     */
+    perspective?: number | null;
+  };
+  satelliteMotion?: {
+    orbitSpeed?: number | null;
+    /**
+     * Counter-clockwise on screen. Off runs them clockwise.
+     */
+    orbitCcw?: boolean | null;
+    speedScale?: number | null;
+    /**
+     * 0 leaves no trail, 50 is the longest streak
+     */
+    trail?: number | null;
+  };
+  satelliteLook?: {
+    size?: number | null;
+    alpha?: number | null;
+    /**
+     * 0 is a flat disc, 1 is a fully modelled sphere
+     */
+    shade?: number | null;
+    /**
+     * Extra near/far size difference beyond the perspective divide
+     */
+    depthScale?: number | null;
+    streak?: number | null;
+    /**
+     * Outline radius as a multiple of the sphere. 0 removes it.
+     */
+    ring?: number | null;
+    /**
+     * Innermost satellite orbit, as a fraction of the outer radius
+     */
+    bandInner?: number | null;
+    bandOuter?: number | null;
+    /**
+     * Per-satellite inclination variation, in degrees. 0 is one shared plane.
+     */
+    tiltSpread?: number | null;
+    /**
+     * Used for any satellite the colour list below does not cover
+     */
+    baseColor?: string | null;
+  };
+  /**
+   * Colour belongs to the ORBIT SLOT, not to the word: the first row colours the first satellite regardless of which word it carries, and regardless of language. Reordering the hero words does NOT reorder these. Extra rows are ignored; satellites past the last row use the base colour above.
+   */
+  satelliteColors?:
+    | {
+        color: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * The words themselves are the hero block’s “floating words” on the Home page, and the number of satellites follows that list.
+   */
+  satelliteLabels?: {
+    mode?: ('always' | 'hover' | 'none') | null;
+    size?: number | null;
+    color?: string | null;
+    offset?: number | null;
+    hoverRadius?: number | null;
+  };
+  /**
+   * What the satellites do while a visitor holds the logo. Shares the same gesture as the hold-to-separate effect above.
+   */
+  satelliteHold?: {
+    /**
+     * Stop orbiting and tremble in place while the logo is held
+     */
+    freeze?: boolean | null;
+    shakePx?: number | null;
+    shakeSpeed?: number | null;
+  };
+  satelliteBehaviour?: {
+    entranceMs?: number | null;
+    /**
+     * Screens of scrolling over which the field dissolves. 0 never fades.
+     */
+    scrollFadeVh?: number | null;
+    /**
+     * Changing this reshuffles the starting arrangement
+     */
+    seed?: number | null;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1156,6 +1270,69 @@ export interface HeroEffectsSelect<T extends boolean = true> {
         emberSize?: T;
         emberTwinkle?: T;
         emberOpacity?: T;
+      };
+  satellitesEnabled?: T;
+  satelliteField?:
+    | T
+    | {
+        innerRadius?: T;
+        outerRadius?: T;
+        mobileInnerRadius?: T;
+        mobileOuterRadius?: T;
+        tilt?: T;
+        tiltSideway?: T;
+        perspective?: T;
+      };
+  satelliteMotion?:
+    | T
+    | {
+        orbitSpeed?: T;
+        orbitCcw?: T;
+        speedScale?: T;
+        trail?: T;
+      };
+  satelliteLook?:
+    | T
+    | {
+        size?: T;
+        alpha?: T;
+        shade?: T;
+        depthScale?: T;
+        streak?: T;
+        ring?: T;
+        bandInner?: T;
+        bandOuter?: T;
+        tiltSpread?: T;
+        baseColor?: T;
+      };
+  satelliteColors?:
+    | T
+    | {
+        color?: T;
+        id?: T;
+      };
+  satelliteLabels?:
+    | T
+    | {
+        mode?: T;
+        size?: T;
+        color?: T;
+        offset?: T;
+        hoverRadius?: T;
+      };
+  satelliteHold?:
+    | T
+    | {
+        freeze?: T;
+        shakePx?: T;
+        shakeSpeed?: T;
+      };
+  satelliteBehaviour?:
+    | T
+    | {
+        entranceMs?: T;
+        scrollFadeVh?: T;
+        seed?: T;
       };
   updatedAt?: T;
   createdAt?: T;

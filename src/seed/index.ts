@@ -134,6 +134,66 @@ const run = async () => {
         emberTwinkle: 2.5,
         emberOpacity: 0.95,
       },
+      // Owner-approved satellite values, tuned live at /dev/satellites and
+      // signed off 2026-08-26. These mirror DEFAULT_SATELLITES exactly; the
+      // check suite in lib/satellites/types.check.ts pins the same numbers.
+      //
+      // ⚠ This block only runs on a FRESH install. The seed bails early with
+      // "Seed skipped — users already exist", so adding values here does NOT
+      // backfill an existing dev or production database. Payload's own
+      // defaultValue covers the scalar fields on read, but `satelliteColors`
+      // is an array and arrays have no defaultValue — an existing install
+      // shows an EMPTY colour list in /admin until it is written. Write it
+      // with an authenticated POST to /api/globals/hero-effects
+      // (toSatellitesPayload(DEFAULT_SATELLITES) produces exactly this shape),
+      // or through the dev bench's save button.
+      satellitesEnabled: true,
+      satelliteField: {
+        innerRadius: 3,
+        outerRadius: 1.6,
+        mobileInnerRadius: 1.5,
+        mobileOuterRadius: 0.78,
+        tilt: 20,
+        tiltSideway: 160,
+        perspective: 1300,
+      },
+      satelliteMotion: { orbitSpeed: 2.2, orbitCcw: true, speedScale: 0.8, trail: 42 },
+      satelliteLook: {
+        size: 4,
+        alpha: 0.95,
+        shade: 1,
+        depthScale: 0.9,
+        streak: 1,
+        ring: 1.1,
+        bandInner: 0.5,
+        bandOuter: 0.8,
+        tiltSpread: 15,
+        baseColor: '#8E1114',
+      },
+      satelliteColors: [
+        '#000000',
+        '#ffd500',
+        '#f96d3e',
+        '#23e126',
+        '#0f8a75',
+        '#04b1b4',
+        '#13118d',
+        '#2B2A27',
+        '#b04803',
+        '#145c0a',
+        '#118d1f',
+        '#b400cc',
+        '#bd0000',
+      ].map((color) => ({ color })),
+      satelliteLabels: {
+        mode: 'always',
+        size: 12,
+        color: '#2B2A27',
+        offset: 14,
+        hoverRadius: 90,
+      },
+      satelliteHold: { freeze: true, shakePx: 3, shakeSpeed: 1.1 },
+      satelliteBehaviour: { entranceMs: 1600, scrollFadeVh: 0.6, seed: 20260826 },
     },
   })
 
