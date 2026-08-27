@@ -43,6 +43,10 @@ as real-device performance.
 | `t9-ring-profile.mjs` | Profiles ring/core ink across captured frames. Used to calibrate the thresholds the other tests assert on. |
 | `preview-live-update.mjs` | Proves a Hero Effects edit reaches the admin preview iframe **without saving**, and that a mismatched-shape message is ignored when the URL's `?source=` doesn't match it. |
 | `preview-context-leak.mjs` | Clicks the preview's "Replay intro" 25× and asserts the WebGL context is still live — regression guard for the context exhaustion fixed in `9190364`. |
+| `satellites-capture.mjs` | Baseline health for the orbiting satellites: fps, ink on both canvases, motion between frames, label count, zero console errors. |
+| `satellites-orbit-hold.mjs` | Orbit direction via the sign of the cross product of consecutive position vectors (screenshots are easy to get backwards through a tilted perspective projection); freeze + shake driven by the **real** `LogoEngine.getCharge()`, not a re-implementation. |
+| `satellites-onscreen.mjs` | What fraction of the belt is on screen, and whether any label is clipped by a frame edge or overlaps another, at 1600×900 / 2560×1080 / 390×844. End-to-end proof for the placement rules unit-tested in `lib/satellites/labels.check.ts`. |
+| `satellites-degradation.mjs` | Reduced motion is byte-stable **and** non-trivially inked (a `MIN_STATIC_INK` floor — see the trap below); mobile is animating. |
 
 ## Two traps, both already paid for
 
@@ -77,6 +81,37 @@ the collection case this means `useLivePreview`'s `initialData` must carry a
 real `id`, or the endpoint resolves to `/api/{collection}/undefined` and every
 live edit fails silently. Caught by reading `mergeData.js` directly, not by
 the failure showing up as an error anywhere.
+
+**A `MIN_STATIC_INK` floor matters as much as byte-stability for a reduced-motion
+assertion.** Byte-stability alone passes happily on a blank canvas — that is
+exactly how a real satellites defect stayed invisible: an earlier, wider orbit
+band rendered ~76px of ink under reduced motion at 1440×900 (effectively one
+satellite, everything else off-frame at its seeded angle), and a stability-only
+check called that a pass. Assert both.
+
+**Running `npm run build` alongside a live `npm run dev` corrupts `.next` for
+the dev server.** Task 8's own build-check step (needed because this hero's
+`admin-preview` route once failed `next build` while `next dev` compiled it
+fine) left the still-running dev server serving a mix of dev and production
+artifacts — `Cannot find module './vendor-chunks/gsap.js'`, 500s on every
+route. Same symptom class as the `.next`-corruption gotcha documented
+elsewhere in this project (stop the server, `rm -rf .next`, not just
+`.next/cache`, restart clean) but a different trigger: not a version swap or a
+force-kill, a production build run against a directory a dev server still has
+open. If a verification run needs `npm run build`, expect to restart `npm run
+dev` clean afterwards before trusting any subsequent browser check.
+
+**A single transient label-overlap reading did not reproduce.** One run of
+`satellites-onscreen.mjs`, taken on the very first request after the `.next`
+wipe above, reported one overlapping label pair at 1600×900
+(`avgLabelOverlaps 0.25`, one sample of eight). 60 dense samples over the next
+12s found none, and an immediate clean re-run of the same script passed 0
+overlaps at all three viewports. The placement algorithm has 14 passing unit
+assertions in `labels.check.ts` covering exactly the "two labels collide"
+case, including with cached-width edge cases. Logged as cold-start dev-server
+compile jitter, not a defect — but if this recurs **after a clean, warm
+server**, that changes the diagnosis; don't dismiss it a second time on the
+strength of this note alone.
 
 **Isolate a "did the guard hold" check from the hero's own idle animation.**
 A before/after screenshot pair a few seconds apart shows a large delta from
