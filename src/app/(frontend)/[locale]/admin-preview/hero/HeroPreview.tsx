@@ -7,6 +7,10 @@ import { HeroBlock } from '@/components/blocks/HeroBlock'
 import { parseSource, SOURCE_PARAM } from '@/lib/livePreview/source'
 import { resolveIgnition, type HeroEffectsIgnitionInput } from '@/lib/three/ignition/resolveIgnition'
 import { resolveSeparation, type HeroEffectsInput } from '@/lib/three/shatter/resolveSeparation'
+import {
+  resolveSatellites,
+  type HeroEffectsSatellitesInput,
+} from '@/lib/satellites/resolveSatellites'
 import type { IgnitionConfig } from '@/lib/three/ignition/types'
 import type { SatelliteConfig } from '@/lib/satellites/types'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
@@ -74,7 +78,7 @@ export default function HeroPreview(props: Props) {
 
   let separation = props.savedSeparation
   let ignition = props.savedIgnition
-  const satellites = props.savedSatellites
+  let satellites = props.savedSatellites
   let line1 = props.savedLine1
   let line2 = props.savedLine2
   let locationLine = props.savedLocationLine
@@ -94,6 +98,7 @@ export default function HeroPreview(props: Props) {
   if (hasLiveEffects) {
     separation = resolveSeparation(data as HeroEffectsInput)
     ignition = resolveIgnition(data as HeroEffectsIgnitionInput)
+    satellites = resolveSatellites(data as HeroEffectsSatellitesInput)
   }
 
   if (hasLivePage) {
