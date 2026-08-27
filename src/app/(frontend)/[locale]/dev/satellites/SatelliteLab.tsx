@@ -4,20 +4,23 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SatelliteField } from '@/components/hero/SatelliteField'
 import { DEFAULT_SATELLITES, type LabelMode, type SatelliteConfig } from '@/lib/satellites/types'
+import { toSatellitesPayload } from '@/lib/satellites/resolveSatellites'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
 import type { IgnitionConfig } from '@/lib/three/ignition/types'
 
 const LogoCanvas = dynamic(() => import('@/components/three/LogoCanvas'), { ssr: false })
 
 /**
- * PROTOTYPE tuning bench. Throwaway.
+ * Tuning bench for the orbiting satellites.
  *
  * Unlike the ignition and shatter benches this never rebuilds an engine on a
  * slider change — the satellite field takes live config updates in place — so
  * there is no WebGL context churn here and no debounce is needed.
  *
- * The words are hard-coded rather than CMS-fed on purpose: this prototype makes
- * zero database or schema changes, so rollback is "delete the branch".
+ * Appearance saves to the hero-effects global via the save button. Words are
+ * NOT saved from here — they live on the page's hero block (floatingWords),
+ * localized, and are edited at /admin's own word editor (PR #2). This bench
+ * only lets you preview a different word list locally.
  */
 
 // Used only when the homepage has no hero words to seed from.
@@ -56,30 +59,6 @@ const parseWords = (text: string): string[] =>
     .map((w) => w.trim())
     .filter(Boolean)
 
-/**
- * Bench state persists to localStorage, not to the CMS.
- *
- * The shatter and ignition benches POST to /api/globals/hero-effects because
- * those features have fields there. The satellites deliberately have none — the
- * prototype makes zero schema changes so rollback stays "delete the branch" —
- * so there is nothing to write. Losing a tuning session to a page reload is a
- * real cost though, hence this.
- */
-const STORE_KEY = 'tt-satellites-proto-v1'
-
-type Saved = { cfg: Partial<SatelliteConfig>; wordText: string; at: number }
-
-function loadSaved(): Saved | null {
-  try {
-    const raw = localStorage.getItem(STORE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Saved
-    return parsed && typeof parsed === 'object' && parsed.cfg ? parsed : null
-  } catch {
-    return null
-  }
-}
-
 type NumKey = {
   [K in keyof SatelliteConfig]: SatelliteConfig[K] extends number ? K : never
 }[keyof SatelliteConfig]
@@ -90,8 +69,13 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: 'field geometry',
     rows: [
-      { key: 'INNER_RADIUS', label: 'Inner radius (× logo)', min: 0.4, max: 3, step: 0.05 },
-      { key: 'OUTER_RADIUS', label: 'Outer radius', min: 0.2, max: 1.6, step: 0.02 },
+      { key: 'INNER_RADIUS', label: 'Inner radius (× logo)', min: 0.4, max: 6, step: 0.05 },
+      // Ceiling widened to 3 (was 1.6) — the owner's approved value sat
+      // exactly on the old slider ceiling, which may have constrained the
+      // choice. Matches the CMS field's own range.
+      { key: 'OUTER_RADIUS', label: 'Outer radius', min: 0.2, max: 3, step: 0.02 },
+      { key: 'MOBILE_INNER_RADIUS', label: 'Mobile inner radius', min: 0.4, max: 6, step: 0.05 },
+      { key: 'MOBILE_OUTER_RADIUS', label: 'Mobile outer radius', min: 0.2, max: 3, step: 0.02 },
       { key: 'TILT', label: 'Inclination °', min: 0, max: 90, step: 1 },
       { key: 'TILT_SIDEWAY', label: 'Roll °', min: 0, max: 360, step: 1 },
       { key: 'PERSPECTIVE', label: 'Perspective', min: 300, max: 4000, step: 50 },
@@ -128,7 +112,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { key: 'SAT_DEPTH_SCALE', label: 'Near/far size boost', min: 0, max: 2, step: 0.05 },
       { key: 'SAT_STREAK', label: 'Trail streak', min: 0, max: 1, step: 0.05 },
       { key: 'SAT_RING', label: 'Ring × size', min: 0, max: 6, step: 0.1 },
-      { key: 'SAT_RADIUS_MIN', label: 'Band inner', min: 0.1, max: 1, step: 0.02 },
+      // Bench max matches the CMS field (bandInner: min 0.1 max 1.4) exactly —
+      // this used to cap at 1, one more slider that could silently constrain a
+      // choice below what the field actually accepts.
+      { key: 'SAT_RADIUS_MIN', label: 'Band inner', min: 0.1, max: 1.4, step: 0.02 },
       { key: 'SAT_RADIUS_MAX', label: 'Band outer', min: 0.1, max: 1.4, step: 0.02 },
       { key: 'SAT_TILT_SPREAD', label: 'Inclination spread °', min: 0, max: 120, step: 1 },
     ],
@@ -143,7 +130,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
   {
     title: 'behaviour',
-    rows: [{ key: 'ENTRANCE_MS', label: 'Entrance ms', min: 0, max: 5000, step: 100 }],
+    rows: [
+      { key: 'ENTRANCE_MS', label: 'Entrance ms', min: 0, max: 5000, step: 100 },
+      { key: 'SCROLL_FADE_VH', label: 'Scroll fade (vh)', min: 0, max: 3, step: 0.1 },
+    ],
   },
 ]
 
@@ -231,12 +221,14 @@ export default function SatelliteLab({
   separation,
   ignition,
   initialWords,
+  initialConfig,
 }: {
   separation: SeparationConfig
   ignition: IgnitionConfig
   initialWords: string[]
+  initialConfig: SatelliteConfig
 }) {
-  const [cfg, setCfg] = useState<SatelliteConfig>({ ...DEFAULT_SATELLITES })
+  const [cfg, setCfg] = useState<SatelliteConfig>(initialConfig)
   const [active, setActive] = useState(false)
   const [showLogo, setShowLogo] = useState(true)
   const [wordText, setWordText] = useState(
@@ -260,38 +252,34 @@ export default function SatelliteLab({
     setDirty(true)
   }, [])
 
-  // Restore after mount, never during render: the server has no localStorage,
-  // so seeding state from it inline would be a hydration mismatch. Merged OVER
-  // the current defaults rather than replacing them, so a save taken before a
-  // new knob existed still loads instead of arriving with that knob undefined.
-  useEffect(() => {
-    const saved = loadSaved()
-    if (!saved) return
-    setCfg((c) => ({ ...c, ...saved.cfg }))
-    if (typeof saved.wordText === 'string') setWordText(saved.wordText)
-    setSavedAt(saved.at)
-    setDirty(false)
-  }, [])
-
-  const save = useCallback(() => {
+  // Real write to the CMS, matching the shatter bench's own save button. The
+  // admin session cookie rides along via credentials: 'same-origin' — no token
+  // handling needed here, unlike the verification scripts that hit this same
+  // endpoint from outside the browser.
+  const save = useCallback(async () => {
+    setStatus('saving…')
     try {
-      const at = Date.now()
-      localStorage.setItem(STORE_KEY, JSON.stringify({ cfg, wordText, at } satisfies Saved))
-      setSavedAt(at)
+      const res = await fetch('/api/globals/hero-effects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(toSatellitesPayload(cfg)),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      setSavedAt(Date.now())
       setDirty(false)
+      setStatus('saved to CMS — reload the homepage to see it live')
     } catch (err) {
-      console.error('bench: could not save', err)
-      setStatus('save failed — see console')
+      console.error('bench: save failed', err)
+      setStatus('save failed — are you logged in at /admin?')
     }
-  }, [cfg, wordText])
+  }, [cfg])
 
   const clearSaved = useCallback(() => {
-    localStorage.removeItem(STORE_KEY)
-    setSavedAt(null)
-    setDirty(false)
-    setCfg({ ...DEFAULT_SATELLITES })
+    setCfg(initialConfig)
     setWordText((initialWords.length ? initialWords : FALLBACK_WORDS).join('\n'))
-  }, [initialWords])
+    setDirty(false)
+  }, [initialConfig, initialWords])
 
   // Entrance rides the real ignition cue, exactly as the hero's words do. The
   // timeout is a bench-only safety net so a disabled or failed ignition still
@@ -354,7 +342,7 @@ export default function SatelliteLab({
           overflowY: 'auto',
         }}
       >
-        <strong style={{ display: 'block', marginBottom: 8 }}>SATELLITES — prototype bench</strong>
+        <strong style={{ display: 'block', marginBottom: 8 }}>SATELLITES — tuning bench</strong>
         <div style={{ marginBottom: 10, opacity: 0.75 }}>{status}</div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -364,16 +352,21 @@ export default function SatelliteLab({
           <button type="button" onClick={copyJson} style={btn('rgba(43,42,39,0.55)')}>
             {copied ? 'copied' : 'copy json'}
           </button>
-          <button type="button" onClick={clearSaved} style={btn('rgba(43,42,39,0.25)')}>
-            reset
+          <button
+            type="button"
+            onClick={clearSaved}
+            title="Revert to the values loaded from the CMS at page load, without saving"
+            style={btn('rgba(43,42,39,0.25)')}
+          >
+            revert
           </button>
         </div>
         <div style={{ marginBottom: 8, opacity: 0.7 }}>
           {dirty
             ? 'unsaved changes'
             : savedAt
-              ? `saved ${new Date(savedAt).toLocaleTimeString()} — restores on reload`
-              : 'saves to this browser, not the CMS'}
+              ? `saved ${new Date(savedAt).toLocaleTimeString()} to the Hero Effects global`
+              : 'saves to the Hero Effects global'}
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>

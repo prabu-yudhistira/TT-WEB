@@ -2,9 +2,10 @@ import { notFound } from 'next/navigation'
 import { getHeroEffects, getPage, type Locale } from '@/lib/cms'
 import { resolveIgnition } from '@/lib/three/ignition/resolveIgnition'
 import { resolveSeparation } from '@/lib/three/shatter/resolveSeparation'
+import { resolveSatellites } from '@/lib/satellites/resolveSatellites'
 import SatelliteLab from './SatelliteLab'
 
-// PROTOTYPE bench for the orbiting satellites (sub-project 3). Dev-only, never
+// Tuning bench for the orbiting satellites (sub-project 3). Dev-only, never
 // reachable in a production build — same gate as /dev/ignition and /dev/shatter.
 export default async function SatellitesDevPage({
   params,
@@ -17,7 +18,8 @@ export default async function SatellitesDevPage({
 
   // Seed from the homepage's REAL words rather than invented sample text, so
   // what gets judged here is the actual copy at its actual lengths. Editing
-  // them in the bench is local only — nothing writes back to the CMS.
+  // them in the bench is local only — words do not write back to the CMS
+  // (they live on the page's hero block, not on hero-effects).
   const hero = (page?.layout || []).find((b) => b.blockType === 'hero')
   const words =
     hero && hero.blockType === 'hero'
@@ -29,6 +31,7 @@ export default async function SatellitesDevPage({
       separation={resolveSeparation(effects)}
       ignition={resolveIgnition(effects)}
       initialWords={words}
+      initialConfig={resolveSatellites(effects)}
     />
   )
 }
