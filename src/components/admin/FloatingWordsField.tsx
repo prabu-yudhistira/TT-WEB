@@ -176,13 +176,12 @@ export const FloatingWordsField: ArrayFieldClientComponent = (props) => {
         ))}
 
       <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-        One word per line. Order is priority — phones show only the first {MIN_RECOMMENDED}.
-        {' '}
+        One word per line — each becomes one orbiting satellite, on every screen size.{' '}
         <strong>
           {words.length} / {MAX_WORDS}
         </strong>
         {words.length > 0 && words.length < MIN_RECOMMENDED
-          ? ` — below ${MIN_RECOMMENDED} the constellation looks sparse`
+          ? ` — below ${MIN_RECOMMENDED} the orbit looks sparse`
           : ''}
         {tooMany ? ` — only the first ${MAX_WORDS} lines are kept` : ''}
         {overLong ? ` — words over ${MAX_WORD_LEN} characters are shortened` : ''}

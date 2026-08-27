@@ -27,7 +27,7 @@ export const HeroBlock: Block = {
       maxRows: 18,
       admin: {
         description:
-          '8–18 short words orbiting the logo; order = priority (small screens show only the first 8)',
+          '8–18 short words orbiting the logo, one satellite each — on every screen size. Colours are set per orbit slot under Hero Effects → Satellites.',
         // UI-only swap: one textarea instead of 18 collapsible rows. The stored
         // shape is unchanged — delete this `components` block and Payload's
         // stock array editor returns with every word intact.
