@@ -29,26 +29,26 @@
  * Vector do it. No sprite sheet, no assets.
  */
 
-/** One eye's shape. Mirrored for the other eye unless a field says otherwise. */
+/**
+ * One eye's shape. Mirrored for the other eye unless a field says otherwise.
+ *
+ * The primitive is an ELLIPSE, not a rounded box: the owner asked for ovals to
+ * match the mascot's own painted eyes, and a rounded box can only reach a
+ * stadium/capsule, never a true oval. Dropping the four corner radii also
+ * dropped the `brow` cut, which existed only to build the `angry` expression —
+ * removed at the owner's request.
+ */
 export type EyeShape = {
   /** Centre offset from the eye's home position, in display units (-1..1 space). */
   dx: number
   dy: number
-  /** Half-extents in display units. */
+  /** Half-extents of the ellipse, in display units. */
   w: number
   h: number
-  /** Corner rounding, 0 = square, 1 = fully round. Outer/inner pairs let the
-   *  "angry" wedge and the "smiling" arc come from the same primitive. */
-  rTopOuter: number
-  rTopInner: number
-  rBotOuter: number
-  rBotInner: number
   /** Lean, degrees. Positive leans the top toward the outside. */
   lean: number
   /** Upward bow of the lower edge, 0..1 — this is what makes a smiling arc. */
   smile: number
-  /** Straight cut across the top, 0..1 — this is what makes the angry brow. */
-  brow: number
 }
 
 export type Expression = {
@@ -61,15 +61,13 @@ export type Expression = {
 const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
   dx: 0,
   dy: 0,
-  w: 0.30,
-  h: 0.42,
-  rTopOuter: 0.85,
-  rTopInner: 0.85,
-  rBotOuter: 0.85,
-  rBotInner: 0.85,
+  // Sized to the mascot's OWN painted ovals rather than to the reference video,
+  // at the owner's request — the display should read as the same eyes lit up,
+  // not as a smaller screen inside the socket.
+  w: 0.34,
+  h: 0.50,
   lean: 0,
   smile: 0,
-  brow: 0,
   ...o,
 })
 
@@ -81,37 +79,42 @@ const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
  * revolution every 3.2s), so the face sweeps past the viewer for well under a
  * second at a time, at which point one eye is ~14x18px. Only large silhouette
  * changes read at all; subtlety here would be invisible by construction.
+ *
+ * `angry` was removed at the owner's request 2026-08-28. There was never a
+ * `sad`; `squint` is the nearest thing to one and is kept.
  */
 export const EXPRESSIONS: Record<string, Expression> = {
   neutral: { name: 'neutral', left: eye() },
-  blink: { name: 'blink', left: eye({ h: 0.045, rTopOuter: 1, rTopInner: 1, rBotOuter: 1, rBotInner: 1 }) },
-  squint: { name: 'squint', left: eye({ h: 0.20, w: 0.31 }) },
-  happy: { name: 'happy', left: eye({ h: 0.16, w: 0.33, smile: 1, dy: -0.05 }) },
-  angry: { name: 'angry', left: eye({ h: 0.36, brow: 0.55, rTopInner: 0.1 }) },
-  wide: { name: 'wide', left: eye({ w: 0.34, h: 0.52 }) },
-  lookLeft: { name: 'lookLeft', left: eye({ dx: -0.16, lean: -14, w: 0.28 }) },
-  lookRight: { name: 'lookRight', left: eye({ dx: 0.16, lean: 14, w: 0.28 }) },
+  // A flattened ellipse is a lens, which is what the reference's blink actually
+  // looks like — a rounded bar would have been the rounded-box artefact.
+  blink: { name: 'blink', left: eye({ h: 0.05 }) },
+  squint: { name: 'squint', left: eye({ h: 0.22, w: 0.35 }) },
+  happy: { name: 'happy', left: eye({ h: 0.19, w: 0.37, smile: 1, dy: -0.04 }) },
+  wide: { name: 'wide', left: eye({ w: 0.38, h: 0.60 }) },
+  lookLeft: { name: 'lookLeft', left: eye({ dx: -0.15, lean: -16, w: 0.31 }) },
+  lookRight: { name: 'lookRight', left: eye({ dx: 0.15, lean: 16, w: 0.31 }) },
+  lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: -0.13, dy: 0.14, lean: -20, w: 0.31, h: 0.46 }) },
+  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.13, dy: 0.14, lean: 20, w: 0.31, h: 0.46 }) },
   wink: {
     name: 'wink',
-    left: eye({ h: 0.045, rTopOuter: 1, rTopInner: 1, rBotOuter: 1, rBotInner: 1 }),
-    right: eye({ h: 0.16, w: 0.33, smile: 1, dy: -0.05 }),
+    left: eye({ h: 0.05 }),
+    right: eye({ h: 0.19, w: 0.37, smile: 1, dy: -0.04 }),
   },
 }
 
-/** Packs an EyeShape into the 12 floats the shader reads. */
+/**
+ * Packs an EyeShape into the 12 floats the shader reads. Slots past the ellipse
+ * parameters stay zero — the array width is kept at 12 so the uniform layout
+ * does not change if a future expression needs more.
+ */
 export function packEye(e: EyeShape, out: Float32Array, at: number): void {
+  out.fill(0, at, at + 12)
   out[at] = e.dx
   out[at + 1] = e.dy
   out[at + 2] = e.w
   out[at + 3] = e.h
-  out[at + 4] = e.rTopOuter
-  out[at + 5] = e.rTopInner
-  out[at + 6] = e.rBotOuter
-  out[at + 7] = e.rBotInner
-  out[at + 8] = (e.lean * Math.PI) / 180
-  out[at + 9] = e.smile
-  out[at + 10] = e.brow
-  out[at + 11] = 0
+  out[at + 4] = (e.lean * Math.PI) / 180
+  out[at + 5] = e.smile
 }
 
 export const lerpEye = (a: EyeShape, b: EyeShape, t: number): EyeShape => ({
@@ -119,13 +122,8 @@ export const lerpEye = (a: EyeShape, b: EyeShape, t: number): EyeShape => ({
   dy: a.dy + (b.dy - a.dy) * t,
   w: a.w + (b.w - a.w) * t,
   h: a.h + (b.h - a.h) * t,
-  rTopOuter: a.rTopOuter + (b.rTopOuter - a.rTopOuter) * t,
-  rTopInner: a.rTopInner + (b.rTopInner - a.rTopInner) * t,
-  rBotOuter: a.rBotOuter + (b.rBotOuter - a.rBotOuter) * t,
-  rBotInner: a.rBotInner + (b.rBotInner - a.rBotInner) * t,
   lean: a.lean + (b.lean - a.lean) * t,
   smile: a.smile + (b.smile - a.smile) * t,
-  brow: a.brow + (b.brow - a.brow) * t,
 })
 
 /** `right` defaults to a mirror of `left`. */
@@ -155,35 +153,25 @@ uniform float uEyeR[12];
 varying vec3 vTtObjPos;
 
 
-// Rounded-blob SDF with four independent corner radii, a lean, a bowed lower
-// edge (smile) and a straight top cut (brow). Every expression in the reference
-// is reachable from these.
+// Ellipse SDF with a lean and a bowed lower edge. An ellipse, not a rounded
+// box: the owner asked for ovals matching the mascot's painted eyes, and a
+// rounded box tops out at a stadium. Flattening h turns it into a lens, which
+// is exactly what the reference's blink looks like.
+//
+// length(q/hs) - 1.0 is in normalised units, so it is scaled back by the
+// smaller half-extent to stay an approximate distance — that keeps fwidth()
+// antialiasing stable as the eye squashes.
 float tt_eyeShape(vec2 p, float pa[12], float sideSign) {
   vec2 q = p - vec2(pa[0] * sideSign, pa[1]);
-  float a = pa[8] * sideSign;
+  float a = pa[4] * sideSign;
   float c = cos(a), s = sin(a);
   q = vec2(q.x * c - q.y * s, q.x * s + q.y * c);
-  vec2 hs = vec2(pa[2], pa[3]);
+  vec2 hs = max(vec2(pa[2], pa[3]), vec2(1e-4));
 
   // smile: bow the lower edge upward, so the shape reads as an arc
-  q.y += pa[9] * 0.55 * hs.y * (1.0 - (q.x * q.x) / max(hs.x * hs.x, 1e-4));
+  q.y += pa[5] * 0.55 * hs.y * (1.0 - clamp((q.x * q.x) / (hs.x * hs.x), 0.0, 1.0));
 
-  // pick the corner radius for this quadrant (outer = away from the nose)
-  float outer = (q.x * sideSign) > 0.0 ? 1.0 : 0.0;
-  float rTop = mix(pa[5], pa[4], outer);
-  float rBot = mix(pa[7], pa[6], outer);
-  float r = (q.y > 0.0 ? rTop : rBot) * min(hs.x, hs.y);
-
-  vec2 d = abs(q) - (hs - vec2(r));
-  float sdf = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
-
-  // brow: a straight diagonal cut down from the inner top corner
-  if (pa[10] > 0.001) {
-    float bx = -q.x * sideSign;
-    float browLine = q.y - (hs.y - pa[10] * hs.y * 2.0) - bx * pa[10] * 1.1;
-    sdf = max(sdf, browLine);
-  }
-  return sdf;
+  return (length(q / hs) - 1.0) * min(hs.x, hs.y);
 }
 
 vec3 tt_eyes(vec3 base, out float coverage) {

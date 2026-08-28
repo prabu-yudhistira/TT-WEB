@@ -199,11 +199,14 @@ export class MascotEngine {
   private eyeUniforms: Record<string, { value: unknown }> = {
     uEyesOn: { value: 1 },
     uFaceRadius: { value: 0.5 },
-    uEyeColor: { value: new THREE.Color('#59C8F0') },
-    uEyeCore: { value: new THREE.Color('#DCF6FF') },
+    // Amber, not the reference video's cyan: the owner asked for the display to
+    // match the mascot's own painted eyes and the gold dust trail (#FDB721), so
+    // the hero keeps ONE warm accent rather than gaining a second, cold one.
+    uEyeColor: { value: new THREE.Color('#F2A81C') },
+    uEyeCore: { value: new THREE.Color('#FFF0BE') },
     uSocketColor: { value: new THREE.Color('#06080B') },
     uEyeGlow: { value: 0.55 },
-    uEyeGap: { value: 0.36 },
+    uEyeGap: { value: 0.38 },
     uScanline: { value: 0 },
     uSocketSpan: { value: 1.34 },
     uEyeL: { value: new Float32Array(12) },
@@ -760,7 +763,8 @@ export class MascotEngine {
 
   /** Expressions the glance beat picks from, in rough order of how often. */
   private static readonly GLANCE_POOL = [
-    'blink', 'blink', 'happy', 'wink', 'squint', 'lookLeft', 'lookRight', 'happy',
+    'blink', 'blink', 'happy', 'wink', 'squint',
+    'lookLeft', 'lookRight', 'lookUpLeft', 'lookUpRight', 'happy',
   ]
 
   /**
