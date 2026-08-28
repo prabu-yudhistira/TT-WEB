@@ -1107,6 +1107,141 @@ export interface HeroEffect {
      */
     seed?: number | null;
   };
+  /**
+   * A single brass mascot orbiting the logo alongside the satellites, trailing gold dust and carrying its own word. Turning this off removes it entirely — nothing else in the hero changes.
+   */
+  mascotEnabled?: boolean | null;
+  /**
+   * The mascot’s word. NOT one of the hero “floating words” — those are localized and their count drives the satellites; this is the mascot’s own fixed name, shown identically in both languages.
+   */
+  mascotLabelText?: string | null;
+  /**
+   * The mascot shares the satellites’ orbital plane (tilt, roll, direction). These are its own place within it.
+   */
+  mascotOrbit?: {
+    /**
+     * As a fraction of the satellites’ outer radius. The bead band is 0.5–0.8.
+     */
+    radius?: number | null;
+    mobileRadius?: number | null;
+    /**
+     * How far the mascot rides above the belt plane, in px. Keep this well clear of 0 — it is what keeps the mascot reading as nearer than the beads it passes.
+     */
+    height?: number | null;
+    tiltOffset?: number | null;
+    /**
+     * Starting angle on the orbit, degrees
+     */
+    phase?: number | null;
+    /**
+     * Orbit speed as a multiple of the satellites’ orbit speed
+     */
+    speedScale?: number | null;
+  };
+  mascotLook?: {
+    /**
+     * On-screen diameter in px at zero depth
+     */
+    size?: number | null;
+    mobileSize?: number | null;
+    /**
+     * Extra near/far size difference beyond the perspective divide. NOT the satellites’ 0.9 — that value is tuned for 4px beads.
+     */
+    depthScale?: number | null;
+    opacity?: number | null;
+    /**
+     * Reflection strength. Brass is fully metallic — at 0 it goes black.
+     */
+    envIntensity?: number | null;
+    lightIntensity?: number | null;
+  };
+  mascotSpin?: {
+    /**
+     * Degrees per second, independent of the orbit
+     */
+    spinSpeed?: number | null;
+    spinTilt?: number | null;
+    /**
+     * Slow vertical float on top of the orbit
+     */
+    bobPx?: number | null;
+    bobSeconds?: number | null;
+  };
+  /**
+   * A shed particle field. Additive blending is a deliberate choice — the dust colour is picked bright to suit it.
+   */
+  mascotTrail?: {
+    enabled?: boolean | null;
+    /**
+     * How long each mote lives
+     */
+    seconds?: number | null;
+    /**
+     * Motes per second
+     */
+    density?: number | null;
+    /**
+     * Mote diameter in px
+     */
+    size?: number | null;
+    /**
+     * Random scatter at emission, px
+     */
+    spread?: number | null;
+    /**
+     * How fast motes drift off the path, px/sec
+     */
+    drift?: number | null;
+    /**
+     * Hot-core strength
+     */
+    glow?: number | null;
+    twinkle?: number | null;
+    opacity?: number | null;
+    /**
+     * Additive blending. Off is slightly more saturated on the paper.
+     */
+    additive?: boolean | null;
+    /**
+     * The saturated body of each mote
+     */
+    color?: string | null;
+    /**
+     * The bright centre of each mote
+     */
+    coreColor?: string | null;
+  };
+  /**
+   * The word’s text is set above (“mascot label text”). These control how it looks.
+   */
+  mascotLabel?: {
+    enabled?: boolean | null;
+    size?: number | null;
+    color?: string | null;
+    /**
+     * Gap from the mascot’s edge, px
+     */
+    offset?: number | null;
+    /**
+     * Paper-coloured halo behind the word, px. Fixes the word going illegible where it crosses the mark’s red stroke. 0 is off.
+     */
+    halo?: number | null;
+  };
+  /**
+   * Shares the same gesture as the hold-to-separate effect. Freeze + tremble in place while the logo is held.
+   */
+  mascotHold?: {
+    freeze?: boolean | null;
+    shakePx?: number | null;
+    shakeSpeed?: number | null;
+  };
+  mascotBehaviour?: {
+    entranceMs?: number | null;
+    /**
+     * Screens of scrolling over which the mascot dissolves. 0 never fades.
+     */
+    scrollFadeVh?: number | null;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1333,6 +1468,74 @@ export interface HeroEffectsSelect<T extends boolean = true> {
         entranceMs?: T;
         scrollFadeVh?: T;
         seed?: T;
+      };
+  mascotEnabled?: T;
+  mascotLabelText?: T;
+  mascotOrbit?:
+    | T
+    | {
+        radius?: T;
+        mobileRadius?: T;
+        height?: T;
+        tiltOffset?: T;
+        phase?: T;
+        speedScale?: T;
+      };
+  mascotLook?:
+    | T
+    | {
+        size?: T;
+        mobileSize?: T;
+        depthScale?: T;
+        opacity?: T;
+        envIntensity?: T;
+        lightIntensity?: T;
+      };
+  mascotSpin?:
+    | T
+    | {
+        spinSpeed?: T;
+        spinTilt?: T;
+        bobPx?: T;
+        bobSeconds?: T;
+      };
+  mascotTrail?:
+    | T
+    | {
+        enabled?: T;
+        seconds?: T;
+        density?: T;
+        size?: T;
+        spread?: T;
+        drift?: T;
+        glow?: T;
+        twinkle?: T;
+        opacity?: T;
+        additive?: T;
+        color?: T;
+        coreColor?: T;
+      };
+  mascotLabel?:
+    | T
+    | {
+        enabled?: T;
+        size?: T;
+        color?: T;
+        offset?: T;
+        halo?: T;
+      };
+  mascotHold?:
+    | T
+    | {
+        freeze?: T;
+        shakePx?: T;
+        shakeSpeed?: T;
+      };
+  mascotBehaviour?:
+    | T
+    | {
+        entranceMs?: T;
+        scrollFadeVh?: T;
       };
   updatedAt?: T;
   createdAt?: T;
