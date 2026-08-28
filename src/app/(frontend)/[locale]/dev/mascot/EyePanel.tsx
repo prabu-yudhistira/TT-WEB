@@ -1,30 +1,32 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import {
-  DEFAULT_EYE_TUNING,
-  EXPRESSION_ORDER,
-  cloneEyeTuning,
-  type EyeTuning,
-} from '@/lib/mascot/eyeTuning'
-import type { EyeShape } from '@/lib/mascot/eyes'
+import { EXPRESSIONS, EXPRESSION_ORDER, type EyeShape } from '@/lib/mascot/eyes'
+import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from '@/lib/mascot/eyeTypes'
 
 /**
- * ⚠️ THROWAWAY. The eye-tuning half of the mascot bench, kept out of
- * MascotLab.tsx so that deleting it later is one file plus one JSX line.
+ * The eye-tuning half of the mascot bench, kept out of MascotLab.tsx so it
+ * stays one file to reason about.
  *
- * Exists so the owner can approve eye values ON SCREEN before a spec is
- * written — the inversion that produced the satellites and the mascot itself.
- * The JSON this panel copies out becomes the spec's source of truth.
+ * This is now the ONLY tool for shape work: the 14 expression shapes are frozen
+ * in lib/mascot/eyes.ts and are deliberately not CMS-editable (spec §7.1), so
+ * the panel holds its own working copy of them and `copy json` emits it for
+ * pasting back into that file. That paste IS the approval step.
+ *
+ * The config half (look, scanlines, beat, weights) IS CMS-backed and saves
+ * through MascotLab's existing button.
  */
 
-type Row = { key: keyof EyeTuning; label: string; min: number; max: number; step: number }
+type Row = { key: keyof MascotEyesConfig; label: string; min: number; max: number; step: number }
 
 const LOOK: Row[] = [
   { key: 'GLOW', label: 'Glow', min: 0, max: 2, step: 0.05 },
   { key: 'GAP', label: 'Gap between eyes', min: 0, max: 0.9, step: 0.01 },
-  { key: 'SOCKET_SPAN', label: 'Socket cover', min: 0.3, max: 2.2, step: 0.02 },
-  { key: 'FACE_RADIUS', label: 'Face radius ⚠ measured 0.50', min: 0.3, max: 0.8, step: 0.01 },
+  // Ranges clear the approved values with room: this project has already
+  // shipped a value sitting exactly on its own slider ceiling.
+  { key: 'SOCKET_SPAN', label: 'Socket cover', min: 0.3, max: 2.5, step: 0.02 },
+  // FACE_RADIUS is absent on purpose — it is the MEASURED radius of the front
+  // cap (0.50), not a preference, and a slider for it could only break the mask.
 ]
 
 const SCAN: Row[] = [
@@ -103,13 +105,13 @@ function Slider({
 }
 
 export default function EyePanel({
-  tuning,
+  config,
   onChange,
   inspect,
   onInspect,
 }: {
-  tuning: EyeTuning
-  onChange: (t: EyeTuning) => void
+  config: MascotEyesConfig
+  onChange: (c: MascotEyesConfig) => void
   inspect: { on: boolean; angleDeg: number; sizePx: number }
   onInspect: (v: { on: boolean; angleDeg: number; sizePx: number }) => void
 }) {
@@ -119,8 +121,26 @@ export default function EyePanel({
   const [copied, setCopied] = useState(false)
 
   const setNum = useCallback(
-    (k: keyof EyeTuning, v: number) => onChange({ ...tuning, [k]: v }),
-    [tuning, onChange],
+    (k: keyof MascotEyesConfig, v: number) => onChange({ ...config, [k]: v }),
+    [config, onChange],
+  )
+
+  /**
+   * Shapes are FROZEN in eyes.ts and are not CMS-editable, so the panel keeps
+   * its own working copy. `copy json` emits it alongside the config for pasting
+   * back into eyes.ts — that paste is how a shape edit gets approved.
+   */
+  const [shapes, setShapes] = useState<Record<string, { left: EyeShape; right: EyeShape | null }>>(
+    () =>
+      Object.fromEntries(
+        EXPRESSION_ORDER.map((k) => [
+          k,
+          {
+            left: { ...EXPRESSIONS[k].left },
+            right: EXPRESSIONS[k].right ? { ...EXPRESSIONS[k].right } : null,
+          },
+        ]),
+      ),
   )
 
   /**
@@ -155,39 +175,40 @@ export default function EyePanel({
     [pin],
   )
 
-  const shape = tuning.shapes[sel]
+  const shape = shapes[sel]
   const editing: EyeShape = side === 'right' ? (shape.right ?? shape.left) : shape.left
   const separated = shape.right !== null
 
   const setShape = useCallback(
     (k: keyof EyeShape, v: number) => {
-      const cur = tuning.shapes[sel]
-      const next = cloneEyeTuning(tuning)
-      if (side === 'right') {
-        next.shapes[sel].right = { ...(cur.right ?? cur.left), [k]: v }
-      } else {
-        next.shapes[sel].left = { ...cur.left, [k]: v }
-      }
-      onChange(next)
+      const cur = shapes[sel]
+      setShapes({
+        ...shapes,
+        [sel]:
+          side === 'right'
+            ? { left: cur.left, right: { ...(cur.right ?? cur.left), [k]: v } }
+            : { left: { ...cur.left, [k]: v }, right: cur.right },
+      })
     },
-    [tuning, sel, side, onChange],
+    [shapes, sel, side],
   )
 
   const toggleSeparate = useCallback(
     (on: boolean) => {
-      const next = cloneEyeTuning(tuning)
-      next.shapes[sel].right = on ? { ...tuning.shapes[sel].left } : null
-      onChange(next)
+      setShapes({
+        ...shapes,
+        [sel]: { left: shapes[sel].left, right: on ? { ...shapes[sel].left } : null },
+      })
       setSide(on ? 'right' : 'left')
     },
-    [tuning, sel, onChange],
+    [shapes, sel],
   )
 
   const copy = useCallback(() => {
-    void navigator.clipboard?.writeText(JSON.stringify(tuning, null, 2))
+    void navigator.clipboard?.writeText(JSON.stringify({ config, shapes }, null, 2))
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
-  }, [tuning])
+  }, [config, shapes])
 
   return (
     <aside
@@ -215,7 +236,7 @@ export default function EyePanel({
         </button>
         <button
           type="button"
-          onClick={() => onChange(cloneEyeTuning(DEFAULT_EYE_TUNING))}
+          onClick={() => onChange({ ...DEFAULT_MASCOT_EYES })}
           style={btn('rgba(43,42,39,0.35)')}
         >
           reset
@@ -287,7 +308,7 @@ export default function EyePanel({
               color: name === sel ? '#F6F1E7' : '#2B2A27',
               // A zero-weight expression is out of the glance pool: it will
               // never appear on its own, which is easy to forget while tuning it.
-              opacity: (tuning.weights[name] ?? 0) > 0 || name === 'neutral' || name === 'wide' ? 1 : 0.45,
+              opacity: (config.WEIGHTS[name] ?? 0) > 0 || name === 'neutral' || name === 'wide' ? 1 : 0.45,
             }}
           >
             {name}
@@ -368,12 +389,12 @@ export default function EyePanel({
       ))}
 
       <Slider
-        label={`Weight in glance pool${(tuning.weights[sel] ?? 0) === 0 ? ' (never plays)' : ''}`}
-        value={tuning.weights[sel] ?? 0}
+        label={`Weight in glance pool${(config.WEIGHTS[sel] ?? 0) === 0 ? ' (never plays)' : ''}`}
+        value={config.WEIGHTS[sel] ?? 0}
         min={0}
         max={4}
         step={1}
-        onChange={(v) => onChange({ ...cloneEyeTuning(tuning), weights: { ...tuning.weights, [sel]: v } })}
+        onChange={(v) => onChange({ ...config, WEIGHTS: { ...config.WEIGHTS, [sel]: v } })}
       />
 
       {/* ── look ─────────────────────────────────────────────────────── */}
@@ -389,8 +410,8 @@ export default function EyePanel({
           <span>{label}</span>
           <input
             type="color"
-            value={tuning[k]}
-            onChange={(e) => onChange({ ...tuning, [k]: e.target.value.toUpperCase() })}
+            value={config[k]}
+            onChange={(e) => onChange({ ...config, [k]: e.target.value.toUpperCase() })}
           />
         </label>
       ))}
@@ -399,7 +420,7 @@ export default function EyePanel({
         <Slider
           key={r.key}
           label={r.label}
-          value={tuning[r.key] as number}
+          value={config[r.key] as number}
           min={r.min}
           max={r.max}
           step={r.step}
@@ -412,7 +433,7 @@ export default function EyePanel({
         <Slider
           key={r.key}
           label={r.label}
-          value={tuning[r.key] as number}
+          value={config[r.key] as number}
           min={r.min}
           max={r.max}
           step={r.step}
@@ -425,8 +446,8 @@ export default function EyePanel({
       <label style={{ display: 'flex', gap: 6, margin: '6px 0 8px', cursor: 'pointer' }}>
         <input
           type="checkbox"
-          checked={tuning.NO_REPEAT}
-          onChange={(e) => onChange({ ...tuning, NO_REPEAT: e.target.checked })}
+          checked={config.NO_REPEAT}
+          onChange={(e) => onChange({ ...config, NO_REPEAT: e.target.checked })}
         />
         <span title="The pool is sampled fresh each pass, so repeats cluster — you can get the same expression three sweeps running.">
           never repeat two passes running
@@ -436,7 +457,7 @@ export default function EyePanel({
         <Slider
           key={r.key}
           label={r.label}
-          value={tuning[r.key] as number}
+          value={config[r.key] as number}
           min={r.min}
           max={r.max}
           step={r.step}
