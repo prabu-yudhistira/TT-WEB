@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MascotEngine } from '../../lib/mascot/MascotEngine'
 import type { MascotConfig } from '../../lib/mascot/types'
-import type { EyeTuning } from '../../lib/mascot/eyeTuning'
+import type { MascotEyesConfig } from '../../lib/mascot/eyeTypes'
 import type { SatelliteConfig } from '../../lib/satellites/types'
 
 /**
@@ -37,7 +37,7 @@ export function MascotLayer({
   labelBoxRef,
   modelUrl = '/models/mascot.draco.glb',
   onStatus,
-  eyeTuning,
+  eyes,
   inspect,
 }: {
   config: MascotConfig
@@ -57,12 +57,12 @@ export function MascotLayer({
   modelUrl?: string
   onStatus?: (s: string) => void
   /**
-   * ⚠️ BENCH ONLY, both of these. The eyes are a prototype being tuned on
-   * screen before a spec exists (see lib/mascot/eyeTuning.ts). The hero passes
-   * neither, so it keeps the engine's own defaults and behaves exactly as it
-   * did before the bench was built.
+   * REQUIRED, not optional. An optional config would silently fall back to the
+   * engine's defaults if a caller ever dropped the prop — the same failure mode
+   * the 2026-08-09 review found when `separation` was optional on HeroBlock.
    */
-  eyeTuning?: EyeTuning
+  eyes: MascotEyesConfig
+  /** ⚠️ BENCH ONLY. Parks the mascot face-on and blown up for shape work. */
   inspect?: { on: boolean; angleDeg: number; sizePx: number }
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -100,6 +100,7 @@ export function MascotLayer({
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     engine.setBelt(belt)
     engine.setConfig(config)
+    engine.setEyeConfig(eyes)
     engine.setReduced(mq.matches)
     engine.resize()
     if (!mq.matches) engine.start()
@@ -150,8 +151,8 @@ export function MascotLayer({
   // Bench only. Declared after the mount effect, so the engine exists by the
   // time these first run.
   useEffect(() => {
-    if (eyeTuning) engineRef.current?.setEyeTuning(eyeTuning)
-  }, [eyeTuning])
+    engineRef.current?.setEyeConfig(eyes)
+  }, [eyes])
 
   useEffect(() => {
     if (inspect) engineRef.current?.setInspect(inspect)

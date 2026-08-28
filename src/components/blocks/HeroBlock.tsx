@@ -9,6 +9,7 @@ import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
 import type { SatelliteConfig } from '../../lib/satellites/types'
 import type { MascotConfig } from '../../lib/mascot/types'
+import type { MascotEyesConfig } from '../../lib/mascot/eyeTypes'
 import type { LabelBox } from '../../lib/satellites/labels'
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
   ignition: IgnitionConfig
   satellites: SatelliteConfig
   mascot: MascotConfig
+  eyes: MascotEyesConfig
   floatingWords?: string[]
 }
 
@@ -73,6 +75,7 @@ export function HeroBlock({
   ignition,
   satellites,
   mascot,
+  eyes,
   floatingWords = [],
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
@@ -176,6 +179,7 @@ export function HeroBlock({
         enabled={mascot.ENABLED}
         chargeRef={chargeRef}
         labelBoxRef={labelBoxRef}
+        eyes={eyes}
       />
       <LogoStage
         onLive={onStageLive}

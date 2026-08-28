@@ -14,14 +14,12 @@ import {
   EYES_VERTEX_CHUNK,
   lerpEye,
   packEye,
+  pickWeighted,
+  rightOf,
+  type Expression,
   type EyeShape,
 } from './eyes'
-import {
-  DEFAULT_EYE_TUNING,
-  pickWeighted,
-  type EyeTuning,
-  type TunedExpression,
-} from './eyeTuning'
+import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -234,10 +232,11 @@ export class MascotEngine {
   private lastGlance: string | null = null
 
   /**
-   * The live tunable surface (see ./eyeTuning.ts). Defaults reproduce exactly
-   * what was on screen before the bench existed, so mounting it changes nothing.
+   * The CMS-editable eye surface (see ./eyeTypes.ts). The SHAPES are not here —
+   * they are frozen in ./eyes.ts. Defaults are the owner-approved values, so an
+   * engine that never receives a config renders exactly what shipped.
    */
-  private tuning: EyeTuning = DEFAULT_EYE_TUNING
+  private eyes: MascotEyesConfig = DEFAULT_MASCOT_EYES
 
   /**
    * Bench-only viewing mode. Shaping an eye needs the face big, still and
@@ -428,21 +427,30 @@ export class MascotEngine {
   }
 
   /**
-   * Live eye tuning. Rides the same no-rebuild path setConfig() uses, so a
-   * slider drag does not tear down the engine and lose the pinned expression.
+   * Live eye configuration. Rides the same no-rebuild path setConfig() uses, so
+   * a slider drag does not tear down the engine and lose the pinned expression.
    */
-  setEyeTuning(t: EyeTuning) {
-    this.tuning = t
+  setEyeConfig(c: MascotEyesConfig) {
+    const wasEnabled = this.eyes.ENABLED
+    this.eyes = c
     const u = this.eyeUniforms
-    ;(u.uEyeColor.value as THREE.Color).set(t.COLOR)
-    ;(u.uEyeCore.value as THREE.Color).set(t.CORE)
-    ;(u.uSocketColor.value as THREE.Color).set(t.SOCKET)
-    u.uEyeGlow.value = t.GLOW
-    u.uEyeGap.value = t.GAP
-    u.uSocketSpan.value = t.SOCKET_SPAN
-    u.uFaceRadius.value = t.FACE_RADIUS
-    // Re-write the current shape immediately: without this a shape edit only
-    // appears on the next glance, which reads as the slider being dead.
+    ;(u.uEyeColor.value as THREE.Color).set(c.COLOR)
+    ;(u.uEyeCore.value as THREE.Color).set(c.CORE)
+    ;(u.uSocketColor.value as THREE.Color).set(c.SOCKET)
+    u.uEyeGlow.value = c.GLOW
+    u.uEyeGap.value = c.GAP
+    u.uSocketSpan.value = c.SOCKET_SPAN
+    u.uFaceRadius.value = c.FACE_RADIUS
+
+    // Toggling the switch has to rebuild the material: when off, the display's
+    // chunks are not injected AT ALL. Merely zeroing uEyesOn would leave the
+    // socket mask compiled in and the mascot's painted eyes still covered —
+    // which is exactly the half-disabled state this project has shipped three
+    // times. Spec §7.4.
+    if (this.model && wasEnabled !== c.ENABLED) this.patchEyes()
+
+    // Re-write the current shape immediately: without this a change only
+    // appears on the next glance, which reads as the control being dead.
     if (this.forcedExpr) this.setExpression(this.forcedExpr)
     if (this.reduced) this.drawStatic()
   }
@@ -806,6 +814,20 @@ export class MascotEngine {
     this.eyeUniforms.uObjScale.value = Math.max(s.x, s.y, s.z) / 2 || 1
 
     for (const m of this.materials) {
+      // OFF means the chunks are never injected — the mascot renders with its
+      // own painted eyes, exactly as before this feature existed. Clearing
+      // onBeforeCompile and forcing a recompile is what makes the switch
+      // reversible at runtime rather than only at mount.
+      //
+      // Zeroing uEyesOn instead would leave the socket mask compiled in and the
+      // painted ovals still covered — a black faceplate, which is WORSE than
+      // the state the switch promises to restore. Spec §7.4.
+      if (!this.eyes.ENABLED) {
+        m.onBeforeCompile = () => {}
+        delete m.userData.ttEyeShader
+        m.needsUpdate = true
+        continue
+      }
       m.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, this.eyeUniforms)
 
@@ -853,7 +875,7 @@ export class MascotEngine {
    */
   private updateEyes(dtSec: number, charge: number, diameterPx: number, alpha: number) {
     const u = this.eyeUniforms
-    const t = this.tuning
+    const t = this.eyes
     u.uEyesOn.value = alpha
 
     // Scanlines are moire on a small body: 7 lines over an 18px-tall eye.
@@ -869,7 +891,7 @@ export class MascotEngine {
     if (isFacing && !this.wasFacing) {
       this.glanceT = 0
       this.glanceExpr = pickWeighted(
-        t.weights,
+        t.WEIGHTS,
         Math.random(),
         t.NO_REPEAT ? this.lastGlance : null,
       )
@@ -904,15 +926,9 @@ export class MascotEngine {
     this.setExpression('neutral', this.glanceExpr ?? undefined, k)
   }
 
-  /**
-   * Resolves an expression through the live tuning, falling back to the frozen
-   * prototype table for any name the tuning does not carry.
-   */
-  private exprOf(name: string): TunedExpression {
-    const tuned = this.tuning.shapes[name]
-    if (tuned) return tuned
-    const base = EXPRESSIONS[name] ?? EXPRESSIONS.neutral
-    return { left: base.left, right: base.right ?? null }
+  /** Shapes are frozen in ./eyes.ts; an unknown name resolves to neutral. */
+  private exprOf(name: string): Expression {
+    return EXPRESSIONS[name] ?? EXPRESSIONS.neutral
   }
 
   /** Drive the display: set the expression, optionally blended toward another. */
@@ -920,10 +936,7 @@ export class MascotEngine {
     const a = this.exprOf(name)
     const b = blendTo ? this.exprOf(blendTo) : a
     const k = blendTo ? Math.min(1, Math.max(0, t)) : 0
-    this.writeEyes(
-      lerpEye(a.left, b.left, k),
-      lerpEye(a.right ?? a.left, b.right ?? b.left, k),
-    )
+    this.writeEyes(lerpEye(a.left, b.left, k), lerpEye(rightOf(a), rightOf(b), k))
   }
 
   private writeEyes(l: EyeShape, r: EyeShape) {
