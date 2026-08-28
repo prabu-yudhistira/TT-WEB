@@ -41,12 +41,13 @@ const BEAT: Row[] = [
 ]
 
 const SHAPE: { key: keyof EyeShape; label: string; min: number; max: number; step: number }[] = [
-  { key: 'dx', label: 'Offset x', min: -0.5, max: 0.5, step: 0.01 },
-  { key: 'dy', label: 'Offset y', min: -0.5, max: 0.5, step: 0.01 },
-  { key: 'w', label: 'Half width', min: 0.02, max: 0.7, step: 0.01 },
+  { key: 'dx', label: 'Separation (mirrored)', min: -0.5, max: 0.6, step: 0.01 },
+  { key: 'gaze', label: 'Gaze ← → (both eyes)', min: -0.5, max: 0.5, step: 0.01 },
+  { key: 'dy', label: 'Height (both eyes)', min: -0.5, max: 0.5, step: 0.01 },
+  { key: 'w', label: 'Half width', min: 0.02, max: 0.8, step: 0.01 },
   { key: 'h', label: 'Half height', min: 0.02, max: 0.9, step: 0.01 },
   { key: 'lean', label: 'Lean °', min: -45, max: 45, step: 1 },
-  { key: 'smile', label: 'Smile arc', min: 0, max: 1, step: 0.05 },
+  { key: 'crescent', label: 'Crescent (0 = solid)', min: 0, max: 1.6, step: 0.02 },
 ]
 
 const btn = (bg: string): React.CSSProperties => ({

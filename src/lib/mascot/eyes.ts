@@ -39,16 +39,42 @@
  * removed at the owner's request.
  */
 export type EyeShape = {
-  /** Centre offset from the eye's home position, in display units (-1..1 space). */
+  /**
+   * SEPARATION, not position. Mirrored by the shader (multiplied by the eye's
+   * side sign), so positive dx pushes the two eyes apart on top of GAP.
+   * For a shared sideways movement use `gaze`.
+   */
   dx: number
+  /** Shared vertical offset. NOT mirrored — both eyes move the same way. */
   dy: number
+  /**
+   * Shared HORIZONTAL offset — both eyes slide the same way, which is what a
+   * sideways glance actually is.
+   *
+   * This exists because `dx` cannot express one: it is mirrored, so the
+   * original lookLeft (`dx: -0.15`) pulled the eyes 0.15 closer together
+   * instead of moving them left, and every look* direction was wrong for that
+   * structural reason rather than a tuning one.
+   */
+  gaze: number
   /** Half-extents of the ellipse, in display units. */
   w: number
   h: number
-  /** Lean, degrees. Positive leans the top toward the outside. */
+  /** Lean, degrees. Mirrored: positive leans each eye's top toward the outside. */
   lean: number
-  /** Upward bow of the lower edge, 0..1 — this is what makes a smiling arc. */
-  smile: number
+  /**
+   * Carves the eye into a crescent by subtracting a copy of itself offset
+   * DOWNWARD, leaving a thin arc along the top — the smiling LED eye.
+   *
+   * 0 leaves a solid ellipse. Small values leave a thin sliver, large values a
+   * thicker arc, and past ~2 the cut misses entirely and the ellipse returns.
+   *
+   * This replaces the earlier `smile`, which bowed the lower edge of a SOLID
+   * ellipse. That can only ever produce a fat blob; the reference's happy eye
+   * is hollow, tapering to a point at each end, which is a subtraction and
+   * cannot be reached by deforming one shape.
+   */
+  crescent: number
 }
 
 export type Expression = {
@@ -61,13 +87,14 @@ export type Expression = {
 const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
   dx: 0,
   dy: 0,
+  gaze: 0,
   // Sized to the mascot's OWN painted ovals rather than to the reference video,
   // at the owner's request — the display should read as the same eyes lit up,
   // not as a smaller screen inside the socket.
   w: 0.34,
   h: 0.50,
   lean: 0,
-  smile: 0,
+  crescent: 0,
   ...o,
 })
 
@@ -104,25 +131,40 @@ export const EXPRESSIONS: Record<string, Expression> = {
   squint: { name: 'squint', left: eye({ dx: 0.17, dy: 0.20, w: 0.66, h: 0.09 }) },
   wide: { name: 'wide', left: eye({ dx: 0.15, dy: 0.17, w: 0.60, h: 0.78 }) },
 
-  // ── still at PROTOTYPE values — the owner has called these wrong ───
-  // They were unreachable until selecting an expression started holding it
-  // (only `neutral` is on screen at rest), so the tuning pass could not get to
-  // them. Do not read these as approved.
-  happy: { name: 'happy', left: eye({ h: 0.19, w: 0.37, smile: 1, dy: -0.04 }) },
-  lookLeft: { name: 'lookLeft', left: eye({ dx: -0.15, lean: -16, w: 0.31 }) },
-  lookRight: { name: 'lookRight', left: eye({ dx: 0.15, lean: 16, w: 0.31 }) },
-  lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: -0.13, dy: 0.14, lean: -20, w: 0.31, h: 0.46 }) },
-  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.13, dy: 0.14, lean: 20, w: 0.31, h: 0.46 }) },
-  // Downward glances mirror the upward ones with the LEAN SIGN FLIPPED: the
-  // top of the eye tips the other way when the gaze drops, so reusing the up
-  // lean would read as looking up while sitting low.  A little shorter, too —
-  // a downward look carries a hint of lid.
-  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: -0.13, dy: -0.13, lean: 18, w: 0.32, h: 0.41 }) },
-  lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.13, dy: -0.13, lean: -18, w: 0.32, h: 0.41 }) },
+  // ── rebuilt, NOT yet approved ─────────────────────────────────────
+  // `happy` follows the owner's reference frame: a crescent tapering to a
+  // point at each end, leaning so the thick part sits toward the outside.
+  //
+  // The PROPORTION is what makes it read, more than the carve: carving
+  // neutral's tall footprint (h 0.68) gave two tall commas, not a smile. The
+  // reference's arcs are wide and shallow, so h drops to 0.30 while w stays
+  // wide, and the crescent is cut from that.
+  //
+  // Arc thickness is crescent x h. Too thin and the band's own inner glow
+  // fills the hollow and the eye reads as a bright OUTLINE rather than an arc
+  // — measured on screen, not predicted.
+  happy: { name: 'happy', left: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.30, lean: 15, crescent: 0.55 }) },
+
+  // The look* family carries neutral's language at slightly reduced width, so
+  // a full gaze stays inside the socket. Direction is `gaze` (shared) — using
+  // `dx` here was the original bug: it is mirrored, so it only ever moved the
+  // eyes toward or away from each other.
+  lookLeft: { name: 'lookLeft', left: eye({ dx: 0.18, dy: 0.09, gaze: -0.22, w: 0.38, h: 0.60 }) },
+  lookRight: { name: 'lookRight', left: eye({ dx: 0.18, dy: 0.09, gaze: 0.22, w: 0.38, h: 0.60 }) },
+  // Straight up and straight down: no gaze, only dy — which is the shared
+  // axis, so it needed nothing new.
+  lookUp: { name: 'lookUp', left: eye({ dx: 0.18, dy: 0.30, w: 0.38, h: 0.56 }) },
+  lookDown: { name: 'lookDown', left: eye({ dx: 0.18, dy: -0.12, w: 0.38, h: 0.52 }) },
+  lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: 0.18, dy: 0.26, gaze: -0.18, w: 0.38, h: 0.56 }) },
+  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.18, dy: 0.26, gaze: 0.18, w: 0.38, h: 0.56 }) },
+  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: 0.18, dy: -0.08, gaze: -0.18, w: 0.38, h: 0.52 }) },
+  lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.18, dy: -0.08, gaze: 0.18, w: 0.38, h: 0.52 }) },
+
+  // One eye closed (the approved blink), one smiling (the new crescent).
   wink: {
     name: 'wink',
-    left: eye({ h: 0.05 }),
-    right: eye({ h: 0.19, w: 0.37, smile: 1, dy: -0.04 }),
+    left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.05 }),
+    right: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.30, lean: 15, crescent: 0.55 }),
   },
 }
 
@@ -138,16 +180,18 @@ export function packEye(e: EyeShape, out: Float32Array, at: number): void {
   out[at + 2] = e.w
   out[at + 3] = e.h
   out[at + 4] = (e.lean * Math.PI) / 180
-  out[at + 5] = e.smile
+  out[at + 5] = e.crescent
+  out[at + 6] = e.gaze
 }
 
 export const lerpEye = (a: EyeShape, b: EyeShape, t: number): EyeShape => ({
   dx: a.dx + (b.dx - a.dx) * t,
   dy: a.dy + (b.dy - a.dy) * t,
+  gaze: a.gaze + (b.gaze - a.gaze) * t,
   w: a.w + (b.w - a.w) * t,
   h: a.h + (b.h - a.h) * t,
   lean: a.lean + (b.lean - a.lean) * t,
-  smile: a.smile + (b.smile - a.smile) * t,
+  crescent: a.crescent + (b.crescent - a.crescent) * t,
 })
 
 /** `right` defaults to a mirror of `left`. */
@@ -186,16 +230,28 @@ varying vec3 vTtObjPos;
 // smaller half-extent to stay an approximate distance — that keeps fwidth()
 // antialiasing stable as the eye squashes.
 float tt_eyeShape(vec2 p, float pa[12], float sideSign) {
-  vec2 q = p - vec2(pa[0] * sideSign, pa[1]);
+  // pa[0] (dx) is MIRRORED — it separates the eyes. pa[6] (gaze) is NOT, so it
+  // slides both the same way, which is what a sideways glance is. Mixing the
+  // two up is why every look* direction was wrong: dx alone can only move the
+  // eyes toward or away from each other.
+  vec2 q = p - vec2(pa[0] * sideSign + pa[6], pa[1]);
   float a = pa[4] * sideSign;
   float c = cos(a), s = sin(a);
   q = vec2(q.x * c - q.y * s, q.x * s + q.y * c);
   vec2 hs = max(vec2(pa[2], pa[3]), vec2(1e-4));
 
-  // smile: bow the lower edge upward, so the shape reads as an arc
-  q.y += pa[5] * 0.55 * hs.y * (1.0 - clamp((q.x * q.x) / (hs.x * hs.x), 0.0, 1.0));
+  float d = (length(q / hs) - 1.0) * min(hs.x, hs.y);
 
-  return (length(q / hs) - 1.0) * min(hs.x, hs.y);
+  // crescent: subtract the same ellipse offset DOWNWARD, leaving a thin arc
+  // along the top that tapers to a point at each end — the reference's happy
+  // eye. Deforming a single solid ellipse cannot produce this; the shape is
+  // hollow, so it has to be a subtraction (max(d, -dCut)).
+  if (pa[5] > 0.001) {
+    vec2 qc = vec2(q.x, q.y + pa[5] * hs.y);
+    float dCut = (length(qc / hs) - 1.0) * min(hs.x, hs.y);
+    d = max(d, -dCut);
+  }
+  return d;
 }
 
 vec3 tt_eyes(vec3 base, out float coverage) {

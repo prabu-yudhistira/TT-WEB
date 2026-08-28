@@ -124,6 +124,8 @@ export const DEFAULT_EYE_TUNING: EyeTuning = {
     wide: 0,
     lookLeft: 1,
     lookRight: 1,
+    lookUp: 1,
+    lookDown: 1,
     lookUpLeft: 1,
     lookUpRight: 1,
     lookDownLeft: 1,
