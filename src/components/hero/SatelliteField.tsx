@@ -28,6 +28,7 @@ export function SatelliteField({
   active,
   enabled = true,
   chargeRef,
+  labelBoxRef,
 }: {
   words: string[]
   /**
@@ -46,6 +47,12 @@ export function SatelliteField({
    * canvas loop can simply pull would be pure overhead.
    */
   chargeRef?: React.MutableRefObject<(() => number) | null>
+  /**
+   * Holds a getter for the mascot's current label box, so the satellites'
+   * collision pass can treat it as occupied and yield to it. Optional — with no
+   * mascot on the page the behaviour is exactly as before.
+   */
+  labelBoxRef?: React.MutableRefObject<(() => import('../../lib/satellites/labels').LabelBox | null) | null>
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const backRef = useRef<HTMLCanvasElement>(null)
@@ -75,6 +82,12 @@ export function SatelliteField({
     // at zero. Same class of bug as the setShatterArmed race the 2026-08-09
     // review caught.
     engine.setChargeSource(() => chargeRef?.current?.() ?? 0)
+    // Indirect through the ref on every call, for the same reason as the
+    // charge: MascotLayer may not have built its engine yet when this mounts.
+    engine.setReservedLabels(() => {
+      const box = labelBoxRef?.current?.()
+      return box ? [box] : null
+    })
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     engine.setConfig(config)

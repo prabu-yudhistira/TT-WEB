@@ -175,8 +175,11 @@ export const DEFAULT_SATELLITES: Readonly<SatelliteConfig> = Object.freeze({
   //
   // Indices past the word list are unused; words past this list fall back to
   // SAT_COLOR.
+  // Slot 0 ('#000000') was dropped 2026-08-28 when "samsara" left the hero word
+  // list: shrinking the list from the FRONT keeps every remaining word on the
+  // colour it was tuned with instead of inheriting its predecessor's. The live
+  // CMS satelliteColors list was shifted the same way.
   SAT_COLORS: [
-    '#000000',
     '#ffd500',
     '#f96d3e',
     '#23e126',
