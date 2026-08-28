@@ -122,7 +122,7 @@ const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
  * `angry` was removed at the owner's request 2026-08-28. There was never a
  * `sad`; `squint` is the nearest thing to one and is kept.
  */
-export const EXPRESSIONS: Record<string, Expression> = {
+export const EXPRESSIONS: Readonly<Record<string, Expression>> = Object.freeze({
   // ── ALL OWNER-TUNED on screen, 2026-08-28 ─────────────────────────
   // Every value below was set live at /dev/mascot and pasted back. Treat them
   // as decisions, not defaults: several are deliberately ASYMMETRIC between
@@ -163,6 +163,47 @@ export const EXPRESSIONS: Record<string, Expression> = {
     left: eye({ dx: 0.26, dy: 0.11, gaze: 0.03, w: 0.39, h: 0.49, lean: -1 }),
     right: eye({ dx: 0.25, dy: 0.04, gaze: -0.05, w: 0.45, h: 0.44, crescent: 0.22 }),
   },
+})
+
+/** Stable order for iteration, the bench's picker, and the weighted pool. */
+export const EXPRESSION_ORDER = Object.keys(EXPRESSIONS)
+
+/**
+ * Picks an expression by weight.
+ *
+ * `avoid` implements NO_REPEAT: it is dropped from the running total rather
+ * than re-rolled, so a pool whose only positive weight IS the avoided entry
+ * still returns something instead of spinning. Returns null when nothing is
+ * eligible, which the caller reads as "play no glance this pass" — an owner
+ * who zeroes the pool wants the face at rest, not a fallback to an expression
+ * they removed on purpose.
+ */
+export function pickWeighted(
+  weights: Record<string, number>,
+  rand: number,
+  avoid?: string | null,
+): string | null {
+  let total = 0
+  for (const k of EXPRESSION_ORDER) {
+    if (k === avoid) continue
+    total += Math.max(0, weights[k] ?? 0)
+  }
+  if (total <= 0) return null
+  let r = rand * total
+  for (const k of EXPRESSION_ORDER) {
+    if (k === avoid) continue
+    const w = Math.max(0, weights[k] ?? 0)
+    // ⚠️ Skipping zero weights is load-bearing, not an optimisation.
+    // Math.random() can return exactly 0, and without this guard `r <= 0` is
+    // already true on the first entry — so a rand of 0 returned whichever
+    // expression happened to come first in EXPRESSION_ORDER regardless of its
+    // weight. That is `neutral`, which is the resting face and deliberately
+    // weighted 0, or any expression the owner had removed from the pool.
+    if (w <= 0) continue
+    r -= w
+    if (r <= 0) return k
+  }
+  return null
 }
 
 /**
