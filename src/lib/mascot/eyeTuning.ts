@@ -94,7 +94,9 @@ export type EyeTuning = {
 export const DEFAULT_EYE_TUNING: EyeTuning = {
   COLOR: '#F2A81C',
   CORE: '#FFF0BE',
-  SOCKET: '#06080B',
+  // Pure black, owner-tuned. The near-black #06080B carried a faint blue cast
+  // the owner removed.
+  SOCKET: '#000000',
   GLOW: 0.55,
   GAP: 0.38,
   SOCKET_SPAN: 1.34,

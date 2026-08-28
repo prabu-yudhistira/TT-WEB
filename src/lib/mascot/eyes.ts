@@ -131,15 +131,15 @@ export const EXPRESSIONS: Record<string, Expression> = {
   neutral: { name: 'neutral', left: eye({ dx: 0.25, dy: 0.09, w: 0.42, h: 0.68 }) },
   // A flattened ellipse is a lens, which is what the reference's blink actually
   // looks like — a rounded bar would have been the rounded-box artefact.
-  blink: { name: 'blink', left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.05 }) },
-  squint: { name: 'squint', left: eye({ dx: 0.21, dy: 0.20, w: 0.60, h: 0.09 }) },
+  blink: { name: 'blink', left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.03 }) },
+  squint: { name: 'squint', left: eye({ dx: 0.21, dy: 0.20, w: 0.60, h: 0.11 }) },
   wide: { name: 'wide', left: eye({ dx: 0.21, dy: 0.17, w: 0.60, h: 0.78 }) },
 
   // A crescent tapering to a point at each end, per the owner's reference
   // frame. Arc thickness is crescent x h; too thin and the band's own inner
   // glow fills the hollow it just carved, and the eye reads as a bright
   // OUTLINE rather than an arc — measured on screen, not predicted.
-  happy: { name: 'happy', left: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.47, lean: 6, crescent: 0.36 }) },
+  happy: { name: 'happy', left: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.47, lean: 24, crescent: 0.30 }) },
 
   // Direction is `gaze` (shared). Using `dx` here was the original bug: it is
   // mirrored, so it only ever moved the eyes toward or away from each other.
@@ -147,19 +147,21 @@ export const EXPRESSIONS: Record<string, Expression> = {
   lookRight: { name: 'lookRight', left: eye({ dx: 0.18, dy: 0.09, gaze: 0.36, w: 0.38, h: 0.60 }) },
   // Straight up and down need no gaze — dy was already the shared axis.
   lookUp: { name: 'lookUp', left: eye({ dx: 0.11, dy: 0.50, w: 0.38, h: 0.56, lean: -19 }) },
-  lookDown: { name: 'lookDown', left: eye({ dx: 0.18, dy: -0.50, gaze: -0.01, w: 0.38, h: 0.52, lean: 20 }) },
+  lookDown: { name: 'lookDown', left: eye({ dx: 0.12, dy: -0.50, gaze: -0.01, w: 0.38, h: 0.52, lean: 25 }) },
   lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: 0.08, dy: 0.46, gaze: -0.30, w: 0.38, h: 0.57 }) },
-  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.18, dy: 0.38, gaze: 0.26, w: 0.38, h: 0.57 }) },
-  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: 0.09, dy: -0.37, gaze: -0.34, w: 0.38, h: 0.52, lean: 17 }) },
+  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.07, dy: 0.38, gaze: 0.28, w: 0.38, h: 0.57 }) },
+  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: 0.09, dy: -0.37, gaze: -0.34, w: 0.38, h: 0.52, lean: 11 }) },
   lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.08, dy: -0.45, gaze: 0.29, w: 0.38, h: 0.52, lean: 12 }) },
 
-  // One eye closed, one smiling. The open eye is NOT `happy` — the owner tuned
-  // it separately (sits higher, shorter, no lean, deeper carve). Do not
-  // "simplify" this by pointing it at happy's shape.
+  // NOT one eye closed. The owner re-tuned this so the left eye stays OPEN
+  // (h 0.49, a hair narrower than neutral, barely leaned) while the right does
+  // a shallow smiling crescent — a knowing, one-sided look rather than a
+  // literal blink. The two eyes are tuned fully independently; do not point
+  // either at another expression's shape.
   wink: {
     name: 'wink',
-    left: eye({ dx: 0.26, dy: 0.05, gaze: 0.03, w: 0.40, h: 0.05 }),
-    right: eye({ dx: 0.25, dy: 0.22, gaze: -0.05, w: 0.45, h: 0.44, crescent: 0.40 }),
+    left: eye({ dx: 0.26, dy: 0.11, gaze: 0.03, w: 0.39, h: 0.49, lean: -1 }),
+    right: eye({ dx: 0.25, dy: 0.04, gaze: -0.05, w: 0.45, h: 0.44, crescent: 0.22 }),
   },
 }
 

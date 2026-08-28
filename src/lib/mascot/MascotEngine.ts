@@ -216,7 +216,7 @@ export class MascotEngine {
     // the hero keeps ONE warm accent rather than gaining a second, cold one.
     uEyeColor: { value: new THREE.Color('#F2A81C') },
     uEyeCore: { value: new THREE.Color('#FFF0BE') },
-    uSocketColor: { value: new THREE.Color('#06080B') },
+    uSocketColor: { value: new THREE.Color('#000000') },
     uEyeGlow: { value: 0.55 },
     uEyeGap: { value: 0.38 },
     uScanline: { value: 0 },
