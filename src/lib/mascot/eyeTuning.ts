@@ -120,7 +120,7 @@ export const DEFAULT_EYE_TUNING: EyeTuning = {
     neutral: 0,
     blink: 2,
     squint: 1,
-    happy: 2,
+    happy: 1,
     wide: 0,
     lookLeft: 1,
     lookRight: 1,

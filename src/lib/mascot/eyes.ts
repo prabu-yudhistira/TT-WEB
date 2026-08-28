@@ -123,48 +123,43 @@ const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
  * `sad`; `squint` is the nearest thing to one and is kept.
  */
 export const EXPRESSIONS: Record<string, Expression> = {
-  // ── owner-tuned on screen 2026-08-28 ──────────────────────────────
+  // ── ALL OWNER-TUNED on screen, 2026-08-28 ─────────────────────────
+  // Every value below was set live at /dev/mascot and pasted back. Treat them
+  // as decisions, not defaults: several are deliberately ASYMMETRIC between
+  // the left and right variants of the same gesture, and several sit close to
+  // the socket edge on purpose. Both are noted where they matter.
   neutral: { name: 'neutral', left: eye({ dx: 0.25, dy: 0.09, w: 0.42, h: 0.68 }) },
   // A flattened ellipse is a lens, which is what the reference's blink actually
   // looks like — a rounded bar would have been the rounded-box artefact.
   blink: { name: 'blink', left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.05 }) },
-  squint: { name: 'squint', left: eye({ dx: 0.17, dy: 0.20, w: 0.66, h: 0.09 }) },
-  wide: { name: 'wide', left: eye({ dx: 0.15, dy: 0.17, w: 0.60, h: 0.78 }) },
+  squint: { name: 'squint', left: eye({ dx: 0.21, dy: 0.20, w: 0.60, h: 0.09 }) },
+  wide: { name: 'wide', left: eye({ dx: 0.21, dy: 0.17, w: 0.60, h: 0.78 }) },
 
-  // ── rebuilt, NOT yet approved ─────────────────────────────────────
-  // `happy` follows the owner's reference frame: a crescent tapering to a
-  // point at each end, leaning so the thick part sits toward the outside.
-  //
-  // The PROPORTION is what makes it read, more than the carve: carving
-  // neutral's tall footprint (h 0.68) gave two tall commas, not a smile. The
-  // reference's arcs are wide and shallow, so h drops to 0.30 while w stays
-  // wide, and the crescent is cut from that.
-  //
-  // Arc thickness is crescent x h. Too thin and the band's own inner glow
-  // fills the hollow and the eye reads as a bright OUTLINE rather than an arc
-  // — measured on screen, not predicted.
-  happy: { name: 'happy', left: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.30, lean: 15, crescent: 0.55 }) },
+  // A crescent tapering to a point at each end, per the owner's reference
+  // frame. Arc thickness is crescent x h; too thin and the band's own inner
+  // glow fills the hollow it just carved, and the eye reads as a bright
+  // OUTLINE rather than an arc — measured on screen, not predicted.
+  happy: { name: 'happy', left: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.47, lean: 6, crescent: 0.36 }) },
 
-  // The look* family carries neutral's language at slightly reduced width, so
-  // a full gaze stays inside the socket. Direction is `gaze` (shared) — using
-  // `dx` here was the original bug: it is mirrored, so it only ever moved the
-  // eyes toward or away from each other.
-  lookLeft: { name: 'lookLeft', left: eye({ dx: 0.18, dy: 0.09, gaze: -0.22, w: 0.38, h: 0.60 }) },
-  lookRight: { name: 'lookRight', left: eye({ dx: 0.18, dy: 0.09, gaze: 0.22, w: 0.38, h: 0.60 }) },
-  // Straight up and straight down: no gaze, only dy — which is the shared
-  // axis, so it needed nothing new.
-  lookUp: { name: 'lookUp', left: eye({ dx: 0.18, dy: 0.30, w: 0.38, h: 0.56 }) },
-  lookDown: { name: 'lookDown', left: eye({ dx: 0.18, dy: -0.12, w: 0.38, h: 0.52 }) },
-  lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: 0.18, dy: 0.26, gaze: -0.18, w: 0.38, h: 0.56 }) },
-  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.18, dy: 0.26, gaze: 0.18, w: 0.38, h: 0.56 }) },
-  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: 0.18, dy: -0.08, gaze: -0.18, w: 0.38, h: 0.52 }) },
-  lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.18, dy: -0.08, gaze: 0.18, w: 0.38, h: 0.52 }) },
+  // Direction is `gaze` (shared). Using `dx` here was the original bug: it is
+  // mirrored, so it only ever moved the eyes toward or away from each other.
+  lookLeft: { name: 'lookLeft', left: eye({ dx: 0.18, dy: 0.09, gaze: -0.35, w: 0.38, h: 0.60 }) },
+  lookRight: { name: 'lookRight', left: eye({ dx: 0.18, dy: 0.09, gaze: 0.36, w: 0.38, h: 0.60 }) },
+  // Straight up and down need no gaze — dy was already the shared axis.
+  lookUp: { name: 'lookUp', left: eye({ dx: 0.11, dy: 0.50, w: 0.38, h: 0.56, lean: -19 }) },
+  lookDown: { name: 'lookDown', left: eye({ dx: 0.18, dy: -0.50, gaze: -0.01, w: 0.38, h: 0.52, lean: 20 }) },
+  lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: 0.08, dy: 0.46, gaze: -0.30, w: 0.38, h: 0.57 }) },
+  lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.18, dy: 0.38, gaze: 0.26, w: 0.38, h: 0.57 }) },
+  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: 0.09, dy: -0.37, gaze: -0.34, w: 0.38, h: 0.52, lean: 17 }) },
+  lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.08, dy: -0.45, gaze: 0.29, w: 0.38, h: 0.52, lean: 12 }) },
 
-  // One eye closed (the approved blink), one smiling (the new crescent).
+  // One eye closed, one smiling. The open eye is NOT `happy` — the owner tuned
+  // it separately (sits higher, shorter, no lean, deeper carve). Do not
+  // "simplify" this by pointing it at happy's shape.
   wink: {
     name: 'wink',
-    left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.05 }),
-    right: eye({ dx: 0.25, dy: 0.10, w: 0.45, h: 0.30, lean: 15, crescent: 0.55 }),
+    left: eye({ dx: 0.26, dy: 0.05, gaze: 0.03, w: 0.40, h: 0.05 }),
+    right: eye({ dx: 0.25, dy: 0.22, gaze: -0.05, w: 0.45, h: 0.44, crescent: 0.40 }),
   },
 }
 
@@ -283,7 +278,12 @@ vec3 tt_eyes(vec3 base, out float coverage) {
   float cap = 1.0 - smoothstep(uSocketSpan - 0.22, uSocketSpan, r);
   vec3 col = mix(base, uSocketColor, cap * uEyesOn);
 
-  // hot core inside the blob, saturated body toward its edge
+  // hot core inside the blob, saturated body toward its edge.
+  //
+  // The fixed 0.20 ramp looks like it should starve a thin crescent of its
+  // core — the band is only ~0.17 deep. Rendered side by side at 715px it made
+  // no visible difference, so the scale-aware version was removed rather than
+  // kept on the strength of the argument. Do not re-derive it as a fix.
   float core = 1.0 - smoothstep(-0.20, 0.02, d);
   vec3 lit = mix(uEyeColor, uEyeCore, core * 0.85);
 
