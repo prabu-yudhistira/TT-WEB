@@ -14,9 +14,14 @@ import {
   EYES_VERTEX_CHUNK,
   lerpEye,
   packEye,
-  rightOf,
   type EyeShape,
 } from './eyes'
+import {
+  DEFAULT_EYE_TUNING,
+  pickWeighted,
+  type EyeTuning,
+  type TunedExpression,
+} from './eyeTuning'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -175,6 +180,13 @@ export class MascotEngine {
       loaded: !!this.model,
       charge: this.chargeSource(),
       pos: this.lastScreen,
+      // On-screen body diameter in CSS px. Published because it is the number
+      // the eye work is judged against — 12.6px on the far side of the orbit,
+      // 70px at closest approach — and because a verification script otherwise
+      // has to infer the size path rather than read it.
+      diameterPx: this.lastDiameterPx,
+      spin: this.spin,
+      inspect: this.inspect.on,
     })
 
     // Dev handle for the bench and for verification scripts: hold one
@@ -216,10 +228,32 @@ export class MascotEngine {
   }
   /** Where the glance beat is in its arc, and what it plays. */
   private glanceT = 1
-  private glanceExpr = 'blink'
+  private glanceExpr: string | null = 'blink'
   private wasFacing = false
+  /** Previous pass's expression, for NO_REPEAT. */
+  private lastGlance: string | null = null
+
+  /**
+   * The live tunable surface (see ./eyeTuning.ts). Defaults reproduce exactly
+   * what was on screen before the bench existed, so mounting it changes nothing.
+   */
+  private tuning: EyeTuning = DEFAULT_EYE_TUNING
+
+  /**
+   * Bench-only viewing mode. Shaping an eye needs the face big, still and
+   * pointed at the viewer; the shipped mascot is 12.6-70px, spinning at 113°/s
+   * and facing the viewer about a quarter of the time. Tuning in the
+   * comfortable view alone is how subtlety that is invisible at real size gets
+   * approved, so the bench can flip between the two and neither is the default.
+   */
+  private inspect: { on: boolean; angleDeg: number; sizePx: number } = {
+    on: false,
+    angleDeg: 0,
+    sizePx: 320,
+  }
 
   private lastScreen = { x: NaN, y: NaN, z: NaN, scale: 1 }
+  private lastDiameterPx = 0
   private labelW = 0
   private labelH = 0
   private labelBox: LabelBox | null = null
@@ -316,7 +350,10 @@ export class MascotEngine {
       this.dustMat.needsUpdate = true
     }
 
-    this.trail.emit(c, emitX, emitY, dtSec, alpha, this.elapsed)
+    // Inspect mode parks the mascot, so a live emitter would pile 130 motes/sec
+    // onto one point and bury the face being tuned. Emission stops; ageing does
+    // not, so the existing wake drains away instead of freezing in mid-air.
+    this.trail.emit(c, emitX, emitY, this.inspect.on ? 0 : dtSec, alpha, this.elapsed)
     for (const m of this.trail.sample(c, this.elapsed, alpha, dtSec)) {
       this.dustPos[m.i * 3] = m.x
       this.dustPos[m.i * 3 + 1] = m.y
@@ -387,6 +424,32 @@ export class MascotEngine {
     this.cfg = cfg
     this.applyLook()
     this.layout()
+    if (this.reduced) this.drawStatic()
+  }
+
+  /**
+   * Live eye tuning. Rides the same no-rebuild path setConfig() uses, so a
+   * slider drag does not tear down the engine and lose the pinned expression.
+   */
+  setEyeTuning(t: EyeTuning) {
+    this.tuning = t
+    const u = this.eyeUniforms
+    ;(u.uEyeColor.value as THREE.Color).set(t.COLOR)
+    ;(u.uEyeCore.value as THREE.Color).set(t.CORE)
+    ;(u.uSocketColor.value as THREE.Color).set(t.SOCKET)
+    u.uEyeGlow.value = t.GLOW
+    u.uEyeGap.value = t.GAP
+    u.uSocketSpan.value = t.SOCKET_SPAN
+    u.uFaceRadius.value = t.FACE_RADIUS
+    // Re-write the current shape immediately: without this a shape edit only
+    // appears on the next glance, which reads as the slider being dead.
+    if (this.forcedExpr) this.setExpression(this.forcedExpr)
+    if (this.reduced) this.drawStatic()
+  }
+
+  /** Bench-only. `on: false` restores the real size, spin and orbit. */
+  setInspect(v: { on: boolean; angleDeg: number; sizePx: number }) {
+    this.inspect = v
     if (this.reduced) this.drawStatic()
   }
 
@@ -472,6 +535,7 @@ export class MascotEngine {
   }
 
   private sizePx() {
+    if (this.inspect.on) return this.inspect.sizePx
     // window.innerWidth, not this.W: SatelliteEngine keys its own mobile split
     // off the window, and the two must agree or the belts diverge on a
     // viewport where the hero box and the window differ.
@@ -565,9 +629,20 @@ export class MascotEngine {
     const speedFactor = Math.sqrt(
       Math.max(8, this.orbitR) > 0 ? this.beltInnerR() / Math.max(this.orbitR, 10) : 1,
     )
-    this.angle +=
-      dir * motion * belt.ORBIT_SPEED * c.SPEED_SCALE * speedFactor * 0.012 * dt
-    this.spin += ((c.SPIN_SPEED * Math.PI) / 180) * (dt / 60)
+    if (this.inspect.on) {
+      // Parked and face-on. The face is +Z in model space and only the spin
+      // turns it, so spin 0 IS frontal — which also pins cos(spin) at 1, well
+      // above any FACING_THRESHOLD, so the glance beat keeps running and can be
+      // watched. The orbit is frozen at the owner's chosen angle rather than a
+      // computed "best" one: where the mascot reads most clearly depends on the
+      // viewport and on what else is switched on.
+      this.angle = (this.inspect.angleDeg * Math.PI) / 180
+      this.spin = 0
+    } else {
+      this.angle +=
+        dir * motion * belt.ORBIT_SPEED * c.SPEED_SCALE * speedFactor * 0.012 * dt
+      this.spin += ((c.SPIN_SPEED * Math.PI) / 180) * (dt / 60)
+    }
 
     this.place(alpha, charge, dt / 60)
   }
@@ -621,8 +696,14 @@ export class MascotEngine {
 
     // Beyond the perspective divide, matching SAT_DEPTH_SCALE so the mascot
     // and the beads share one depth cue rather than two different ones.
-    const depthScale = 1 + (q.scale - 1) * (1 + c.DEPTH_SCALE * 4)
+    //
+    // Inspect mode opts out: the depth cue is a function of where the mascot is
+    // parked, so leaving it on made "inspect diameter 320" render a 144px body
+    // and change size again whenever the park angle moved. A tuning control
+    // that reports one number and draws another is worse than no control.
+    const depthScale = this.inspect.on ? 1 : 1 + (q.scale - 1) * (1 + c.DEPTH_SCALE * 4)
     const diameterPx = this.sizePx() * Math.max(0.15, depthScale)
+    this.lastDiameterPx = diameterPx
     const radiusPx = diameterPx / 2
     this.placer.scale.setScalar(diameterPx)
 
@@ -761,13 +842,6 @@ export class MascotEngine {
     }
   }
 
-  /** Expressions the glance beat picks from, in rough order of how often. */
-  private static readonly GLANCE_POOL = [
-    'blink', 'blink', 'happy', 'wink', 'squint',
-    'lookLeft', 'lookRight', 'lookUpLeft', 'lookUpRight',
-    'lookDownLeft', 'lookDownRight', 'happy',
-  ]
-
   /**
    * One frame of the face display.
    *
@@ -779,25 +853,34 @@ export class MascotEngine {
    */
   private updateEyes(dtSec: number, charge: number, diameterPx: number, alpha: number) {
     const u = this.eyeUniforms
+    const t = this.tuning
     u.uEyesOn.value = alpha
 
-    // Scanlines are moire below ~40px of body: 7 lines over an 18px-tall eye.
+    // Scanlines are moire on a small body: 7 lines over an 18px-tall eye.
     // Faded in with size rather than switched, so it cannot pop.
-    u.uScanline.value = diameterPx > 40 ? Math.min(9, (diameterPx - 40) / 12) : 0
+    u.uScanline.value =
+      diameterPx > t.SCANLINE_MIN_PX
+        ? Math.min(t.SCANLINE_MAX, (diameterPx - t.SCANLINE_MIN_PX) / Math.max(0.01, t.SCANLINE_RAMP))
+        : 0
 
     // The face is +Z in model space and only the spin turns it, so cos(spin) is
     // the facing term. > 0 means the display is toward the viewer at all.
-    const facing = Math.cos(this.spin)
-    const isFacing = facing > 0.30
+    const isFacing = Math.cos(this.spin) > t.FACING_THRESHOLD
     if (isFacing && !this.wasFacing) {
       this.glanceT = 0
-      this.glanceExpr =
-        MascotEngine.GLANCE_POOL[Math.floor(Math.random() * MascotEngine.GLANCE_POOL.length)]
+      this.glanceExpr = pickWeighted(
+        t.weights,
+        Math.random(),
+        t.NO_REPEAT ? this.lastGlance : null,
+      )
+      if (this.glanceExpr) this.lastGlance = this.glanceExpr
     }
     this.wasFacing = isFacing
     // The beat runs a little shorter than the face-forward window so it lands
     // and resolves while it can actually be seen.
-    if (this.glanceT < 1) this.glanceT = Math.min(1, this.glanceT + dtSec / 0.62)
+    if (this.glanceT < 1) {
+      this.glanceT = Math.min(1, this.glanceT + dtSec / Math.max(0.01, t.GLANCE_SECONDS))
+    }
 
     if (this.forcedExpr) {
       this.setExpression(this.forcedExpr)
@@ -807,23 +890,40 @@ export class MascotEngine {
     if (charge > 0.02) {
       // Press-and-hold: eyes widen as the charge builds, then squeeze shut at
       // the peak — riding the same gesture the body already reacts to.
-      if (charge < 0.7) this.setExpression('neutral', 'wide', charge / 0.7)
-      else this.setExpression('wide', 'blink', (charge - 0.7) / 0.3)
+      const x = Math.min(0.999, Math.max(0.001, t.CHARGE_CROSSOVER))
+      if (charge < x) this.setExpression('neutral', 'wide', charge / x)
+      else this.setExpression('wide', 'blink', (charge - x) / (1 - x))
       return
     }
 
-    // Triangle: neutral -> expression -> neutral across the beat.
-    const t = this.glanceT
-    const k = t >= 1 ? 0 : t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.55
-    this.setExpression('neutral', this.glanceExpr, k)
+    // Triangle: neutral -> expression -> neutral across the beat. A null
+    // expression means the pool is empty, so the face simply rests.
+    const p = Math.min(0.99, Math.max(0.01, t.GLANCE_PEAK))
+    const g = this.glanceT
+    const k = g >= 1 || !this.glanceExpr ? 0 : g < p ? g / p : 1 - (g - p) / (1 - p)
+    this.setExpression('neutral', this.glanceExpr ?? undefined, k)
+  }
+
+  /**
+   * Resolves an expression through the live tuning, falling back to the frozen
+   * prototype table for any name the tuning does not carry.
+   */
+  private exprOf(name: string): TunedExpression {
+    const tuned = this.tuning.shapes[name]
+    if (tuned) return tuned
+    const base = EXPRESSIONS[name] ?? EXPRESSIONS.neutral
+    return { left: base.left, right: base.right ?? null }
   }
 
   /** Drive the display: set the expression, optionally blended toward another. */
   setExpression(name: string, blendTo?: string, t = 0) {
-    const a = EXPRESSIONS[name] ?? EXPRESSIONS.neutral
-    const b = blendTo ? (EXPRESSIONS[blendTo] ?? a) : a
+    const a = this.exprOf(name)
+    const b = blendTo ? this.exprOf(blendTo) : a
     const k = blendTo ? Math.min(1, Math.max(0, t)) : 0
-    this.writeEyes(lerpEye(a.left, b.left, k), lerpEye(rightOf(a), rightOf(b), k))
+    this.writeEyes(
+      lerpEye(a.left, b.left, k),
+      lerpEye(a.right ?? a.left, b.right ?? b.left, k),
+    )
   }
 
   private writeEyes(l: EyeShape, r: EyeShape) {

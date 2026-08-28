@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SatelliteField } from '@/components/hero/SatelliteField'
 import { MascotLayer } from '@/components/hero/MascotLayer'
 import { DEFAULT_MASCOT, type MascotConfig } from '@/lib/mascot/types'
+import { DEFAULT_EYE_TUNING, cloneEyeTuning, type EyeTuning } from '@/lib/mascot/eyeTuning'
 import { toMascotPayload } from '@/lib/mascot/resolveMascot'
+import EyePanel from './EyePanel'
 import type { SatelliteConfig } from '@/lib/satellites/types'
 import type { LabelBox } from '@/lib/satellites/labels'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
@@ -142,6 +144,10 @@ export default function MascotLab({
   words: string[]
 }) {
   const [cfg, setCfg] = useState<MascotConfig>({ ...DEFAULT_MASCOT })
+  // Eye tuning is bench-local on purpose: it is a prototype surface with no CMS
+  // fields yet, so it never touches the hero-effects global the way cfg does.
+  const [eyes, setEyes] = useState<EyeTuning>(() => cloneEyeTuning(DEFAULT_EYE_TUNING))
+  const [inspect, setInspect] = useState({ on: false, angleDeg: 0, sizePx: 320 })
   const [active, setActive] = useState(false)
   const [showLogo, setShowLogo] = useState(true)
   const [showSats, setShowSats] = useState(true)
@@ -266,6 +272,8 @@ export default function MascotLab({
         chargeRef={chargeRef}
         labelBoxRef={labelBoxRef}
         onStatus={setMascotStatus}
+        eyeTuning={eyes}
+        inspect={inspect}
       />
 
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: showLogo ? 1 : 0 }}>
@@ -476,6 +484,8 @@ export default function MascotLab({
           </div>
         ))}
       </aside>
+
+      <EyePanel tuning={eyes} onChange={setEyes} inspect={inspect} onInspect={setInspect} />
     </div>
   )
 }

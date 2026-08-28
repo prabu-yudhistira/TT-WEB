@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MascotEngine } from '../../lib/mascot/MascotEngine'
 import type { MascotConfig } from '../../lib/mascot/types'
+import type { EyeTuning } from '../../lib/mascot/eyeTuning'
 import type { SatelliteConfig } from '../../lib/satellites/types'
 
 /**
@@ -36,6 +37,8 @@ export function MascotLayer({
   labelBoxRef,
   modelUrl = '/models/mascot.draco.glb',
   onStatus,
+  eyeTuning,
+  inspect,
 }: {
   config: MascotConfig
   /** The belt the mascot orbits in — supplies the shared plane and radii. */
@@ -53,6 +56,14 @@ export function MascotLayer({
   labelBoxRef?: React.MutableRefObject<(() => import('../../lib/satellites/labels').LabelBox | null) | null>
   modelUrl?: string
   onStatus?: (s: string) => void
+  /**
+   * ⚠️ BENCH ONLY, both of these. The eyes are a prototype being tuned on
+   * screen before a spec exists (see lib/mascot/eyeTuning.ts). The hero passes
+   * neither, so it keeps the engine's own defaults and behaves exactly as it
+   * did before the bench was built.
+   */
+  eyeTuning?: EyeTuning
+  inspect?: { on: boolean; angleDeg: number; sizePx: number }
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -135,6 +146,16 @@ export function MascotLayer({
   useEffect(() => {
     engineRef.current?.setBelt(belt)
   }, [belt])
+
+  // Bench only. Declared after the mount effect, so the engine exists by the
+  // time these first run.
+  useEffect(() => {
+    if (eyeTuning) engineRef.current?.setEyeTuning(eyeTuning)
+  }, [eyeTuning])
+
+  useEffect(() => {
+    if (inspect) engineRef.current?.setInspect(inspect)
+  }, [inspect])
 
   useEffect(() => {
     engineRef.current?.setActive(active)
