@@ -5,6 +5,7 @@ import { getHeroEffects, getPage } from '@/lib/cms'
 import { isLocale } from '@/lib/i18n'
 import { resolveIgnition } from '@/lib/three/ignition/resolveIgnition'
 import { resolveSatellites } from '@/lib/satellites/resolveSatellites'
+import { resolveMascot } from '@/lib/mascot/resolveMascot'
 import { resolveSeparation } from '@/lib/three/shatter/resolveSeparation'
 import HeroPreview from './HeroPreview'
 
@@ -47,6 +48,7 @@ export default async function HeroPreviewPage({
         savedSeparation={resolveSeparation(effects)}
         savedIgnition={resolveIgnition(effects)}
         savedSatellites={resolveSatellites(effects)}
+        savedMascot={resolveMascot(effects)}
         savedLine1={hero.line1}
         savedLine2={hero.line2}
         savedLocationLine={hero.locationLine}
