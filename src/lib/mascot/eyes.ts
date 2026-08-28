@@ -72,6 +72,18 @@ const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
 })
 
 /**
+ * ⚠️ `dx` is MIRRORED, which matters when reading the numbers below.
+ *
+ * The shader multiplies it by the eye's side sign, so a positive dx pushes the
+ * left eye further left AND the right eye further right. It is extra
+ * SEPARATION on top of GAP, not a shared sideways slide. An eye's centre sits
+ * at ±(GAP + dx), and its outer edge at GAP + dx + w — which is why a large dx
+ * with a large w can reach past the smooth front cap (r = 1.0) onto the
+ * ornamental bezel, and why a large w with a small dx can cross the centreline
+ * and merge the two eyes into a single bar.
+ */
+
+/**
  * The expression vocabulary, read off the reference video's own frames.
  *
  * ⚠️ PROTOTYPE VALUES — not owner-approved. These exist to be tuned live.
@@ -84,13 +96,19 @@ const eye = (o: Partial<EyeShape> = {}): EyeShape => ({
  * `sad`; `squint` is the nearest thing to one and is kept.
  */
 export const EXPRESSIONS: Record<string, Expression> = {
-  neutral: { name: 'neutral', left: eye() },
+  // ── owner-tuned on screen 2026-08-28 ──────────────────────────────
+  neutral: { name: 'neutral', left: eye({ dx: 0.25, dy: 0.09, w: 0.42, h: 0.68 }) },
   // A flattened ellipse is a lens, which is what the reference's blink actually
   // looks like — a rounded bar would have been the rounded-box artefact.
-  blink: { name: 'blink', left: eye({ h: 0.05 }) },
-  squint: { name: 'squint', left: eye({ h: 0.22, w: 0.35 }) },
+  blink: { name: 'blink', left: eye({ dx: 0.26, dy: 0.05, w: 0.40, h: 0.05 }) },
+  squint: { name: 'squint', left: eye({ dx: 0.17, dy: 0.20, w: 0.66, h: 0.09 }) },
+  wide: { name: 'wide', left: eye({ dx: 0.15, dy: 0.17, w: 0.60, h: 0.78 }) },
+
+  // ── still at PROTOTYPE values — the owner has called these wrong ───
+  // They were unreachable until selecting an expression started holding it
+  // (only `neutral` is on screen at rest), so the tuning pass could not get to
+  // them. Do not read these as approved.
   happy: { name: 'happy', left: eye({ h: 0.19, w: 0.37, smile: 1, dy: -0.04 }) },
-  wide: { name: 'wide', left: eye({ w: 0.38, h: 0.60 }) },
   lookLeft: { name: 'lookLeft', left: eye({ dx: -0.15, lean: -16, w: 0.31 }) },
   lookRight: { name: 'lookRight', left: eye({ dx: 0.15, lean: 16, w: 0.31 }) },
   lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: -0.13, dy: 0.14, lean: -20, w: 0.31, h: 0.46 }) },
