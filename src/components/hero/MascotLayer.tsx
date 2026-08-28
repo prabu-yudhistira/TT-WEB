@@ -8,8 +8,7 @@ import type { SatelliteConfig } from '../../lib/satellites/types'
 /**
  * Hero orbiting mascot — React wrapper.
  *
- * ⚠️ PROTOTYPE. Built to be tuned at /dev/mascot and then rewritten against an
- * approved spec.
+ * Design: docs/superpowers/specs/2026-08-28-hero-mascot-design.md
  *
  * ONE canvas, whose z-index flips as the mascot crosses behind the mark:
  *

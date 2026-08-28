@@ -11,8 +11,9 @@ import { DEFAULT_MASCOT, type MascotConfig } from './types'
 /**
  * Hero orbiting mascot — simulation and rendering.
  *
- * ⚠️ PROTOTYPE. Throwaway, built to be tuned on screen and then rewritten
- * properly against an approved spec. Not TDD'd, not check-suited.
+ * Design: docs/superpowers/specs/2026-08-28-hero-mascot-design.md
+ * Config: src/lib/mascot/types.ts (frozen DEFAULT_MASCOT). Pure particle
+ * bookkeeping lives in ./mascotTrail.ts so it can be tested without a GL context.
  *
  * ── Why this is its own WebGL layer ──────────────────────────────────
  * The satellites are 2D canvas because occlusion and trails fall out of the
