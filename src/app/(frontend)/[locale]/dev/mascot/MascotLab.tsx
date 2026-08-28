@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SatelliteField } from '@/components/hero/SatelliteField'
 import { MascotLayer } from '@/components/hero/MascotLayer'
 import { DEFAULT_MASCOT, type MascotConfig } from '@/lib/mascot/types'
+import { toMascotPayload } from '@/lib/mascot/resolveMascot'
 import type { SatelliteConfig } from '@/lib/satellites/types'
 import type { LabelBox } from '@/lib/satellites/labels'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
@@ -15,14 +16,14 @@ const LogoCanvas = dynamic(() => import('@/components/three/LogoCanvas'), { ssr:
 /**
  * Tuning bench for the orbiting mascot.
  *
- * ⚠️ PROTOTYPE — nothing here saves to the CMS, because there is no mascot CMS
- * group yet. Tune, then hit "copy json" and the approved numbers become the
- * spec's frozen defaults. This is the same order that worked for the
- * satellites: numbers approved on screen first, spec written around them.
+ * `save` writes the mascot slice of the hero-effects global (via
+ * toMascotPayload, riding the admin session cookie); `copy json` still dumps
+ * the raw config. The real satellites and the real logo are both mounted,
+ * unmodified, so what is being judged is the mascot against the actual belt it
+ * has to share — not against a mock-up of one.
  *
- * The real satellites and the real logo are both mounted, unmodified, so what
- * is being judged is the mascot against the actual belt it has to share —
- * not against a mock-up of one.
+ * Dev-only: notFound() in production, same gate as /dev/shatter, /dev/ignition,
+ * /dev/satellites.
  */
 
 type NumKey = {
@@ -147,6 +148,7 @@ export default function MascotLab({
   const [status, setStatus] = useState('loading logo…')
   const [mascotStatus, setMascotStatus] = useState('')
   const [copied, setCopied] = useState(false)
+  const [dirty, setDirty] = useState(false)
   /**
    * Gates the mascot's first mount until the query-string overrides have
    * landed. Without it the layer mounts with ENABLED still true, fires the
@@ -167,7 +169,29 @@ export default function MascotLab({
 
   const set = useCallback(<K extends keyof MascotConfig>(k: K, v: MascotConfig[K]) => {
     setCfg((c) => ({ ...c, [k]: v }))
+    setDirty(true)
   }, [])
+
+  // Real write to the hero-effects global, matching the shatter/satellite
+  // benches. The admin session cookie rides along via credentials:
+  // 'same-origin' — no token handling needed here.
+  const save = useCallback(async () => {
+    setMascotStatus('saving…')
+    try {
+      const res = await fetch('/api/globals/hero-effects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(toMascotPayload(cfg)),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      setDirty(false)
+      setMascotStatus('saved to CMS — reload the homepage to see it live')
+    } catch (err) {
+      console.error('bench: save failed', err)
+      setMascotStatus('save failed — are you logged in at /admin?')
+    }
+  }, [cfg])
 
   // Entrance rides the real ignition cue, exactly as the hero's belt does. The
   // timeout is a bench-only safety net so a disabled or failed ignition still
@@ -278,19 +302,25 @@ export default function MascotLab({
         <div style={{ marginBottom: 10, opacity: 0.75 }}>{mascotStatus}</div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-          <button type="button" onClick={copyJson} style={btn('#8E1114')}>
+          <button type="button" onClick={save} style={btn(dirty ? '#8E1114' : 'rgba(43,42,39,0.55)')}>
+            {dirty ? 'save •' : 'save'}
+          </button>
+          <button type="button" onClick={copyJson} style={btn('rgba(43,42,39,0.55)')}>
             {copied ? 'copied' : 'copy json'}
           </button>
           <button
             type="button"
-            onClick={() => setCfg({ ...DEFAULT_MASCOT })}
+            onClick={() => {
+              setCfg({ ...DEFAULT_MASCOT })
+              setDirty(true)
+            }}
             style={btn('rgba(43,42,39,0.35)')}
           >
             reset
           </button>
         </div>
         <div style={{ marginBottom: 10, opacity: 0.7 }}>
-          prototype — nothing saves to the CMS yet
+          {dirty ? 'unsaved changes' : 'saves the mascot slice of the Hero Effects global'}
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
