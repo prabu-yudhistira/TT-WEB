@@ -954,9 +954,17 @@ export class MascotEngine {
     if (!this.W || !this.H || !this.belt) return
     this.angle = 0
     this.spin = 0
+    // A visitor who asked for stillness must not get a face caught mid-glance,
+    // and the frame must be deterministic — verification compares this exact
+    // frame across configurations.
+    this.glanceT = 1
+    this.glanceExpr = null
+    this.lastGlance = null
+    this.wasFacing = false
     // dtSec 0: nothing is shed and nothing drifts. A motion wake on a frame
     // that is deliberately motionless would be a lie about what is happening.
     this.place(1, 0, 0)
+    this.setExpression('neutral')
     this.renderer.render(this.scene, this.camera)
   }
 
