@@ -2,7 +2,7 @@
  * Assertions for pure satellite label placement.
  * Run: npm run verify:config
  */
-import { placeLabels, EDGE_FADE_PX, type LabelCandidate } from './labels'
+import { placeLabels, EDGE_FADE_PX, type LabelCandidate, type LabelBox } from './labels'
 
 let failures = 0
 const check = (label: string, cond: boolean) => {
@@ -127,6 +127,39 @@ const byIndex = (out: ReturnType<typeof placeLabels>, i: number) =>
 {
   const out = placeLabels([mk({ index: 0, alpha: 0.4 })], W, H, EDGE_FADE_PX)
   check('incoming alpha is carried through', Math.abs(byIndex(out, 0) - 0.4) < 1e-9)
+}
+
+// ── reserved boxes (the mascot's word, placed by a different engine) ──
+{
+  const cand = [mk({ index: 0, x: 100, y: 100 })]
+  const mascotBox: LabelBox = { l: 100, r: 160, t: 100, b: 116 }
+
+  check('no reserved: the satellite label shows', byIndex(placeLabels(cand, W, H, EDGE_FADE_PX), 0) > 0.9)
+  check(
+    'reserved box suppresses the overlapping satellite label',
+    byIndex(placeLabels(cand, W, H, EDGE_FADE_PX, [mascotBox]), 0) === 0,
+  )
+
+  const farBox: LabelBox = { l: 500, r: 560, t: 400, b: 416 }
+  check(
+    'non-overlapping reserved box is harmless',
+    byIndex(placeLabels(cand, W, H, EDGE_FADE_PX, [farBox]), 0) > 0.9,
+  )
+
+  // Reserved wins regardless of z: even a satellite label NEARER the viewer
+  // than the reserved box still yields.
+  const nearCand = [mk({ index: 0, x: 100, y: 100, z: -999 })]
+  check(
+    'reserved wins even against a nearer satellite label',
+    byIndex(placeLabels(nearCand, W, H, EDGE_FADE_PX, [mascotBox]), 0) === 0,
+  )
+
+  // Empty reserved array === omitting it.
+  check(
+    'empty reserved matches omitting it',
+    byIndex(placeLabels(cand, W, H, EDGE_FADE_PX), 0) ===
+      byIndex(placeLabels(cand, W, H, EDGE_FADE_PX, []), 0),
+  )
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll label placement checks passed.')
