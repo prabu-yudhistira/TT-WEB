@@ -764,7 +764,8 @@ export class MascotEngine {
   /** Expressions the glance beat picks from, in rough order of how often. */
   private static readonly GLANCE_POOL = [
     'blink', 'blink', 'happy', 'wink', 'squint',
-    'lookLeft', 'lookRight', 'lookUpLeft', 'lookUpRight', 'happy',
+    'lookLeft', 'lookRight', 'lookUpLeft', 'lookUpRight',
+    'lookDownLeft', 'lookDownRight', 'happy',
   ]
 
   /**

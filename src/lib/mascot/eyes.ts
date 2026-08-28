@@ -95,6 +95,12 @@ export const EXPRESSIONS: Record<string, Expression> = {
   lookRight: { name: 'lookRight', left: eye({ dx: 0.15, lean: 16, w: 0.31 }) },
   lookUpLeft: { name: 'lookUpLeft', left: eye({ dx: -0.13, dy: 0.14, lean: -20, w: 0.31, h: 0.46 }) },
   lookUpRight: { name: 'lookUpRight', left: eye({ dx: 0.13, dy: 0.14, lean: 20, w: 0.31, h: 0.46 }) },
+  // Downward glances mirror the upward ones with the LEAN SIGN FLIPPED: the
+  // top of the eye tips the other way when the gaze drops, so reusing the up
+  // lean would read as looking up while sitting low.  A little shorter, too —
+  // a downward look carries a hint of lid.
+  lookDownLeft: { name: 'lookDownLeft', left: eye({ dx: -0.13, dy: -0.13, lean: 18, w: 0.32, h: 0.41 }) },
+  lookDownRight: { name: 'lookDownRight', left: eye({ dx: 0.13, dy: -0.13, lean: -18, w: 0.32, h: 0.41 }) },
   wink: {
     name: 'wink',
     left: eye({ h: 0.05 }),
