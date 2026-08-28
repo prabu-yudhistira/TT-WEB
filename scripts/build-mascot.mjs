@@ -2,9 +2,12 @@
  * Mascot asset pipeline: source GLB -> shipped Draco GLB.
  *
  *   node scripts/build-mascot.mjs <src.glb> <out.glb> [triTarget] [texSize]
+ *   npm run build:mascot          (wires up the paths below)
  *
- * Typical invocation (source lives outside the repo, in _ASSETS/):
- *   node scripts/build-mascot.mjs "../_ASSETS/Mascot.glb" public/models/mascot.draco.glb 20000 1024
+ * The 57.6 MB source GLB lives at ../_ASSETS/mascot/Mascot.glb — a large
+ * working-tree asset, NOT committed to this app repo (same as logo.glb, which
+ * sits in _ASSETS/logo-3d/). Only the 543 KB shipped output,
+ * public/models/mascot.draco.glb, is committed.
  *
  * Dev-only dependencies (already in devDependencies; never shipped to the client):
  *   @gltf-transform/core  @gltf-transform/extensions  @gltf-transform/functions

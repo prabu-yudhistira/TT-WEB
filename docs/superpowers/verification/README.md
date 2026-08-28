@@ -160,3 +160,27 @@ the real transition:
 Always wait for the scene to settle (`waitForQuiet`) before measuring. Sampling
 during the bridge makes the "no effect" control catch the logo still
 materialising, which swamps the very difference the test is trying to see.
+
+## Mascot
+
+Six scripts. Same rules as the rest of the harness — run from a dir with
+`puppeteer-core`; the app takes no dependency on them.
+
+| Script | Asserts |
+|---|---|
+| `mascot-capture.mjs` | orbit direction by the **sign of the 2D cross product** of consecutive position vectors (not by eye — a tilted perspective projection makes CW/CCW genuinely easy to reverse); ≥1 layer flip over the sampled arc; 0 console errors; writes a contact sheet |
+| `mascot-occlusion.mjs` | body parked ON the mark contributes ≫ pixels in front vs behind (`LABEL_ENABLED=0`, so only the body is measured). Ratio ~1.7×, not near-total: the TT monogram has open counters, so a body behind it legitimately shows through |
+| `mascot-sorting.mjs` | overlap-with-a-bead % and **wrong-sort %** across three viewports. The mascot is on its own canvas and can only sort per-layer against the beads; `HEIGHT 136` biases it toward the viewer so wrong-sort stays 0.0% despite ~1–2% of frames overlapping. Fails if wrong-sort ≥ 2% |
+| `mascot-label.mjs` | mascot-word vs satellite-word collision % (the two are placed by different engines; `placeLabels`' `reserved` param is what keeps it near 0); frame-edge clip count must be 0 |
+| `mascot-degradation.mjs` | reduced motion byte-stable + orbit frozen + non-empty; fps above the 30 software floor; scroll fades the label; a **404 on `mascot.draco.glb`** leaves the satellite canvases up with no page errors; a **10s stall** on the GLB does not delay the logo handoff (logo canvases up < 9 s) |
+| `mascot-kill-switch.mjs` | `mascotEnabled` OFF via authenticated CMS write → no `[data-mascot]` canvas, no label node, no `window.__ttMascot`, `mascot.draco.glb` never fetched. ON → canvas present, one fetch. Both polarities |
+
+Two traps, both already paid for:
+
+- **Emulate `prefers-reduced-motion: reduce` before `mascot-occlusion` and
+  `mascot-sorting`.** Otherwise the satellites keep orbiting between shots and
+  their motion swamps the signal — the same confound documented for the
+  live-preview guard above.
+- **The occlusion ratio is ~1.7×, not ~10×, and that is correct.** The mark is
+  an interlocked monogram; a body behind it shows through the counters. Do not
+  "tighten" the threshold back toward a near-total ratio.
