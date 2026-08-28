@@ -134,13 +134,24 @@ export default function EyePanel({
     fn?.(name)
   }, [])
 
+  /**
+   * Selecting an expression HOLDS it, always.
+   *
+   * The first version only held when a separate checkbox was ticked, and the
+   * bench was unusable as a result: at rest the beat displays `neutral`, and
+   * every other expression is on screen for a fraction of a second per orbit
+   * pass — so dragging a slider for `happy` looked like it did nothing at all.
+   * Only `neutral` appeared to respond, because `neutral` IS the resting face.
+   * Picking a thing to tune is already the statement that you want to see it.
+   */
   const pick = useCallback(
     (name: string) => {
       setSel(name)
       setSide('left')
-      if (pinned) pin(name)
+      setPinned(true)
+      pin(name)
     },
-    [pinned, pin],
+    [pin],
   )
 
   const shape = tuning.shapes[sel]
@@ -283,17 +294,41 @@ export default function EyePanel({
         ))}
       </div>
 
-      <label style={{ display: 'flex', gap: 6, marginBottom: 8, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={pinned}
-          onChange={(e) => {
-            setPinned(e.target.checked)
-            pin(e.target.checked ? sel : null)
-          }}
-        />
-        <span>hold this expression (stops the beat)</span>
-      </label>
+      <div
+        style={{
+          marginBottom: 8,
+          padding: '5px 7px',
+          borderRadius: 3,
+          background: pinned ? 'rgba(142,17,20,0.12)' : 'rgba(43,42,39,0.07)',
+        }}
+      >
+        {pinned ? (
+          <>
+            holding <strong>{sel}</strong> — the sliders below edit it live.{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setPinned(false)
+                pin(null)
+              }}
+              style={{
+                font: 'inherit',
+                padding: '1px 5px',
+                marginTop: 3,
+                cursor: 'pointer',
+                borderRadius: 3,
+                border: '1px solid rgba(43,42,39,0.3)',
+                background: 'rgba(255,255,255,0.6)',
+                color: 'inherit',
+              }}
+            >
+              release — play the beat
+            </button>
+          </>
+        ) : (
+          'beat running — pick an expression to hold and edit it'
+        )}
+      </div>
 
       <label style={{ display: 'flex', gap: 6, marginBottom: 8, cursor: 'pointer' }}>
         <input
