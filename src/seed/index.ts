@@ -239,6 +239,44 @@ const run = async () => {
       mascotLabel: { enabled: true, size: 12, color: '#2B2A27', offset: 14, halo: 0 },
       mascotHold: { freeze: true, shakePx: 1.5, shakeSpeed: 1 },
       mascotBehaviour: { entranceMs: 1600, scrollFadeVh: 0.6 },
+
+      // Eyes — owner-tuned at /dev/mascot across three rounds, signed off
+      // 2026-08-28. Mirrors DEFAULT_MASCOT_EYES exactly;
+      // src/lib/mascot/eyeTypes.check.ts pins the same numbers. The expression
+      // SHAPES are frozen in src/lib/mascot/eyes.ts and are not seeded.
+      mascotEyesEnabled: true,
+      mascotEyesLook: {
+        color: '#F2A81C',
+        coreColor: '#FFF0BE',
+        socketColor: '#000000',
+        glow: 0.55,
+        gap: 0.38,
+        socketSpan: 1.34,
+      },
+      mascotEyesScanlines: { max: 9, minBodyPx: 44, ramp: 12 },
+      mascotEyesBeat: {
+        glanceSeconds: 0.6,
+        glancePeak: 0.45,
+        facingThreshold: 0.3,
+        chargeCrossover: 0.7,
+        noRepeat: false,
+      },
+      mascotEyesWeights: {
+        neutral: 0,
+        blink: 2,
+        squint: 1,
+        wide: 0,
+        happy: 1,
+        lookLeft: 1,
+        lookRight: 1,
+        lookUp: 1,
+        lookDown: 1,
+        lookUpLeft: 1,
+        lookUpRight: 1,
+        lookDownLeft: 1,
+        lookDownRight: 1,
+        wink: 1,
+      },
     },
   })
 

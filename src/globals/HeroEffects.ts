@@ -980,5 +980,144 @@ export const HeroEffects: GlobalConfig = {
         },
       ],
     },
+
+    // ── mascot eyes ──────────────────────────────────────────────────
+    // The animated LED face. Owner-tuned on screen 2026-08-28 and mapped by
+    // resolveMascotEyes(); every field falls back to DEFAULT_MASCOT_EYES when
+    // null on an unsaved global.
+    //
+    // The 14 expression SHAPES are deliberately NOT here — they are frozen in
+    // src/lib/mascot/eyes.ts. Tuning them blind in a form is not a workflow
+    // anyone can succeed at; the bench at /dev/mascot is the tool for that.
+    {
+      name: 'mascotEyesEnabled',
+      type: 'checkbox',
+      defaultValue: true,
+      admin: {
+        description:
+          'The mascot’s animated LED face. Turning this off restores its original painted eyes exactly — no socket darkening, no display. The expression shapes are not editable here: they were tuned on screen and are frozen in code, so changing one is a code change.',
+      },
+    },
+    {
+      name: 'mascotEyesLook',
+      type: 'group',
+      label: 'Mascot eyes — look',
+      fields: [
+        colourField('color', '#F2A81C', {
+          description:
+            'The lit eye. Amber rather than the reference’s cyan, so the hero keeps one warm accent instead of gaining a second, cold one.',
+        }),
+        colourField('coreColor', '#FFF0BE', { description: 'Hot centre of the eye.' }),
+        colourField('socketColor', '#000000', {
+          description:
+            'Darkening over the faceplate. It exists to cover the mascot’s own PAINTED amber ovals — lighten it and the old eyes show through around the new ones.',
+        }),
+        { name: 'glow', type: 'number', defaultValue: 0.55, min: 0, max: 2 },
+        {
+          name: 'gap',
+          type: 'number',
+          defaultValue: 0.38,
+          min: 0,
+          max: 0.9,
+          admin: { description: 'Half-distance between the two eyes.' },
+        },
+        {
+          name: 'socketSpan',
+          type: 'number',
+          defaultValue: 1.34,
+          min: 0.3,
+          max: 2.5,
+          admin: {
+            description:
+              'How far the darkening reaches. ⚠️ Anything drawn past this is CUT with a hard edge, not faded, and at 1.34 there is no headroom left — one expression already reaches 1.35. Raise this, never lower it.',
+          },
+        },
+      ],
+    },
+    {
+      name: 'mascotEyesScanlines',
+      type: 'group',
+      label: 'Mascot eyes — scanlines',
+      fields: [
+        { name: 'max', type: 'number', defaultValue: 9, min: 0, max: 20 },
+        {
+          name: 'minBodyPx',
+          type: 'number',
+          defaultValue: 44,
+          min: 0,
+          max: 200,
+          admin: {
+            description:
+              'Body size below which scanlines are off. Deliberately above the mascot’s 28px base, so they appear only as it swings near — 7 lines over an 18px eye is moire, not texture.',
+          },
+        },
+        { name: 'ramp', type: 'number', defaultValue: 12, min: 1, max: 60 },
+      ],
+    },
+    {
+      name: 'mascotEyesBeat',
+      type: 'group',
+      label: 'Mascot eyes — beat',
+      admin: {
+        description:
+          'The mascot plays ONE expression each time its face sweeps past the viewer, then returns to neutral. There is no idle timer and no cursor tracking — the face is only toward you about a quarter of each turn.',
+      },
+      fields: [
+        { name: 'glanceSeconds', type: 'number', defaultValue: 0.6, min: 0.1, max: 3 },
+        {
+          name: 'glancePeak',
+          type: 'number',
+          defaultValue: 0.45,
+          min: 0.05,
+          max: 0.95,
+          admin: { description: 'Where in the glance the expression peaks.' },
+        },
+        {
+          name: 'facingThreshold',
+          type: 'number',
+          defaultValue: 0.3,
+          min: -0.5,
+          max: 0.95,
+          admin: { description: 'How square-on the face must be to count as facing you.' },
+        },
+        {
+          name: 'chargeCrossover',
+          type: 'number',
+          defaultValue: 0.7,
+          min: 0.05,
+          max: 0.95,
+          admin: {
+            description:
+              'While the mark is held: the eyes widen, then squeeze shut past this point.',
+          },
+        },
+        { name: 'noRepeat', type: 'checkbox', defaultValue: false },
+      ],
+    },
+    {
+      name: 'mascotEyesWeights',
+      type: 'group',
+      label: 'Mascot eyes — expression frequency',
+      admin: {
+        description:
+          'How often each expression is picked. 0 removes it entirely. “Neutral” is the resting face and “wide” belongs to the press-and-hold reaction, so both are 0 here by design.',
+      },
+      fields: [
+        { name: 'neutral', type: 'number', defaultValue: 0, min: 0, max: 4 },
+        { name: 'blink', type: 'number', defaultValue: 2, min: 0, max: 4 },
+        { name: 'squint', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'wide', type: 'number', defaultValue: 0, min: 0, max: 4 },
+        { name: 'happy', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookLeft', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookRight', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookUp', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookDown', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookUpLeft', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookUpRight', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookDownLeft', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'lookDownRight', type: 'number', defaultValue: 1, min: 0, max: 4 },
+        { name: 'wink', type: 'number', defaultValue: 1, min: 0, max: 4 },
+      ],
+    },
   ],
 }
