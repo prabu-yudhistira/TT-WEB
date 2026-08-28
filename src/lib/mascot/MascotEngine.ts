@@ -8,6 +8,15 @@ import { placeLabels, EDGE_FADE_PX, type LabelBox } from '../satellites/labels'
 import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
 import { makeMotePool, TrailState } from './mascotTrail'
+import {
+  EXPRESSIONS,
+  EYES_FRAGMENT_CHUNK,
+  EYES_VERTEX_CHUNK,
+  lerpEye,
+  packEye,
+  rightOf,
+  type EyeShape,
+} from './eyes'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -168,8 +177,44 @@ export class MascotEngine {
       pos: this.lastScreen,
     })
 
+    // Dev handle for the bench and for verification scripts: hold one
+    // expression instead of waiting for the glance beat to pick it.
+    ;(window as unknown as Record<string, unknown>).__ttMascotExpr = (name: string | null) => {
+      this.forcedExpr = name
+      if (name) this.setExpression(name)
+      return Object.keys(EXPRESSIONS)
+    }
+
     window.addEventListener('scroll', this.onScroll, { passive: true })
   }
+
+  /** Set by the bench / verification to pin one expression. null = live. */
+  private forcedExpr: string | null = null
+
+  /**
+   * Face-display uniforms. Shared across every material on the mesh, so one
+   * write drives the whole display. uFaceRadius 0.50 is MEASURED — the smooth
+   * front cap ends there and the bezel relief begins (see ./eyes.ts).
+   */
+  private eyeUniforms: Record<string, { value: unknown }> = {
+    uEyesOn: { value: 1 },
+    uFaceRadius: { value: 0.5 },
+    uEyeColor: { value: new THREE.Color('#59C8F0') },
+    uEyeCore: { value: new THREE.Color('#DCF6FF') },
+    uSocketColor: { value: new THREE.Color('#06080B') },
+    uEyeGlow: { value: 0.55 },
+    uEyeGap: { value: 0.36 },
+    uScanline: { value: 0 },
+    uSocketSpan: { value: 1.34 },
+    uEyeL: { value: new Float32Array(12) },
+    uEyeR: { value: new Float32Array(12) },
+    uObjCenter: { value: new THREE.Vector3() },
+    uObjScale: { value: 1 },
+  }
+  /** Where the glance beat is in its arc, and what it plays. */
+  private glanceT = 1
+  private glanceExpr = 'blink'
+  private wasFacing = false
 
   private lastScreen = { x: NaN, y: NaN, z: NaN, scale: 1 }
   private labelW = 0
@@ -323,6 +368,7 @@ export class MascotEngine {
 
       this.spinner.add(norm)
       this.model = norm
+      this.patchEyes()
       this.applyLook()
     } catch (err) {
       // No mascot is an acceptable outcome; a broken hero is not.
@@ -584,6 +630,7 @@ export class MascotEngine {
     // orbit rather than an idealised one — the hold-shake jitter above is
     // included on purpose.
     this.updateTrail(dtSec, alpha, X, Y)
+    this.updateEyes(dtSec, charge, diameterPx, alpha)
     this.placeLabel(q, radiusPx, alpha)
 
     const behind = q.z >= 0
@@ -647,6 +694,136 @@ export class MascotEngine {
   /** The mascot's current label box, for another layer's collision pass. */
   getLabelBox(): LabelBox | null {
     return this.labelBox
+  }
+
+  // ── face display ────────────────────────────────────────────────────
+
+  /**
+   * Injects the LED face display into the mascot's own material.
+   *
+   * Same idiom as shatterMaterial.ts's tt_hatchify/tt_shine on the logo:
+   * onBeforeCompile, a helper block prepended to the fragment shader, and one
+   * hook line replacing a stock chunk. See ./eyes.ts for why this draws in the
+   * material rather than on a quad (the faceplate is a dome, not a plane).
+   */
+  private patchEyes() {
+    // Normalisation for the quantized attribute space — see EYES_VERTEX_CHUNK.
+    const box = new THREE.Box3()
+    this.spinner.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.geometry.computeBoundingBox()
+      const bb = mesh.geometry.boundingBox
+      if (bb) box.union(bb)
+    })
+    const c = box.getCenter(new THREE.Vector3())
+    const s = box.getSize(new THREE.Vector3())
+    ;(this.eyeUniforms.uObjCenter.value as THREE.Vector3).copy(c)
+    this.eyeUniforms.uObjScale.value = Math.max(s.x, s.y, s.z) / 2 || 1
+
+    for (const m of this.materials) {
+      m.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, this.eyeUniforms)
+
+        // Publish object-space position. `position` is pre-transform, which is
+        // exactly what the display mask wants — it is stable under the spin.
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', `#include <common>\n${EYES_VERTEX_CHUNK}`)
+          .replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\n  vTtObjPos = (position - uObjCenter) / uObjScale;',
+          )
+
+        const HOOK = '#include <dithering_fragment>'
+        // A .replace() whose needle is absent is a SILENT no-op — it compiles
+        // clean, throws nothing, and the feature just never appears. That is
+        // exactly how this shader failed the first time. Assert instead.
+        if (!shader.fragmentShader.includes(HOOK)) {
+          console.error('MascotEngine: eye-display hook not found in the fragment shader')
+          return
+        }
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', `#include <common>\n${EYES_FRAGMENT_CHUNK}`)
+          // After lighting and tone mapping: the display is emissive and must
+          // not be shaded by the scene.
+          .replace(
+            HOOK,
+            `float ttCov = 0.0;
+  gl_FragColor.rgb = tt_eyes(gl_FragColor.rgb, ttCov);
+  ${HOOK}`,
+          )
+        m.userData.ttEyeShader = shader
+      }
+      m.needsUpdate = true
+    }
+  }
+
+  /** Expressions the glance beat picks from, in rough order of how often. */
+  private static readonly GLANCE_POOL = [
+    'blink', 'blink', 'happy', 'wink', 'squint', 'lookLeft', 'lookRight', 'happy',
+  ]
+
+  /**
+   * One frame of the face display.
+   *
+   * The owner kept SPIN_SPEED 113 (a full turn every 3.2s) knowing expressions
+   * would only flash past — so the sweep IS the beat: each time the face turns
+   * toward the viewer the mascot plays ONE expression and returns to neutral as
+   * it turns away. Firing on a timer instead would spend most expressions
+   * pointing at the back of the hero.
+   */
+  private updateEyes(dtSec: number, charge: number, diameterPx: number, alpha: number) {
+    const u = this.eyeUniforms
+    u.uEyesOn.value = alpha
+
+    // Scanlines are moire below ~40px of body: 7 lines over an 18px-tall eye.
+    // Faded in with size rather than switched, so it cannot pop.
+    u.uScanline.value = diameterPx > 40 ? Math.min(9, (diameterPx - 40) / 12) : 0
+
+    // The face is +Z in model space and only the spin turns it, so cos(spin) is
+    // the facing term. > 0 means the display is toward the viewer at all.
+    const facing = Math.cos(this.spin)
+    const isFacing = facing > 0.30
+    if (isFacing && !this.wasFacing) {
+      this.glanceT = 0
+      this.glanceExpr =
+        MascotEngine.GLANCE_POOL[Math.floor(Math.random() * MascotEngine.GLANCE_POOL.length)]
+    }
+    this.wasFacing = isFacing
+    // The beat runs a little shorter than the face-forward window so it lands
+    // and resolves while it can actually be seen.
+    if (this.glanceT < 1) this.glanceT = Math.min(1, this.glanceT + dtSec / 0.62)
+
+    if (this.forcedExpr) {
+      this.setExpression(this.forcedExpr)
+      return
+    }
+
+    if (charge > 0.02) {
+      // Press-and-hold: eyes widen as the charge builds, then squeeze shut at
+      // the peak — riding the same gesture the body already reacts to.
+      if (charge < 0.7) this.setExpression('neutral', 'wide', charge / 0.7)
+      else this.setExpression('wide', 'blink', (charge - 0.7) / 0.3)
+      return
+    }
+
+    // Triangle: neutral -> expression -> neutral across the beat.
+    const t = this.glanceT
+    const k = t >= 1 ? 0 : t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.55
+    this.setExpression('neutral', this.glanceExpr, k)
+  }
+
+  /** Drive the display: set the expression, optionally blended toward another. */
+  setExpression(name: string, blendTo?: string, t = 0) {
+    const a = EXPRESSIONS[name] ?? EXPRESSIONS.neutral
+    const b = blendTo ? (EXPRESSIONS[blendTo] ?? a) : a
+    const k = blendTo ? Math.min(1, Math.max(0, t)) : 0
+    this.writeEyes(lerpEye(a.left, b.left, k), lerpEye(rightOf(a), rightOf(b), k))
+  }
+
+  private writeEyes(l: EyeShape, r: EyeShape) {
+    packEye(l, this.eyeUniforms.uEyeL.value as Float32Array, 0)
+    packEye(r, this.eyeUniforms.uEyeR.value as Float32Array, 0)
   }
 
   /**
