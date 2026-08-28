@@ -184,3 +184,55 @@ Two traps, both already paid for:
 - **The occlusion ratio is ~1.7×, not ~10×, and that is correct.** The mark is
   an interlocked monogram; a body behind it shows through the counters. Do not
   "tighten" the threshold back toward a near-total ratio.
+
+## Mascot eyes (`eyes-*.mjs`)
+
+`eyes-render` · `eyes-legibility` · `eyes-clearance` · `eyes-beat` ·
+`eyes-kill-switch` · `eyes-reduced-motion`, plus `eyes-zoom` (a tool, not a check).
+
+Run order matters once: `eyes-legibility` consumes the crops `eyes-render` writes.
+`eyes-clearance` is pure geometry and needs `node --import tsx`; the rest drive a
+browser. As with every script here, `puppeteer-core` lives in the session
+scratchpad and never in the app, so copy the script there to run it.
+
+**Four traps, each paid for in real debugging time:**
+
+1. **`BOB_PX` must be 0 for any pixel comparison.** With the default bob the
+   body drifts vertically between screenshots and the diff measures *that*, not
+   the eyes. It produced a near-uniform 44–62 across every expression — three
+   assertions passing for the wrong reason.
+
+2. **Wait for the condition, never sleep a fixed time, when asserting something
+   HAPPENED.** A fixed 6s sleep in `mascot-kill-switch.mjs` raced a cold 530 KB
+   GLB fetch and reported "model never fetched" on a build where it loads
+   perfectly. The inverse also holds: when asserting nothing *ever* happens,
+   only elapsed time can support it, so `eyes-reduced-motion` keeps its fixed
+   wait deliberately.
+
+3. **Zoom before diagnosing.** The crescent eyes were diagnosed as rendering
+   "hollow rings" from a contact-sheet thumbnail, and the shader's core shading
+   was changed to fix it. At 715px they were solid all along; the change made no
+   visible difference and was reverted. `eyes-zoom.mjs <expression>` exists for
+   exactly this.
+
+4. **Never test a CMS-driven behaviour on `/dev/mascot`.** The bench holds its
+   eye config in local React state, so a CMS value never reaches it and both
+   polarities of a kill-switch test measure identically. Test those on `/en`.
+
+**Two measurement notes specific to this display:**
+
+- **Darkness, not brightness, identifies the eyes.** The mascot is BRASS —
+  amber-gold all over — so a "lit amber pixel" count cannot separate the display
+  from the body, and reads BACKWARDS when the socket covers brass that would
+  otherwise be bright (measured: eyes ON 261, OFF 333). The socket is pure
+  `#000000` and nothing else on the mascot is.
+- **Freeze the scene before comparing two configurations.** Sampling the live
+  orbit and taking the peak frame selects for the mascot passing over the dark
+  logo — it measures the BACKGROUND, and swung 457 vs 807 between runs.
+  `prefers-reduced-motion` pins it to one deterministic frame; `eyes-kill-switch`
+  asserts both samples came from the same angle and spin.
+
+**A silent-failure note:** feeding a quantized `position` to the object-space
+mask makes every fragment fail — the shader compiles clean, nothing throws, and
+the mascot shows its PAINTED eyes as if the feature were absent. "No console
+errors" proves nothing here. `eyes-render.mjs` asserts on pixels for that reason.

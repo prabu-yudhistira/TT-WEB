@@ -829,39 +829,51 @@ export class MascotEngine {
         continue
       }
       m.onBeforeCompile = (shader) => {
-        Object.assign(shader.uniforms, this.eyeUniforms)
-
-        // Publish object-space position. `position` is pre-transform, which is
-        // exactly what the display mask wants — it is stable under the spin.
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', `#include <common>\n${EYES_VERTEX_CHUNK}`)
-          .replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\n  vTtObjPos = (position - uObjCenter) / uObjScale;',
-          )
-
-        const HOOK = '#include <dithering_fragment>'
-        // A .replace() whose needle is absent is a SILENT no-op — it compiles
-        // clean, throws nothing, and the feature just never appears. That is
-        // exactly how this shader failed the first time. Assert instead.
-        if (!shader.fragmentShader.includes(HOOK)) {
-          console.error('MascotEngine: eye-display hook not found in the fragment shader')
-          return
+        try {
+          this.injectEyes(shader, m)
+        } catch (err) {
+          // The eyes are ADDITIVE to a material that already renders. A failure
+          // here must leave the mascot showing its own painted face, never
+          // blank it. Spec §10.
+          console.error('MascotEngine: eye display disabled — shader patch failed', err)
         }
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', `#include <common>\n${EYES_FRAGMENT_CHUNK}`)
-          // After lighting and tone mapping: the display is emissive and must
-          // not be shaded by the scene.
-          .replace(
-            HOOK,
-            `float ttCov = 0.0;
-  gl_FragColor.rgb = tt_eyes(gl_FragColor.rgb, ttCov);
-  ${HOOK}`,
-          )
-        m.userData.ttEyeShader = shader
       }
       m.needsUpdate = true
     }
+  }
+
+  /** The actual injection, split out so patchEyes can guard it. */
+  private injectEyes(shader: { uniforms: Record<string, unknown>; vertexShader: string; fragmentShader: string }, m: THREE.MeshStandardMaterial) {
+    Object.assign(shader.uniforms, this.eyeUniforms)
+
+    // Publish object-space position. `position` is pre-transform, which is
+    // exactly what the display mask wants — it is stable under the spin.
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${EYES_VERTEX_CHUNK}`)
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n  vTtObjPos = (position - uObjCenter) / uObjScale;',
+      )
+
+    const HOOK = '#include <dithering_fragment>'
+    // A .replace() whose needle is absent is a SILENT no-op — it compiles
+    // clean, throws nothing, and the feature just never appears. That is
+    // exactly how this shader failed the first time. Assert instead.
+    if (!shader.fragmentShader.includes(HOOK)) {
+      console.error('MascotEngine: eye-display hook not found in the fragment shader')
+      return
+    }
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${EYES_FRAGMENT_CHUNK}`)
+      // After lighting and tone mapping: the display is emissive and must
+      // not be shaded by the scene.
+      .replace(
+        HOOK,
+        `float ttCov = 0.0;
+  gl_FragColor.rgb = tt_eyes(gl_FragColor.rgb, ttCov);
+  ${HOOK}`,
+      )
+    m.userData.ttEyeShader = shader
   }
 
   /**
@@ -940,8 +952,14 @@ export class MascotEngine {
   }
 
   private writeEyes(l: EyeShape, r: EyeShape) {
-    packEye(l, this.eyeUniforms.uEyeL.value as Float32Array, 0)
-    packEye(r, this.eyeUniforms.uEyeR.value as Float32Array, 0)
+    const L = this.eyeUniforms.uEyeL.value as Float32Array
+    const R = this.eyeUniforms.uEyeR.value as Float32Array
+    // A short array would let packEye write past its slots, and a NaN reaching
+    // the SDF makes the whole eye vanish with nothing logged. Cheap guard
+    // against a class of failure that is silent by nature.
+    if (!L || !R || L.length < 12 || R.length < 12) return
+    packEye(l, L, 0)
+    packEye(r, R, 0)
   }
 
   /**
