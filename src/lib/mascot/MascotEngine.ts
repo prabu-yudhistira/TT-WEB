@@ -7,6 +7,7 @@ import { projectOrbit, orbitGeometry } from '../satellites/project'
 import { placeLabels, EDGE_FADE_PX, type LabelBox } from '../satellites/labels'
 import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
+import { makeMotePool, TrailState } from './mascotTrail'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -38,25 +39,13 @@ import { DEFAULT_MASCOT, type MascotConfig } from './types'
  */
 
 /**
- * Fixed mote pool. At the tuned density (90/sec) and lifetime (1.1s) only ~100
- * are ever alive; the headroom is for the bench's upper slider ranges. Fixed
- * rather than growable so the buffers are allocated once and never resized
- * mid-flight.
+ * Fixed mote pool, allocated once and never resized mid-flight.
+ * ceil(TRAIL_DENSITY max 400 * TRAIL_SECONDS max 5 * 1.3) — the CMS cannot ask
+ * for more live motes than the pool holds.
  */
-const MAX_MOTES = 900
+const MAX_MOTES = 2600
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
-
-type Mote = {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  born: number
-  life: number
-  size: number
-  seed: number
-}
 
 export class MascotEngine {
   private renderer: THREE.WebGLRenderer
@@ -82,11 +71,8 @@ export class MascotEngine {
   private dustPos!: Float32Array
   private dustAlpha!: Float32Array
   private dustSize!: Float32Array
-  private motes: Mote[] = []
-  /** Ring-buffer cursor into the fixed pool. */
-  private moteNext = 0
-  /** Fractional carry so a density that is not a multiple of the frame rate still emits evenly. */
-  private emitDebt = 0
+  /** Pure particle bookkeeping — emission carry, stall clamp, fade, ring buffer. */
+  private trail!: TrailState
 
   private cfg: MascotConfig = { ...DEFAULT_MASCOT }
   private belt: SatelliteConfig | null = null
@@ -208,10 +194,7 @@ export class MascotEngine {
     this.dustPos = new Float32Array(MAX_MOTES * 3)
     this.dustAlpha = new Float32Array(MAX_MOTES)
     this.dustSize = new Float32Array(MAX_MOTES)
-    this.motes = new Array(MAX_MOTES)
-    for (let i = 0; i < MAX_MOTES; i++) {
-      this.motes[i] = { x: 0, y: 0, vx: 0, vy: 0, born: 0, life: 0, size: 0, seed: Math.random() }
-    }
+    this.trail = new TrailState(makeMotePool(MAX_MOTES))
     this.dustGeo = new THREE.BufferGeometry()
     this.dustGeo.setAttribute('position', new THREE.BufferAttribute(this.dustPos, 3))
     this.dustGeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.dustAlpha, 1))
@@ -274,38 +257,7 @@ export class MascotEngine {
     this.scene.add(this.dust)
   }
 
-  /** Shed new motes at the mascot's current position. */
-  private emit(x: number, y: number, dtSec: number, alpha: number) {
-    const c = this.cfg
-    if (!c.TRAIL_ENABLED || alpha <= 0.001) {
-      this.emitDebt = 0
-      return
-    }
-    this.emitDebt += c.TRAIL_DENSITY * dtSec
-    let n = Math.floor(this.emitDebt)
-    this.emitDebt -= n
-    // A stall (tab restored, slow frame) must not dump hundreds of motes at one
-    // point — that reads as a blob, not a wake.
-    if (n > 40) n = 40
-    for (let i = 0; i < n; i++) {
-      const m = this.motes[this.moteNext]
-      this.moteNext = (this.moteNext + 1) % MAX_MOTES
-      const a = Math.random() * Math.PI * 2
-      const rad = Math.random() * c.TRAIL_SPREAD
-      m.x = x + Math.cos(a) * rad
-      m.y = y + Math.sin(a) * rad
-      const da = Math.random() * Math.PI * 2
-      const sp = c.TRAIL_DRIFT * (0.35 + Math.random() * 0.65)
-      m.vx = Math.cos(da) * sp
-      m.vy = Math.sin(da) * sp
-      m.born = this.elapsed
-      m.life = c.TRAIL_SECONDS * (0.7 + Math.random() * 0.6)
-      m.size = c.TRAIL_SIZE * (0.55 + Math.random() * 0.9)
-      m.seed = Math.random()
-    }
-  }
-
-  private updateTrail(dtSec: number, alpha: number) {
+  private updateTrail(dtSec: number, alpha: number, emitX: number, emitY: number) {
     const c = this.cfg
     this.dustMat.uniforms.uColor.value.set(c.TRAIL_COLOR)
     this.dustMat.uniforms.uCore.value.set(c.TRAIL_CORE_COLOR)
@@ -316,25 +268,13 @@ export class MascotEngine {
       this.dustMat.needsUpdate = true
     }
 
-    for (let i = 0; i < MAX_MOTES; i++) {
-      const m = this.motes[i]
-      const age = m.life > 0 ? (this.elapsed - m.born) / m.life : 2
-      if (age >= 1 || age < 0) {
-        this.dustAlpha[i] = 0
-        continue
-      }
-      m.x += m.vx * dtSec
-      m.y += m.vy * dtSec
-      // Fade in fast, out slow — a mote that pops in at full brightness reads
-      // as a glitch rather than as something being shed.
-      const fade = age < 0.12 ? age / 0.12 : 1 - (age - 0.12) / 0.88
-      const twinkle =
-        1 - c.TRAIL_TWINKLE * 0.5 * (1 + Math.sin(this.elapsed * 9 + m.seed * 40))
-      this.dustPos[i * 3] = m.x
-      this.dustPos[i * 3 + 1] = m.y
-      this.dustPos[i * 3 + 2] = -1
-      this.dustAlpha[i] = Math.max(0, c.TRAIL_OPACITY * fade * twinkle * alpha)
-      this.dustSize[i] = m.size * (1 - age * 0.45) * this.dpr
+    this.trail.emit(c, emitX, emitY, dtSec, alpha, this.elapsed)
+    for (const m of this.trail.sample(c, this.elapsed, alpha, dtSec)) {
+      this.dustPos[m.i * 3] = m.x
+      this.dustPos[m.i * 3 + 1] = m.y
+      this.dustPos[m.i * 3 + 2] = -1
+      this.dustAlpha[m.i] = m.alpha
+      this.dustSize[m.i] = m.size * this.dpr
     }
     this.dustGeo.attributes.position.needsUpdate = true
     this.dustGeo.attributes.aAlpha.needsUpdate = true
@@ -643,8 +583,7 @@ export class MascotEngine {
     // Motes are shed at the mascot's own position, so the wake traces the real
     // orbit rather than an idealised one — the hold-shake jitter above is
     // included on purpose.
-    this.emit(X, Y, dtSec, alpha)
-    this.updateTrail(dtSec, alpha)
+    this.updateTrail(dtSec, alpha, X, Y)
     this.placeLabel(q, radiusPx, alpha)
 
     const behind = q.z >= 0
