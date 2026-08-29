@@ -11,8 +11,12 @@ import {
   resolveSatellites,
   type HeroEffectsSatellitesInput,
 } from '@/lib/satellites/resolveSatellites'
+import { resolveMascot, type HeroEffectsMascotInput } from '@/lib/mascot/resolveMascot'
+import { resolveMascotEyes, type HeroEffectsEyesInput } from '@/lib/mascot/resolveMascotEyes'
 import type { IgnitionConfig } from '@/lib/three/ignition/types'
 import type { SatelliteConfig } from '@/lib/satellites/types'
+import type { MascotConfig } from '@/lib/mascot/types'
+import type { MascotEyesConfig } from '@/lib/mascot/eyeTypes'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
 
 type HeroBlockShape = {
@@ -30,6 +34,8 @@ type Props = {
   savedSeparation: SeparationConfig
   savedIgnition: IgnitionConfig
   savedSatellites: SatelliteConfig
+  savedMascot: MascotConfig
+  savedEyes: MascotEyesConfig
   savedLine1: string
   savedLine2?: string | null
   savedLocationLine?: string | null
@@ -79,6 +85,8 @@ export default function HeroPreview(props: Props) {
   let separation = props.savedSeparation
   let ignition = props.savedIgnition
   let satellites = props.savedSatellites
+  let mascot = props.savedMascot
+  let eyes = props.savedEyes
   let line1 = props.savedLine1
   let line2 = props.savedLine2
   let locationLine = props.savedLocationLine
@@ -99,6 +107,8 @@ export default function HeroPreview(props: Props) {
     separation = resolveSeparation(data as HeroEffectsInput)
     ignition = resolveIgnition(data as HeroEffectsIgnitionInput)
     satellites = resolveSatellites(data as HeroEffectsSatellitesInput)
+    mascot = resolveMascot(data as HeroEffectsMascotInput)
+    eyes = resolveMascotEyes(data as HeroEffectsEyesInput)
   }
 
   if (hasLivePage) {
@@ -130,6 +140,8 @@ export default function HeroPreview(props: Props) {
         separation={separation}
         ignition={ignition}
         satellites={satellites}
+        mascot={mascot}
+        eyes={eyes}
         floatingWords={words}
       />
 

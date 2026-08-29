@@ -4,9 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
 import { SatelliteField } from '../hero/SatelliteField'
+import { MascotLayer } from '../hero/MascotLayer'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
 import type { SatelliteConfig } from '../../lib/satellites/types'
+import type { MascotConfig } from '../../lib/mascot/types'
+import type { MascotEyesConfig } from '../../lib/mascot/eyeTypes'
+import type { LabelBox } from '../../lib/satellites/labels'
 
 type Props = {
   line1: string
@@ -19,6 +23,8 @@ type Props = {
   separation: SeparationConfig
   ignition: IgnitionConfig
   satellites: SatelliteConfig
+  mascot: MascotConfig
+  eyes: MascotEyesConfig
   floatingWords?: string[]
 }
 
@@ -68,6 +74,8 @@ export function HeroBlock({
   separation,
   ignition,
   satellites,
+  mascot,
+  eyes,
   floatingWords = [],
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
@@ -87,6 +95,12 @@ export function HeroBlock({
   const onChargeSource = useCallback((get: (() => number) | null) => {
     chargeRef.current = get
   }, [])
+
+  // Carries the mascot's current label box to the satellites' collision pass,
+  // so the mascot's word wins any overlap. Pull-based like chargeRef: it
+  // changes every frame and mirroring it into React state would cost a
+  // re-render per frame.
+  const labelBoxRef = useRef<(() => LabelBox | null) | null>(null)
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -152,7 +166,20 @@ export function HeroBlock({
         config={satellites}
         active={stageLive}
         chargeRef={chargeRef}
+        labelBoxRef={labelBoxRef}
         enabled={satellites.SAT_ENABLED}
+      />
+      {/* Also before <LogoStage>: its z-0 (behind-the-mark) state relies on
+          painting before the logo does. Reads the satellites' config as the
+          belt it shares. */}
+      <MascotLayer
+        config={mascot}
+        belt={satellites}
+        active={stageLive}
+        enabled={mascot.ENABLED}
+        chargeRef={chargeRef}
+        labelBoxRef={labelBoxRef}
+        eyes={eyes}
       />
       <LogoStage
         onLive={onStageLive}

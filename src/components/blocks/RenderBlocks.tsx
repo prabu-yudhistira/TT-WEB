@@ -9,6 +9,8 @@ import { ContactMailto } from './ContactMailto'
 import { resolveSeparation } from '../../lib/three/shatter/resolveSeparation'
 import { resolveIgnition } from '../../lib/three/ignition/resolveIgnition'
 import { resolveSatellites } from '../../lib/satellites/resolveSatellites'
+import { resolveMascot } from '../../lib/mascot/resolveMascot'
+import { resolveMascotEyes } from '../../lib/mascot/resolveMascotEyes'
 
 type Blocks = NonNullable<Page['layout']>
 
@@ -39,6 +41,8 @@ export async function RenderBlocks({
                   separation={resolveSeparation(effects)}
                   ignition={resolveIgnition(effects)}
                   satellites={resolveSatellites(effects)}
+                  mascot={resolveMascot(effects)}
+                  eyes={resolveMascotEyes(effects)}
                   floatingWords={(block.floatingWords || [])
                     .map((w) => w.word)
                     .filter((w): w is string => !!w)}

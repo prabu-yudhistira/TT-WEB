@@ -170,8 +170,10 @@ const run = async () => {
         tiltSpread: 15,
         baseColor: '#8E1114',
       },
+      // 12 colours to match the 12 hero words after "samsara" moved to the
+      // mascot (2026-08-28). Colour belongs to the ORBIT SLOT, not the word —
+      // dropping the leading '#000000' kept every remaining word its tuned hue.
       satelliteColors: [
-        '#000000',
         '#ffd500',
         '#f96d3e',
         '#23e126',
@@ -194,6 +196,87 @@ const run = async () => {
       },
       satelliteHold: { freeze: true, shakePx: 3, shakeSpeed: 1.1 },
       satelliteBehaviour: { entranceMs: 1600, scrollFadeVh: 0.6, seed: 20260826 },
+
+      // Owner-tuned at /dev/mascot and signed off 2026-08-28. Mirrors
+      // DEFAULT_MASCOT exactly; src/lib/mascot/types.check.ts pins the same
+      // numbers. Like the satellites block above, this only runs on a FRESH
+      // install — an existing DB reads Payload's field defaultValues, which
+      // cover every mascot field (no arrays here), so resolveMascot returns
+      // the right values even before anyone opens /admin.
+      mascotEnabled: true,
+      mascotLabelText: 'SAMSARA',
+      mascotOrbit: {
+        radius: 0.71,
+        mobileRadius: 0.55,
+        height: 136,
+        tiltOffset: 0,
+        phase: 88,
+        speedScale: 0.52,
+      },
+      mascotLook: {
+        size: 28,
+        mobileSize: 18,
+        depthScale: 0.3,
+        opacity: 1,
+        envIntensity: 1,
+        lightIntensity: 1.5,
+      },
+      mascotSpin: { spinSpeed: 113, spinTilt: 12, bobPx: 0, bobSeconds: 8.8 },
+      mascotTrail: {
+        enabled: true,
+        seconds: 1.4,
+        density: 130,
+        size: 10,
+        spread: 6.5,
+        drift: 25,
+        glow: 0.95,
+        twinkle: 0.45,
+        opacity: 0.75,
+        additive: true,
+        color: '#FDB721',
+        coreColor: '#FFFCD6',
+      },
+      mascotLabel: { enabled: true, size: 12, color: '#2B2A27', offset: 14, halo: 0 },
+      mascotHold: { freeze: true, shakePx: 1.5, shakeSpeed: 1 },
+      mascotBehaviour: { entranceMs: 1600, scrollFadeVh: 0.6 },
+
+      // Eyes — owner-tuned at /dev/mascot across three rounds, signed off
+      // 2026-08-28. Mirrors DEFAULT_MASCOT_EYES exactly;
+      // src/lib/mascot/eyeTypes.check.ts pins the same numbers. The expression
+      // SHAPES are frozen in src/lib/mascot/eyes.ts and are not seeded.
+      mascotEyesEnabled: true,
+      mascotEyesLook: {
+        color: '#F2A81C',
+        coreColor: '#FFF0BE',
+        socketColor: '#000000',
+        glow: 0.55,
+        gap: 0.38,
+        socketSpan: 1.34,
+      },
+      mascotEyesScanlines: { max: 9, minBodyPx: 44, ramp: 12 },
+      mascotEyesBeat: {
+        glanceSeconds: 0.6,
+        glancePeak: 0.45,
+        facingThreshold: 0.3,
+        chargeCrossover: 0.7,
+        noRepeat: false,
+      },
+      mascotEyesWeights: {
+        neutral: 0,
+        blink: 2,
+        squint: 1,
+        wide: 0,
+        happy: 1,
+        lookLeft: 1,
+        lookRight: 1,
+        lookUp: 1,
+        lookDown: 1,
+        lookUpLeft: 1,
+        lookUpRight: 1,
+        lookDownLeft: 1,
+        lookDownRight: 1,
+        wink: 1,
+      },
     },
   })
 

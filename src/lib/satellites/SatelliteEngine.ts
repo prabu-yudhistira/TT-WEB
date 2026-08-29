@@ -1,7 +1,8 @@
 import { mulberry32 } from '../three/shatter/types'
 import { logoScreenBox } from '../three/calibration'
 import { DEFAULT_SATELLITES, type SatelliteConfig } from './types'
-import { placeLabels, EDGE_FADE_PX, type LabelCandidate } from './labels'
+import { placeLabels, EDGE_FADE_PX, type LabelCandidate, type LabelBox } from './labels'
+import { projectOrbit, orbitGeometry, type Projected } from './project'
 
 /**
  * Hero orbiting satellites — simulation and rendering.
@@ -41,8 +42,6 @@ type Sat = Dust & {
   labelW: number
   labelH: number
 }
-
-type Projected = { x: number; y: number; z: number; scale: number }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
@@ -110,6 +109,7 @@ export class SatelliteEngine {
    * re-render per frame.
    */
   private chargeSource: () => number = () => 0
+  private reservedLabels: () => LabelBox[] | null = () => null
   private shakePhase = 0
 
   private onScroll = () => {
@@ -144,8 +144,18 @@ export class SatelliteEngine {
     ;(window as unknown as Record<string, unknown>).__ttSatellites = () => ({
       cx: this.cx,
       cy: this.cy,
+      outerR: this.outerR,
       charge: this.chargeSource(),
-      sats: this.sats.map((s) => ({ x: s.px, y: s.py })),
+      // z and radius are exposed for the mascot's overlap check: the mascot is
+      // on its own layer and can only sort against these per-layer, so knowing
+      // how often a bead is genuinely NEARER while overlapping is the only way
+      // to size that limitation instead of guessing at it.
+      sats: this.sats.map((s) => ({
+        x: s.px,
+        y: s.py,
+        z: this.project(s.radius, s.angle, s.height, ((this.cfg.TILT * Math.PI) / 180) + s.tiltOffset).z,
+        r: Math.max(0.5, this.cfg.SAT_SIZE),
+      })),
     })
 
     window.addEventListener('scroll', this.onScroll, { passive: true })
@@ -182,6 +192,16 @@ export class SatelliteEngine {
   /** Hand the engine a way to read the logo's separation charge each frame. */
   setChargeSource(get: (() => number) | null) {
     this.chargeSource = get ?? (() => 0)
+  }
+
+  /**
+   * Label boxes owned by another layer that this pass must not draw over.
+   * Pull-based, for the same reason the charge is: it changes every frame and
+   * mirroring it into React would cost a re-render per frame to carry a value
+   * the loop can simply read.
+   */
+  setReservedLabels(get: (() => LabelBox[] | null) | null) {
+    this.reservedLabels = get ?? (() => null)
   }
 
   setActive(v: boolean) {
@@ -221,17 +241,11 @@ export class SatelliteEngine {
     // on-screen box — including the object-fit:cover correction that only
     // matters on windows wider than 16:9.
     const mobile = window.innerWidth < 640
-    const box = logoScreenBox(W, H, mobile)
-    this.cx = box.cx
-    this.cy = box.cy
-    const innerFrac = mobile ? this.cfg.MOBILE_INNER_RADIUS : this.cfg.INNER_RADIUS
-    const outerFrac = mobile ? this.cfg.MOBILE_OUTER_RADIUS : this.cfg.OUTER_RADIUS
-    this.innerR = Math.max(8, box.hh * innerFrac)
-    // Floor keeps outerR strictly above innerR: dust seeds across
-    // innerR..outerR, and an inverted span would place particles inside the
-    // orbit floor. Reachable on a tall narrow window, where INNER_RADIUS 3 of a
-    // tall mark can exceed a radius measured off the short side.
-    this.outerR = Math.max(this.innerR + 12, (Math.min(W, H) / 2) * outerFrac)
+    const geo = orbitGeometry(this.cfg, W, H, logoScreenBox(W, H, mobile), mobile)
+    this.cx = geo.cx
+    this.cy = geo.cy
+    this.innerR = geo.innerR
+    this.outerR = geo.outerR
 
     if (changed || this.dust.length === 0) this.seed()
     if (this.reduced) this.drawStatic()
@@ -333,26 +347,13 @@ export class SatelliteEngine {
 
   // ── projection ──────────────────────────────────────────────────────
 
+  /**
+   * Delegates to the shared pure projection. The mascot layer calls the same
+   * function with the same plane, which is what keeps it in this belt rather
+   * than in a second one that merely looks similar.
+   */
   private project(radius: number, angle: number, height: number, tiltRad: number): Projected {
-    const c = this.cfg
-    const sw = (c.TILT_SIDEWAY * Math.PI) / 180
-    const cosA = Math.cos(angle)
-    const sinA = Math.sin(angle)
-
-    const xb = radius * cosA
-    const yb = height
-    const zb = radius * sinA
-
-    // inclination around X
-    const y1 = yb * Math.cos(tiltRad) + zb * Math.sin(tiltRad)
-    const z1 = -yb * Math.sin(tiltRad) + zb * Math.cos(tiltRad)
-
-    // roll around the view axis
-    const x3 = xb * Math.cos(sw) - y1 * Math.sin(sw)
-    const y3 = xb * Math.sin(sw) + y1 * Math.cos(sw)
-
-    const scale = c.PERSPECTIVE / (c.PERSPECTIVE + z1)
-    return { x: this.cx + x3 * scale, y: this.cy + y3 * scale, z: z1, scale }
+    return projectOrbit(this.cfg, this.cx, this.cy, radius, angle, height, tiltRad)
   }
 
   // ── loop ────────────────────────────────────────────────────────────
@@ -613,7 +614,10 @@ export class SatelliteEngine {
       })
     }
 
-    for (const p of placeLabels(candidates, this.W, this.H, EDGE_FADE_PX)) {
+    // The mascot's word is placed by MascotEngine on its own layer and cannot
+    // join the sort above, so it is fed in as already-occupied space instead.
+    const reserved = this.reservedLabels() ?? []
+    for (const p of placeLabels(candidates, this.W, this.H, EDGE_FADE_PX, reserved)) {
       const s = this.sats[p.index]
       const cand = candidates.find((k) => k.index === p.index)
       if (!s.el || !cand) continue

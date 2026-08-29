@@ -28,10 +28,10 @@ const FALLBACK_WORDS = ['Strategy', 'Interface', 'Motion', 'Craft', 'Systems', '
 
 /**
  * The owner's original saturated picks, kept so the pencil conversion can be
- * compared against its source in one click rather than from memory.
+ * compared against its source in one click rather than from memory. Leading
+ * '#000000' dropped 2026-08-28 with "samsara" — see DEFAULT_SATELLITES.SAT_COLORS.
  */
 const SATURATED_COLORS = [
-  '#000000',
   '#ffd500',
   '#f96d3e',
   '#23e126',
