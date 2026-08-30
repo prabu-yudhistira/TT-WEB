@@ -13,7 +13,7 @@
  * solid all along.
  * Run: npm run verify:config
  */
-import { solveHandoff, projectedPx } from './cameraHandoff'
+import { solveHandoff, projectedPx, screenToWorld, worldSizeFor } from './cameraHandoff'
 
 let failures = 0
 const check = (label: string, cond: boolean) => {
@@ -98,6 +98,51 @@ for (const fov of [30, 45, 60, 75]) {
 // defeat the lock.
 {
   check('fixture 54.32px', near(projectedPx(1.0, 20, 900, 45), 54.32, 0.02))
+}
+
+// ── screenToWorld / worldSizeFor ────────────────────────────────────
+// Closes the perspective-placement gap Task 8 found and left open: place()
+// works in ORTHOGRAPHIC screen pixels, so the perspective camera needs the pose
+// converted, or the body lands outside the frustum and the room renders empty.
+// That is precisely what happened the first time the room dev handle swapped
+// cameras — an empty dark frame, no error.
+{
+  const W = 1440
+  const H = 900
+  const fov = 45
+  const dist = 20
+  const halfH = dist * Math.tan((fov * Math.PI) / 360)
+
+  const c = screenToWorld(W / 2, H / 2, dist, W, H, fov)
+  check('screen centre maps to world origin', near(c.x, 0, 1e-9) && near(c.y, 0, 1e-9))
+
+  const top = screenToWorld(W / 2, 0, dist, W, H, fov)
+  const bottom = screenToWorld(W / 2, H, dist, W, H, fov)
+  check(`screen top maps to +halfHeight (${top.y.toFixed(3)})`, near(top.y, halfH, 1e-6))
+  check('screen bottom maps to -halfHeight', near(bottom.y, -halfH, 1e-6))
+  // Screen y grows DOWN, world y grows UP. Getting this backwards flips the
+  // whole fall, which reads as SAMSARA rising out of the room.
+  check('y is inverted between screen and world', top.y > 0 && bottom.y < 0)
+
+  const right = screenToWorld(W, H / 2, dist, W, H, fov)
+  check('screen right maps to +halfWidth, aspect-corrected', near(right.x, halfH * (W / H), 1e-6))
+
+  const at20 = screenToWorld(W, H / 2, 20, W, H, fov)
+  const at40 = screenToWorld(W, H / 2, 40, W, H, fov)
+  check('the same pixel is twice the world offset at twice the distance', near(at40.x, at20.x * 2, 1e-6))
+}
+
+{
+  // worldSizeFor must invert projectedPx exactly. The two are used together —
+  // one places the body, the other scales it — and any mismatch between them is
+  // a visible size jump at the seam.
+  for (const targetPx of [21, 120, 360]) {
+    for (const dist of [8, 20, 45]) {
+      const wd = worldSizeFor(targetPx, dist, 900, 45)
+      const back = projectedPx(wd, dist, 900, 45)
+      check(`worldSizeFor inverts projectedPx (${targetPx}px @${dist})`, near(back, targetPx, 1e-6))
+    }
+  }
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll camera handoff checks passed.')
