@@ -301,3 +301,25 @@ compiles routes on demand. Under repeated load this surfaces as
 failure, never an assertion failure. Different scripts fail on different runs,
 and each passes in isolation. **Read the failure mode before believing a
 regression:** a Node stack trace is environmental, a `FAIL <label>` line is real.
+
+### `samsara-detail.mjs` — never score SAMSARA's eyes by counting amber pixels
+
+The room swaps in a 200k-triangle model. The eye shader is injected through
+`onBeforeCompile` on the MATERIALS, so a swap without re-running `patchEyes()`
+leaves SAMSARA with no eyes — silently. Nothing throws, nothing logs.
+
+⚠️ The obvious metric is wrong, and it passed the negative test. Counting
+"amber" pixels (`R > 150 && R > B + 45`) reported **99,682 lit pixels on a build
+with the eye shader deliberately removed**, because **SAMSARA is brass** and that
+predicate matches most of its warm metal body. This is the third time this
+project has measured the mascot instead of its eyes — the kill-switch check was
+wrong the same way.
+
+What discriminates is a **difference between two expressions**, cropped tight to
+the face: if the shader is not injected, `wide` renders identically to `blink`.
+
+⚠️ And the absolute threshold must clear the **rotation-jitter floor**. With the
+shader removed the difference collapses to ~17.7, not to zero, because
+`facing > 0.97` still admits a few degrees of spin. A threshold of 2 was tried
+and passed a build with no eyes. Working builds measure 94–98; the floor is set
+at 40.

@@ -73,6 +73,9 @@ export class MascotEngine {
   /** the spin itself */
   private spinner = new THREE.Group()
   private model: THREE.Object3D | null = null
+  /** High-detail room model state. Loaded at most once, lazily. */
+  private detailLoaded = false
+  private detailLoading = false
   private materials: THREE.MeshStandardMaterial[] = []
   private envRT: THREE.WebGLRenderTarget | null = null
 
@@ -245,6 +248,14 @@ export class MascotEngine {
       this.setMode('room')
       this.setTransform({ x: this.W * 0.5, y: this.H * 0.5, sizePx: px })
       return { sizePx: px, mode: this.mode, x: this.W * 0.5, y: this.H * 0.5 }
+    }
+
+    /** Load the high-detail room model on demand, for verification. */
+    ;(window as unknown as Record<string, unknown>).__ttSamsaraDetail = async (
+      url = '/models/mascot.room.draco.glb',
+    ) => {
+      const ok = await this.loadDetail(url)
+      return { ok, detail: this.detailLoaded }
     }
 
     // Dev handle for the bench and for verification scripts: hold one
@@ -475,6 +486,115 @@ export class MascotEngine {
     } finally {
       draco.dispose()
     }
+  }
+
+  /**
+   * Swap in a higher-detail model for the room. Owner requirement, spec §6.3b.
+   *
+   * The hero's 20k build is correct at 12.6–70px and would be pure cost there.
+   * But the room shows SAMSARA at ~360px, five times past anything the
+   * decimation ladder validated, where the silhouette facets and the forehead
+   * monogram — which is modelled GEOMETRY, not texture, because the skin texture
+   * tiles 16x and cannot carry a unique mark — stops being readable.
+   *
+   * ⚠️ THE HAZARD, and the whole reason this is not just `load()` again:
+   * the eye shader is injected through onBeforeCompile on the MATERIALS. Swap
+   * the model without re-running patchEyes() and SAMSARA arrives in the room
+   * with no eyes at all — the socket mask and every expression uniform belong to
+   * the material that was just thrown away. patchEyes() and applyLook() are
+   * therefore re-run here, in that order, exactly as load() does.
+   *
+   * Resolves false rather than throwing when the fetch fails: a missing
+   * high-detail asset must degrade to the 20k model, never to a broken room.
+   */
+  async loadDetail(url: string): Promise<boolean> {
+    if (this.disposed || this.detailLoaded || this.detailLoading) return false
+    this.detailLoading = true
+
+    const draco = new DRACOLoader()
+    draco.setDecoderPath('/draco/')
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(draco)
+
+    try {
+      const gltf = await loader.loadAsync(url)
+      if (this.disposed) return false
+
+      const model = gltf.scene
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const centre = box.getCenter(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z) || 1
+      model.position.sub(centre)
+      const norm = new THREE.Group()
+      norm.add(model)
+      norm.scale.setScalar(1 / maxDim)
+
+      // Retire the old body before adopting the new one, or the 530 KB model's
+      // geometry and textures stay resident for the rest of the session.
+      const old = this.model
+      if (old) {
+        this.spinner.remove(old)
+        old.traverse((o) => {
+          const m = o as THREE.Mesh
+          if (!m.isMesh) return
+          m.geometry?.dispose()
+          const mat = m.material as THREE.Material | THREE.Material[]
+          for (const mm of Array.isArray(mat) ? mat : [mat]) {
+            const std = mm as THREE.MeshStandardMaterial
+            std.map?.dispose()
+            std.normalMap?.dispose()
+            std.roughnessMap?.dispose()
+            std.metalnessMap?.dispose()
+            mm.dispose()
+          }
+        })
+      }
+
+      this.materials = []
+      model.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        const mat = m.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]
+        for (const mm of Array.isArray(mat) ? mat : [mat]) {
+          if ((mm as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+            this.materials.push(mm as THREE.MeshStandardMaterial)
+          }
+        }
+      })
+
+      this.spinner.add(norm)
+      this.model = norm
+
+      // ⚠️ Order matters and mirrors load(): the eye chunks must be injected
+      // before the look is applied, or the first frame renders an unpatched
+      // material and the socket flashes as plain brass.
+      this.patchEyes()
+      this.applyLook()
+
+      // The room enables shadows on the renderer; a freshly adopted mesh does
+      // not inherit the castShadow flag set on the model it replaced.
+      if (this.room?.group.visible) {
+        this.spinner.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true
+        })
+      }
+
+      this.detailLoaded = true
+      return true
+    } catch (err) {
+      // Degrade to the 20k model. The room must never wait on, or break over,
+      // a 2.1 MB download.
+      console.warn('MascotEngine: high-detail model unavailable, keeping the orbit build', err)
+      return false
+    } finally {
+      this.detailLoading = false
+      draco.dispose()
+    }
+  }
+
+  hasDetail() {
+    return this.detailLoaded
   }
 
   // ── configuration ───────────────────────────────────────────────────
