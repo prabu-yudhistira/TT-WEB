@@ -6,7 +6,7 @@
 // catches the mark edge-on and reads as a mismatch to the eye. resetPose()
 // zeroes the spin at the handoff and the idle rotation only resumes ~1.2s
 // later, so this samples inside that window.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { CHROME, ARGS, fresh } from './t9-lib.mjs'
 
 const ORIGIN = 'http://localhost:3000'

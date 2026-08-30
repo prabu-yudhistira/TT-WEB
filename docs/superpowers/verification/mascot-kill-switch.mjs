@@ -10,7 +10,7 @@
  * Run: node docs/superpowers/verification/mascot-kill-switch.mjs
  * Requires: npm run dev on :3000
  */
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const BASE = 'http://localhost:3000'
 let failures = 0

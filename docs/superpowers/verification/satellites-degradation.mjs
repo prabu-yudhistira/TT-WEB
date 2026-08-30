@@ -13,7 +13,7 @@
 // MIN_STATIC_INK floor below exists so a regression like that fails loudly
 // again instead of quietly passing.
 
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const URL = process.env.TT_URL ?? 'http://localhost:3000/en'

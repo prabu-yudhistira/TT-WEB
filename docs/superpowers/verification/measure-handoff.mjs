@@ -7,7 +7,7 @@
 // The video is paused on its final frame rather than caught in flight: the
 // extrusion is still growing right up to the end, so a frame sampled "near" the
 // end measures a logo that has not finished.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { CHROME, ARGS, rawRGB, fresh } from './t9-lib.mjs'
 
 const ORIGIN = 'http://localhost:3000'

@@ -10,7 +10,7 @@
 // project's own first pass at the CCW default was verified this way rather
 // than by watching a screenshot, deliberately.
 
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const URL = process.env.TT_URL ?? 'http://localhost:3000/en/dev/satellites'

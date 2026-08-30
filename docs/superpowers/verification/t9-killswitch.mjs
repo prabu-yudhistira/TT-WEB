@@ -13,7 +13,7 @@
 // Runs BOTH polarities, so the probe is proven to be able to see the thing it
 // claims is absent: with ignition ON the wrapper must rise before video end,
 // with it OFF it must not.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { CHROME, ARGS, BASE } from './t9-lib.mjs'
 
 const ORIGIN = new URL(BASE).origin

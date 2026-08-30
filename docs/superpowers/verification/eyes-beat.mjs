@@ -10,7 +10,7 @@
  * Run: node docs/superpowers/verification/eyes-beat.mjs
  * Requires: npm run dev on :3000
  */
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { createRequire } from 'node:module'
 const sharp = createRequire('file:///D:/TAMPA%20TARUNO/WEBSITE/_WEB_PRODUCT/package.json')('sharp')
 
@@ -87,15 +87,95 @@ check('the face changes shape while facing', spread > 300, 'lit spread ' + sprea
 // Press the CENTRE of the viewport, which is where the mark sits. Targeting
 // page.$('canvas') picks the first canvas in the DOM — a satellite layer with
 // pointer-events:none — so the gesture never reached the logo at all.
-await page.mouse.move(640, 400)
-await page.mouse.down()
-await new Promise((r) => setTimeout(r, 450))
-const midCharge = await page.evaluate(() => window.__ttMascot().charge)
-const midHold = await litOf()
-await new Promise((r) => setTimeout(r, 1500))
-const lateCharge = await page.evaluate(() => window.__ttMascot().charge)
-const lateHold = await litOf()
+// ⚠️ Sample the PEAK lit area over a window while the face is toward the
+// viewer — never a single instant.
+//
+// This check used to take one instantaneous litOf() for mid and one for late.
+// SAMSARA spins at 113 deg/s and its face points at the viewer only ~25% of
+// each turn, so whether a sample caught the face or the back of the head
+// dominated the reading: measured, the check failed roughly 1 run in 3 on
+// UNCHANGED code, reporting "lit 5285 -> 5473" purely from spin phase. That is
+// the same background-not-subject error that made the mascot kill-switch check
+// wrong three times.
+//
+// The rest of this file already gates on facing > 0.3. This now does too, and
+// takes the max over a window so both readings describe the same thing: the
+// eyes at their most visible.
+// Sample the first frame that satisfies BOTH a charge band and facing.
+//
+// Two independent variables had to be pinned, and missing either made this
+// check fail ~1 run in 3 on UNCHANGED code:
+//
+//  1. CHARGE. During a hold the eyes are a deterministic function of charge —
+//     neutral->wide below CHARGE_CROSSOVER, wide->blink above it. Charge
+//     saturates in ~950ms, so two fixed delays can easily BOTH land at 1.00,
+//     comparing a state against itself and deciding on pixel noise. Every
+//     observed failure reported "charge 1.00".
+//  2. FACING. SAMSARA spins at 113 deg/s and shows its face ~25% of each turn,
+//     so an instantaneous sample may be reading the back of its head.
+//
+// Waiting for an explicit band fixes (1); the facing gate fixes (2). Sampling
+// the FIRST qualifying frame rather than a max over a window matters too — a
+// window wide enough to guarantee a face pass also spans the charge ramp, which
+// reintroduces exactly the ambiguity being removed.
+const sample = () =>
+  page.evaluate(() => ({
+    charge: window.__ttMascot().charge,
+    facing: Math.cos(window.__ttMascot().spin),
+  }))
+
+// ⚠️ The low-charge frame has to be RE-CREATED, not waited for.
+//
+// Charge ramps 0 -> 1 in ~950ms and then stays pinned at 1 for as long as the
+// button is down, so the 0.25–0.7 band exists for roughly 430ms and never
+// recurs. Facing cycles on a 3.2s period. Simply polling for both conditions
+// catches them together about a quarter of the time and then waits forever —
+// measured, that failed 5 runs out of 5.
+//
+// So release and re-press until the ramp lands on a face-on frame. Each attempt
+// is a fresh ramp, which turns a one-shot coincidence into a retry.
+let mid = { lit: 0, charge: -1, ok: false }
+for (let attempt = 0; attempt < 10 && !mid.ok; attempt++) {
+  await page.mouse.move(640, 400)
+  await page.mouse.down()
+  const t0 = Date.now()
+  while (Date.now() - t0 < 1200) {
+    const s = await sample()
+    if (s.charge >= 0.25 && s.charge <= 0.7 && s.facing > 0.3) {
+      mid = { lit: await litOf(), charge: s.charge, ok: true }
+      break
+    }
+    if (s.charge > 0.7) break // ramp missed this pass
+    await new Promise((r) => setTimeout(r, 40))
+  }
+  if (!mid.ok) {
+    await page.mouse.up()
+    await new Promise((r) => setTimeout(r, 500)) // let the charge decay
+  }
+}
+
+// Still holding from the successful attempt. Saturate, then wait for the face.
+let late = { lit: 0, charge: -1, ok: false }
+if (mid.ok) {
+  const t1 = Date.now()
+  while (Date.now() - t1 < 6000) {
+    const s = await sample()
+    if (s.charge >= 0.95 && s.facing > 0.3) {
+      late = { lit: await litOf(), charge: s.charge, ok: true }
+      break
+    }
+    await new Promise((r) => setTimeout(r, 60))
+  }
+}
 await page.mouse.up()
+
+const midCharge = mid.charge
+const lateCharge = late.charge
+const midHold = mid.lit
+const lateHold = late.lit
+
+check('caught a low-charge and a high-charge frame, both face-on',
+  mid.ok && late.ok, 'mid ' + midCharge.toFixed(2) + ', late ' + lateCharge.toFixed(2))
 
 // Assert the GESTURE first. Without this a dead press produces a confusing
 // pixel comparison rather than naming its own cause.

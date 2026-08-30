@@ -8,7 +8,7 @@
 // Run with the dev server up:
 //   node docs/superpowers/verification/satellites-kill-switch.mjs
 
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 

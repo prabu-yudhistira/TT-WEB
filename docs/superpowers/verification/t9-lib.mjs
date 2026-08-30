@@ -4,7 +4,7 @@
 // hidden, which throttles requestAnimationFrame to ~1Hz. That stalls the
 // ENGINE'S OWN CLOCK, not merely the screenshot cadence, so the effect under
 // test never runs. Measured last session: 13 frames in 13 real seconds.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import ffmpeg from 'ffmpeg-static'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync } from 'node:fs'

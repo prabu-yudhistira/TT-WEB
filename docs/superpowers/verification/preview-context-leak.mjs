@@ -2,7 +2,7 @@
 // Browsers cap live contexts at ~16 and this project has shipped
 // FEATURE_FAILURE_WEBGL_EXHAUSTED_DRIVERS once already (fixed in 9190364), so
 // repeated replays must not accumulate contexts.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { CHROME, ARGS, report } from './t9-lib.mjs'
 
 const BASE = process.env.TT_URL_ORIGIN || 'http://localhost:3000'

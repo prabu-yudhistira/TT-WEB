@@ -6,7 +6,7 @@
 // through POST /api/globals/hero-effects with a GET method-override and
 // returns THAT response, so this exercises the real server path, not a
 // client-side simulation of one.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const BASE = process.env.TT_URL_ORIGIN ?? 'http://localhost:3000'

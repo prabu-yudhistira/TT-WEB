@@ -15,7 +15,7 @@
 // POST /api/pages/{id}, each with an X-Payload-HTTP-Method-Override: GET
 // header — and returns THAT response as the new data. So this test is
 // exercising the real server round-trip, not a client-side simulation of one.
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { CHROME, ARGS, fresh, meanAbsDiff, report } from './t9-lib.mjs'
 
 const OUT = fresh('preview-live')

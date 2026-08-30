@@ -11,7 +11,7 @@
  * Run: node mascot-degradation.mjs   (from a dir with puppeteer-core)
  * Requires: npm run dev on :3000
  */
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const HERO = 'http://localhost:3000/en'
 const BENCH = 'http://localhost:3000/en/dev/mascot'

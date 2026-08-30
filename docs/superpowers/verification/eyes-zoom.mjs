@@ -11,7 +11,7 @@
  *
  * Usage: node docs/superpowers/verification/eyes-zoom.mjs <expression> [sizePx]
  */
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const NAME = process.argv[2] || 'neutral'
 const SIZE = Number(process.argv[3] || 760)

@@ -115,6 +115,23 @@ export class MascotEngine {
 
   private chargeSource: () => number = () => 0
 
+  // ── SAMSARA transition (spec 2026-08-30) ──────────────────────────
+  // Additive. `orbit` is the shipped behaviour, unchanged; the other two modes
+  // take SAMSARA's pose from an external script instead of from projectOrbit.
+  // Guarded by docs/superpowers/verification/samsara-orbit-unchanged.mjs, which
+  // was baselined before any of this existed.
+  private mode: 'orbit' | 'transit' | 'room' = 'orbit'
+  /** Pose supplied by transitScript while mode !== 'orbit'. Screen px. */
+  private transform: { x: number; y: number; sizePx: number } | null = null
+  /**
+   * The room's camera. Built alongside the orthographic one rather than
+   * replacing it: the orbit's ortho camera in CSS-pixel units is what makes
+   * SIZE mean literal pixels and what keeps the mascot provably inside the
+   * belt, so it is not touched.
+   */
+  private persp = new THREE.PerspectiveCamera(45, 1, 0.1, 5000)
+  private cameraMode: 'ortho' | 'perspective' = 'ortho'
+
   private onScroll = () => {
     const span = this.cfg.SCROLL_FADE_VH * window.innerHeight
     this.scrollAlpha = span > 0 ? clamp01(1 - window.scrollY / span) : 1
@@ -478,6 +495,54 @@ export class MascotEngine {
     if (v) this.activeSince = performance.now()
   }
 
+  // ── SAMSARA transition surface ────────────────────────────────────
+
+  /**
+   * `orbit` restores the shipped behaviour exactly. `transit` and `room` take
+   * the pose from setTransform() instead of from projectOrbit().
+   */
+  setMode(m: 'orbit' | 'transit' | 'room') {
+    this.mode = m
+    if (m === 'orbit') this.transform = null
+  }
+
+  getMode() {
+    return this.mode
+  }
+
+  /** Screen-space pose while mode !== 'orbit'. Null falls back to the orbit. */
+  setTransform(t: { x: number; y: number; sizePx: number } | null) {
+    this.transform = t
+  }
+
+  /**
+   * Swap the render camera.
+   *
+   * ⚠️ The seam must be solved, not eyeballed: at the handoff SAMSARA has to
+   * occupy the same pixels either side or it jumps in one frame. The caller
+   * supplies a distance from solveHandoff() in lib/samsara/cameraHandoff.ts,
+   * which inverts the projection analytically for exactly this reason.
+   */
+  setCameraMode(m: 'ortho' | 'perspective', opts?: { fovDeg: number; distance: number }) {
+    this.cameraMode = m
+    if (m === 'perspective' && opts) {
+      this.persp.fov = opts.fovDeg
+      this.persp.position.set(0, 0, opts.distance)
+      this.persp.aspect = this.H > 0 ? this.W / this.H : 1
+      this.persp.updateProjectionMatrix()
+      this.persp.lookAt(0, 0, 0)
+    }
+  }
+
+  getCameraMode() {
+    return this.cameraMode
+  }
+
+  /** The camera every render goes through. Ortho unless explicitly swapped. */
+  private activeCamera(): THREE.Camera {
+    return this.cameraMode === 'perspective' ? this.persp : this.camera
+  }
+
   setReduced(v: boolean) {
     this.reduced = v
     if (v) {
@@ -568,6 +633,9 @@ export class MascotEngine {
     this.camera.top = H / 2
     this.camera.bottom = -H / 2
     this.camera.updateProjectionMatrix()
+    // Keep the room camera's aspect in step, or a resize mid-transit stretches it.
+    this.persp.aspect = H > 0 ? W / H : 1
+    this.persp.updateProjectionMatrix()
     this.layout()
     if (this.reduced) this.drawStatic()
   }
@@ -608,7 +676,7 @@ export class MascotEngine {
     const dt = Math.min((now - this.lastTime) / 16.667, 3)
     this.lastTime = now
     this.step(dt, now)
-    this.renderer.render(this.scene, this.camera)
+    this.renderer.render(this.scene, this.activeCamera())
     this.raf = requestAnimationFrame(this.frame)
   }
 
@@ -672,24 +740,38 @@ export class MascotEngine {
       return
     }
 
-    const tiltRad = ((belt.TILT + c.TILT_OFFSET) * Math.PI) / 180
-    const bob = c.BOB_PX
-      ? Math.sin((this.elapsed / Math.max(0.1, c.BOB_SECONDS)) * Math.PI * 2) * c.BOB_PX
-      : 0
-    const q = projectOrbit(
-      belt,
-      this.cx,
-      this.cy,
-      this.orbitR,
-      this.angle + (c.PHASE * Math.PI) / 180,
-      c.HEIGHT + bob,
-      tiltRad,
-    )
+    // ── SAMSARA transition: pose comes from the script, not the orbit ──
+    // The whole of the `orbit` path below is untouched; this branch simply
+    // supplies a q from elsewhere. z is forced negative so the depth flip
+    // reports "in front" — once SAMSARA has committed to leaving it never needs
+    // to pass behind the mark again, and it stays visible for the whole fall.
+    let q: { x: number; y: number; z: number; scale: number }
+    let scriptedDiameter: number | null = null
 
-    if (charge > 0.01 && c.HOLD_SHAKE_PX > 0) {
-      const amp = charge * c.HOLD_SHAKE_PX
-      q.x += Math.sin(this.shakePhase) * amp
-      q.y += Math.cos(this.shakePhase * 1.31) * amp
+    if (this.mode !== 'orbit' && this.transform) {
+      const t = this.transform
+      q = { x: t.x, y: t.y, z: -1, scale: 1 }
+      scriptedDiameter = t.sizePx
+    } else {
+      const tiltRad = ((belt.TILT + c.TILT_OFFSET) * Math.PI) / 180
+      const bob = c.BOB_PX
+        ? Math.sin((this.elapsed / Math.max(0.1, c.BOB_SECONDS)) * Math.PI * 2) * c.BOB_PX
+        : 0
+      q = projectOrbit(
+        belt,
+        this.cx,
+        this.cy,
+        this.orbitR,
+        this.angle + (c.PHASE * Math.PI) / 180,
+        c.HEIGHT + bob,
+        tiltRad,
+      )
+
+      if (charge > 0.01 && c.HOLD_SHAKE_PX > 0) {
+        const amp = charge * c.HOLD_SHAKE_PX
+        q.x += Math.sin(this.shakePhase) * amp
+        q.y += Math.cos(this.shakePhase * 1.31) * amp
+      }
     }
 
     this.lastScreen = { x: q.x, y: q.y, z: q.z, scale: q.scale }
@@ -710,7 +792,10 @@ export class MascotEngine {
     // and change size again whenever the park angle moved. A tuning control
     // that reports one number and draws another is worse than no control.
     const depthScale = this.inspect.on ? 1 : 1 + (q.scale - 1) * (1 + c.DEPTH_SCALE * 4)
-    const diameterPx = this.sizePx() * Math.max(0.15, depthScale)
+    // A scripted pose carries its own on-screen size — the transit interpolates
+    // from the far point's ~21px to 40% of viewport height, and running that
+    // through the orbit's depth cue as well would apply the falloff twice.
+    const diameterPx = scriptedDiameter ?? this.sizePx() * Math.max(0.15, depthScale)
     this.lastDiameterPx = diameterPx
     const radiusPx = diameterPx / 2
     this.placer.scale.setScalar(diameterPx)
@@ -983,7 +1068,7 @@ export class MascotEngine {
     // that is deliberately motionless would be a lie about what is happening.
     this.place(1, 0, 0)
     this.setExpression('neutral')
-    this.renderer.render(this.scene, this.camera)
+    this.renderer.render(this.scene, this.activeCamera())
   }
 
   // ── teardown ────────────────────────────────────────────────────────

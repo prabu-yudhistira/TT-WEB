@@ -9,7 +9,7 @@
  *
  * Run: node docs/superpowers/verification/eyes-reduced-motion.mjs
  */
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { createRequire } from 'node:module'
 const sharp = createRequire('file:///D:/TAMPA%20TARUNO/WEBSITE/_WEB_PRODUCT/package.json')('sharp')
 

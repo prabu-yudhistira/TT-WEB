@@ -236,3 +236,68 @@ scratchpad and never in the app, so copy the script there to run it.
 mask makes every fragment fail — the shader compiles clean, nothing throws, and
 the mascot shows its PAINTED eyes as if the feature were absent. "No console
 errors" proves nothing here. `eyes-render.mjs` asserts on pixels for that reason.
+
+---
+
+## 2026-08-30 — SAMSARA transition work
+
+### The harness was unrunnable as committed
+
+Every script here did `import puppeteer from 'puppeteer-core'`. That package is
+deliberately **not** an app dependency (it lives in the session scratchpad), and
+a bare specifier in a file that lives *here* can never resolve it — **ESM
+resolves from the importing FILE's location upward, not from the working
+directory**. Running from the scratchpad does not help.
+
+Fixed with `_puppeteer.mjs`, a shared resolver that reaches across package roots
+via `createRequire(pathToFileURL(...))`. Point it elsewhere with `TT_SCRATCH`.
+Install first: `cd "<scratchpad>" && npm init -y && npm install puppeteer-core`.
+
+### `samsara-orbit-unchanged.mjs` — key traces on ANGLE, never on time
+
+Regression guard proving the SAMSARA mode surface added to `MascotEngine` is
+additive. Baselined **before** the engine was edited; a guard captured after a
+change proves nothing.
+
+⚠️ Angle-**bucketing** was tried first and was not usable: it reported **3.665px
+of drift against completely unchanged code**. Not an engine fault — 5° of a
+511px-radius orbit is ~45px of arc, and with ~14 samples per bucket the mean
+depends on where in that arc the frames landed (expected error ≈ arc/(2√n) ≈
+6px). **Interpolating** between the samples bracketing each target angle removed
+it: noise fell to **0.056px**, a 65× improvement, which makes a 0.75px tolerance
+meaningful. A deliberate 3px nudge reads as 4.643px.
+
+### `eyes-beat.mjs` — was flaky ~1 run in 3, on unchanged code
+
+Two independent variables had to be pinned, and missing either flipped the
+result:
+
+1. **Charge.** During a hold the eyes are a *deterministic* function of charge
+   (`neutral→wide` below `CHARGE_CROSSOVER`, `wide→blink` above). Charge
+   saturates in ~950ms, so two fixed delays can both land at 1.00 — comparing a
+   state against itself and deciding on pixel noise. Every observed failure
+   reported `charge 1.00`.
+2. **Facing.** SAMSARA spins at 113°/s and shows its face ~25% of each turn, so
+   an instantaneous sample may be reading the back of its head.
+
+⚠️ Two fixes that do **not** work, both tried and measured:
+- *Max lit over a window while facing* — made it worse (3 of 4 failing). A
+  window wide enough to guarantee a face pass also spans the charge ramp, so
+  both readings converge on whatever the widest expression in the window was.
+- *Polling for charge-band AND facing together* — failed 5 of 5. The band exists
+  for ~430ms **once**, facing cycles on 3.2s, and after saturation the band
+  never recurs.
+
+What works: **release and re-press until the ramp lands on a face-on frame.**
+Each attempt is a fresh ramp, turning a one-shot coincidence into a retry.
+Signal went from a marginal 5691→4069 (or inverted 5372→5727) to a decisive
+**17537→4720**, 5 runs out of 5.
+
+### Running the whole sweep back-to-back is flaky — the scripts are not
+
+Each script launches its own Chrome against the Next **dev** server, which
+compiles routes on demand. Under repeated load this surfaces as
+`TimeoutError: Navigation timeout of 60000 ms exceeded` — a *navigation*
+failure, never an assertion failure. Different scripts fail on different runs,
+and each passes in isolation. **Read the failure mode before believing a
+regression:** a Node stack trace is environmental, a `FAIL <label>` line is real.

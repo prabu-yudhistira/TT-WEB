@@ -4,7 +4,7 @@
  * other, so measure how often the mascot's word actually collides with a
  * satellite word — from real DOM rects, not from the geometry model.
  */
-import puppeteer from 'puppeteer-core';
+import puppeteer from './_puppeteer.mjs'
 import { createRequire } from 'node:module';
 const sharp = createRequire('file:///D:/TAMPA%20TARUNO/WEBSITE/_WEB_PRODUCT/package.json')('sharp');
 import { mkdirSync } from 'node:fs';

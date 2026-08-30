@@ -7,7 +7,7 @@
 //
 // Usage: node satellites-capture.mjs [url] [outPrefix] [frames] [waitMs]
 
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 

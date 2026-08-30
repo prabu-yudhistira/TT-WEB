@@ -10,7 +10,7 @@
  *
  * Samples a full orbit and reports the fraction of frames in that state.
  */
-import puppeteer from 'puppeteer-core';
+import puppeteer from './_puppeteer.mjs'
 
 const OWNER = {
   ENABLED: 1, RADIUS: 0.71, MOBILE_RADIUS: 0.55, HEIGHT: 136, TILT_OFFSET: 0,

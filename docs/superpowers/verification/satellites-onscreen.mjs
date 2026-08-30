@@ -4,7 +4,7 @@
 // labels.check.ts — this is the end-to-end proof that they hold on the real,
 // composed page across real viewports, not just in isolation.
 
-import puppeteer from 'puppeteer-core'
+import puppeteer from './_puppeteer.mjs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 // No ?satellites= param — removed once the field shipped unconditionally.
