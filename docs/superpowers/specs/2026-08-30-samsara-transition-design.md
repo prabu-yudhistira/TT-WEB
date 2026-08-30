@@ -97,8 +97,8 @@ Each of those three properties is load-bearing, and each obstructs the fall:
 
 ### 4.2 Approach A — one engine, two cameras, canvas promotes to fixed
 
-`MascotEngine` gains a mode: `orbit`, `transit`, `room`. At the instant the fourth
-gesture commits, two swaps happen, and **both are visually no-ops at that instant**:
+`MascotEngine` gains a mode: `orbit`, `transit`, `room`. Two swaps carry SAMSARA across,
+and each is designed so that it changes nothing visible on the frame it happens:
 
 1. The canvas root goes `position: absolute` (inset-0 within the pinned hero) to
    `position: fixed` (inset-0 within the viewport). A pinned hero *is* the viewport, so
@@ -106,6 +106,13 @@ gesture commits, two swaps happen, and **both are visually no-ops at that instan
    assumed.
 2. The camera goes orthographic to perspective, with FOV and distance solved so that
    SAMSARA's projected size at the handoff depth equals its current pixel size.
+
+**These do not both fire at the commit instant.** Because the far point is the *back* of
+the orbit (§5.6), SAMSARA is behind the mark and on the back canvas when the fall begins,
+so promoting the layer there would pop it in front of the logo. The promotion is instead
+gated on SAMSARA's projected box falling clear of the logo's bounding box — a condition,
+not a timestamp, reached within roughly the first 100 ms of the fall. Full reasoning,
+worked numbers and the resulting ordering constraint on the room's fade-up are in §5.6.
 
 Everything after the commit is one continuous perspective scene. SAMSARA and the room's
 geometry share **one renderer, one scene graph, one loaded model, one eye shader** — so
@@ -248,18 +255,49 @@ iOS rubber-banding.
 
 ### 5.6 Committed timeline
 
-**"The far point", defined.** The owner's description is "continue its half orbit to the
-furthest position, then fall." That has two readings — furthest from the *viewer* (the
-back of the orbit), or furthest from the *mark on screen* (the widest horizontal
-excursion). This spec picks the second: **the far point is the orbit's widest horizontal
-excursion, where `sin(angle) = 0`, on the side SAMSARA is already travelling toward.**
+**"The far point", defined — owner-confirmed 2026-08-30.** The far point is **furthest
+from the viewer: the back of the orbit**, at `angle = π/2`, where `projectOrbit()`'s depth
+term `z1 = -height·sin(TILT) + radius·sin(angle)·cos(TILT)` is maximal.
 
-Two reasons. It is visually unambiguous — SAMSARA is at the frame's edge, maximally clear
-of the logo, so the departure reads as leaving rather than as drifting behind something.
-And it is already a meaningful landmark in the shipped code: it is exactly where the
-mascot's depth crossing happens, which makes it the natural handoff point too.
+This is the reading the owner confirmed, and it is the one that makes the whole sequence
+continuous: SAMSARA is already at the back and at its smallest when it drops, which is
+precisely why it "falls into the **back** of the room." The three bounces then carry it
+forward and larger, so depth runs unbroken from orbit through landing.
 
-This is a choice made to remove ambiguity, not an owner decision. Confirm it at the bench.
+**Where that actually puts it.** Worked from shipped config at 1440×900 — illustrative,
+to be measured, not trusted:
+
+```
+belt outerR   = (min(1440,900)/2) x 0.8  ~= 360 px
+mascot radius = 0.71 x 360               ~= 256 px
+
+at angle pi/2:
+  depth  z1 = -136*sin20 + 256*cos20     ~= +194 px   (positive = BEHIND the logo)
+  screen y  = +136*cos20 + 256*sin20     ~= +215 px   (BELOW the logo centre)
+  screen x  ~= 0                                     (modulo the disk's roll)
+  scale     = minimum — SAMSARA is at its smallest
+```
+
+The mark's own on-screen half-height is about 184 px, so SAMSARA clears its box by
+roughly 31 px — and that margin varies with viewport.
+
+**⚠️ Consequence: the layer promotion is NOT a visual no-op at the far point.** §4.2's
+claim held for the widest horizontal excursion, where SAMSARA is far from the mark. At the
+back of the orbit it is directly below the mark, close to it, and rendering on the *back*
+canvas at z-index 0. Promoting it to a fixed top layer there would pop it from behind the
+mark to in front of it in a single frame.
+
+**Resolution — a condition, not a timestamp.** The promotion fires on the first frame
+where SAMSARA's projected box has fallen **clear of the logo's bounding box**. Until then
+it keeps rendering on the hero's back canvas and stays correctly occluded. Because the
+fall is downward from roughly the mark's lower edge, this happens within the first ~100 ms.
+
+Two things follow, and both are requirements rather than notes:
+
+- The room's fade-up must begin **after** the promotion. Starting it earlier would cover
+  SAMSARA while it is still drawing on the hero's back canvas.
+- `samsara-seam.mjs` must assert no z-order pop across the promotion frame, at several
+  viewports — the clearance margin is viewport-dependent and 31 px is not much.
 
 Starting values below. Subject to §9.
 
