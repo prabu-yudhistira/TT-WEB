@@ -72,31 +72,40 @@ Must be first: the archive captures how the homepage looks **before** anything c
 
 ```bash
 cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT"
-G='-c safe.directory=D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT'
-git $G tag -a pre-section-redesign-2026-08-30 -m "Homepage as it stood before the 3-section redesign"
-git $G checkout -b feat/samsara-transition
+git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" tag -a pre-section-redesign-2026-08-30 -m "Homepage as it stood before the 3-section redesign"
+git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" checkout -b feat/samsara-transition
 ```
 
-Note: the `$G` shell variable will NOT expand correctly if the path is quoted inside it. Write the flag out in full on each command if it errors.
+⚠️ Write the `-c safe.directory=...` flag out in full on every git command. Holding it in a shell variable does not work — the space in `TAMPA TARUNO` word-splits and git reads `TARUNO/WEBSITE/_WEB_PRODUCT` as a subcommand.
 
-- [ ] **Step 2: Start the dev server**
+- [ ] **Step 2: Install `puppeteer-core` in the SCRATCHPAD, and start the dev server**
+
+⚠️ `puppeteer-core` is deliberately **not** a dependency of this app and must never become one. Every existing harness script in `docs/superpowers/verification/` imports it bare and is executed from a scratchpad where it is installed; app-local packages are reached from there via `createRequire` with an absolute `file://` URL. Follow that pattern exactly.
 
 ```bash
-npm run dev
+SCRATCH="C:/Users/YUDHIS~1/AppData/Local/Temp/claude/D--TAMPA-TARUNO-WEBSITE/d0ca22db-692e-419a-99b2-f64c186473d0/scratchpad"
+cd "$SCRATCH" && npm init -y >/dev/null && npm install puppeteer-core
+```
+
+Then, in a separate shell:
+
+```bash
+cd "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" && npm run dev
 ```
 
 Wait for "Ready". Do not run a production build while this is up.
 
 - [ ] **Step 3: Write the screenshot capture script**
 
-Create `scripts/archive-sections.mjs`:
+Create `scripts/archive-sections.mjs` in the repo, but **run it from the scratchpad** (Step 5). Absolute output path, because the working directory will not be the repo:
 
 ```js
 import puppeteer from 'puppeteer-core'
 import { mkdirSync } from 'node:fs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const OUT = 'docs/archive/2026-08-30-homepage-sections/shots'
+const REPO = 'D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT'
+const OUT = `${REPO}/docs/archive/2026-08-30-homepage-sections/shots`
 const SECTIONS = [
   'manifestoStrip', 'featuredWorks', 'servicesRows', 'archiveTeaser', 'contactMailto',
 ]
@@ -148,8 +157,10 @@ These attributes are harmless, and they also make the verification scripts in Ta
 
 - [ ] **Step 5: Run the capture and confirm every section was found**
 
+Run it **from the scratchpad**, not the repo — that is where `puppeteer-core` lives:
+
 ```bash
-node scripts/archive-sections.mjs
+cd "C:/Users/YUDHIS~1/AppData/Local/Temp/claude/D--TAMPA-TARUNO-WEBSITE/d0ca22db-692e-419a-99b2-f64c186473d0/scratchpad" && node "D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT/scripts/archive-sections.mjs"
 ```
 
 Expected: 20 `ok` lines (5 sections × 2 locales × 2 viewports), zero `MISSING`. A `MISSING` means the attribute in Step 4 was not applied or the block is not on the homepage — resolve it before continuing, because after Task 16 it cannot be captured.
@@ -1199,12 +1210,13 @@ git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" commit -m "feat(sam
 - [ ] **Step 3:** Add the `case 'samsaraRoom'` to `RenderBlocks.tsx`.
 - [ ] **Step 4:** Push the schema and confirm no stale temp tables:
 
+The database is `tampa-taruno.db` (per `DATABASE_URI` in `.env`), and `better-sqlite3` is not installed. Query it through `@libsql/client`, which arrives transitively with `@payloadcms/db-sqlite`:
+
 ```bash
-npm run payload migrate:create 2>/dev/null || true
-node -e "const s=require('better-sqlite3')('./tampa.db');console.log(s.prepare(\"SELECT name FROM sqlite_master WHERE name LIKE '__new_%'\").all())"
+node -e "const{createClient}=require('@libsql/client');createClient({url:'file:./tampa-taruno.db'}).execute(\"SELECT name FROM sqlite_master WHERE name LIKE '__new_%'\").then(r=>console.log('stale temp tables:',r.rows))"
 ```
 
-Expected: `[]`. Any hit must be diffed against its non-`__new_` counterpart before being dropped.
+Expected: `[]`. Verified empty at plan time, so any hit is new and was caused by this task. Diff it against its non-`__new_` counterpart before dropping it — an interrupted Drizzle push left one of these blocking the dev server behind an unanswerable "DATA LOSS" prompt once before.
 
 - [ ] **Step 5: Commit**
 
@@ -1241,10 +1253,10 @@ rm -rf .next/cache
 - [ ] **Step 4: Verify the schema did not drop the retired blocks' tables**
 
 ```bash
-node -e "const s=require('better-sqlite3')('./tampa.db');console.log(s.prepare(\"SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'pages_blocks_%'\").all().map(r=>r.name))"
+node -e "const{createClient}=require('@libsql/client');createClient({url:'file:./tampa-taruno.db'}).execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'pages_blocks_%'\").then(r=>console.log(r.rows.map(x=>x.name)))"
 ```
 
-Expected: the child tables for all five retired blocks are still present.
+Expected: the child tables for all five retired blocks are still present. Capture this list BEFORE the reseed as well, and diff — a table that disappears here is content destroyed, and it is the exact failure Task 1 Step 7 exists to prevent.
 
 - [ ] **Step 5: Commit**
 
