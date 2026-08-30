@@ -20,6 +20,8 @@ import {
   type EyeShape,
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
+import { buildRoom, type Room } from '../samsara/room'
+import { DEFAULT_SEQUENCE, type RoomConfig } from '../samsara/types'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -131,6 +133,12 @@ export class MascotEngine {
    */
   private persp = new THREE.PerspectiveCamera(45, 1, 0.1, 5000)
   private cameraMode: 'ortho' | 'perspective' = 'ortho'
+  /**
+   * Built lazily on first show, so a visitor who never scrolls into the room
+   * pays nothing — no geometry, no shadow map, no extra draw calls.
+   */
+  private room: Room | null = null
+  private roomCfg: RoomConfig = DEFAULT_SEQUENCE.ROOM
 
   private onScroll = () => {
     const span = this.cfg.SCROLL_FADE_VH * window.innerHeight
@@ -203,6 +211,41 @@ export class MascotEngine {
       spin: this.spin,
       inspect: this.inspect.on,
     })
+
+    // Dev handle for the room, so frame rate can be measured against the real
+    // shadow-casting scene rather than deferred until the bench exists.
+    ;(window as unknown as Record<string, unknown>).__ttSamsaraRoom = (on: boolean) => {
+      this.setRoomVisible(on)
+      // ⚠️ Deliberately does NOT swap the camera.
+      //
+      // place() positions the mascot in ORTHOGRAPHIC screen-pixel space — X and
+      // Y in the hundreds, scale in pixels. Switching to the perspective camera
+      // without also converting that placement into world units puts the body
+      // far outside the frustum and renders an empty room, which is exactly
+      // what happened the first time this handle did swap it.
+      //
+      // Perspective PLACEMENT is the SequenceController's job (plan Task 11);
+      // until it exists, the camera swap has nothing correct to show.
+      if (on) {
+        this.setMode('room')
+        this.setTransform({ x: this.W * 0.72, y: this.H * 0.52, sizePx: this.H * 0.4 })
+      } else {
+        this.setMode('orbit')
+      }
+      return { room: !!this.room, mode: this.mode, camera: this.cameraMode }
+    }
+
+    /**
+     * Park the body at a given on-screen size, for LOD and detail work.
+     *
+     * Off-centre on purpose: the logo sits at the centre of the hero, so
+     * parking here photographs the MARK rather than the mascot.
+     */
+    ;(window as unknown as Record<string, unknown>).__ttSamsaraBig = (px: number) => {
+      this.setMode('room')
+      this.setTransform({ x: this.W * 0.5, y: this.H * 0.5, sizePx: px })
+      return { sizePx: px, mode: this.mode, x: this.W * 0.5, y: this.H * 0.5 }
+    }
 
     // Dev handle for the bench and for verification scripts: hold one
     // expression instead of waiting for the glance beat to pick it.
@@ -541,6 +584,35 @@ export class MascotEngine {
   /** The camera every render goes through. Ortho unless explicitly swapped. */
   private activeCamera(): THREE.Camera {
     return this.cameraMode === 'perspective' ? this.persp : this.camera
+  }
+
+  /**
+   * Show or hide the dark room. Built on first show and kept thereafter.
+   *
+   * ⚠️ Shadows are enabled on the renderer only while the room is visible.
+   * Leaving shadowMap.enabled on for the orbit would pay a shadow pass on every
+   * hero frame for a scene that casts none.
+   */
+  setRoomVisible(v: boolean) {
+    if (v && !this.room) {
+      this.room = buildRoom(this.roomCfg)
+      this.scene.add(this.room.group)
+      this.spinner.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true
+      })
+    }
+    if (this.room) this.room.group.visible = v
+    this.renderer.shadowMap.enabled = v
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  }
+
+  setRoomConfig(cfg: RoomConfig) {
+    this.roomCfg = cfg
+    this.room?.setConfig(cfg)
+  }
+
+  hasRoom() {
+    return !!this.room
   }
 
   setReduced(v: boolean) {
@@ -1084,6 +1156,11 @@ export class MascotEngine {
     this.stop()
     window.removeEventListener('scroll', this.onScroll)
     this.depthCb = null
+    // Before the generic scene traversal below, so the room's own lights and
+    // shadow map are released explicitly rather than left to the mesh sweep,
+    // which only handles meshes.
+    this.room?.dispose()
+    this.room = null
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
