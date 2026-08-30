@@ -19,25 +19,58 @@
  */
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
+import { existsSync, readdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 
-const SCRATCH =
-  process.env.TT_SCRATCH ??
-  'C:/Users/YUDHISTIRA/AppData/Local/Temp/claude/D--TAMPA-TARUNO-WEBSITE/d0ca22db-692e-419a-99b2-f64c186473d0/scratchpad'
+/**
+ * ⚠️ The scratchpad directory is SESSION-SPECIFIC — its path contains a UUID
+ * that changes every session. Hardcoding one made this file work for exactly
+ * one day, then fail the next session with a confusing module-not-found.
+ *
+ * So: search for any scratchpad under this project's temp folder that actually
+ * has puppeteer-core installed. TT_SCRATCH still wins if set.
+ */
+function candidateRoots() {
+  const roots = []
+  if (process.env.TT_SCRATCH) roots.push(process.env.TT_SCRATCH)
 
-// pathToFileURL, not a hand-built file:// string: this repo sits under
-// "TAMPA TARUNO" and the scratchpad path is a Windows path, so both the space
-// and the separators need encoding that is easy to get wrong by hand.
-let puppeteer
-try {
-  const require = createRequire(pathToFileURL(`${SCRATCH}/package.json`))
-  puppeteer = require('puppeteer-core')
-} catch (err) {
-  console.error('Could not load puppeteer-core from:', SCRATCH)
-  console.error('Install it there first:')
-  console.error('  cd "<scratchpad>" && npm init -y && npm install puppeteer-core')
-  console.error('Or set TT_SCRATCH to a directory that has it.')
-  throw err
+  const base = `${tmpdir()}/claude/D--TAMPA-TARUNO-WEBSITE`.replace(/\\/g, '/')
+  try {
+    for (const dir of readdirSync(base)) {
+      roots.push(`${base}/${dir}/scratchpad`)
+    }
+  } catch {
+    // No sessions directory at all — fall through to the error below.
+  }
+  return roots
 }
+
+let puppeteer
+let loadedFrom = null
+for (const root of candidateRoots()) {
+  if (!existsSync(`${root}/node_modules/puppeteer-core`)) continue
+  try {
+    // pathToFileURL, not a hand-built file:// string: these are Windows paths
+    // and this repo sits under "TAMPA TARUNO", so both the separators and the
+    // space need encoding that is easy to get wrong by hand.
+    puppeteer = createRequire(pathToFileURL(`${root}/package.json`))('puppeteer-core')
+    loadedFrom = root
+    break
+  } catch {
+    // Try the next candidate.
+  }
+}
+
+if (!puppeteer) {
+  console.error('Could not find puppeteer-core in any session scratchpad.')
+  console.error('It is deliberately NOT an app dependency. Install it in THIS session\'s scratchpad:')
+  console.error('  cd "<scratchpad>" && npm init -y && npm install puppeteer-core')
+  console.error('Then re-run. Or set TT_SCRATCH to a directory that already has it.')
+  console.error('Searched:', candidateRoots().join('\n          '))
+  throw new Error('puppeteer-core not found')
+}
+
+if (process.env.TT_VERBOSE) console.error(`[_puppeteer] loaded from ${loadedFrom}`)
 
 export default puppeteer
 export { puppeteer }
