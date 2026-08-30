@@ -1337,3 +1337,47 @@ Expected: `200` five times.
 **Type consistency:** `SequenceConfig` and `DEFAULT_SEQUENCE` (Task 2) are consumed under those exact names in Tasks 3, 5, 6, 9, 15. `Beat` is `'down' | 'up' | null` in Task 3 and consumed as `'down' | 'up'` by `SequenceController.beat()` in Task 9 — the `null` case is filtered by the caller, which is correct and is stated in both interface blocks. `transitPoseAt` / `hasClearedLogo` / `Box` (Task 6) are used under those names in Task 11. `solveHandoff` / `projectedPx` (Task 4) are used in Tasks 7 and 11.
 
 **Placeholder scan:** Tasks 8, 11, 12, 14–18 carry step descriptions rather than full code bodies. This is deliberate and bounded: every one of them is either (a) downstream of the Task 13 freeze gate, so writing literal values now would contradict spec §9, or (b) three.js/React wiring whose shape depends on the tuned values. Each still names exact files, exact commands, and exact expected output. The five pure modules — where the real risk lives — carry complete test code.
+
+---
+
+## Task 8b: The room's high-detail LOD (added 2026-08-30, owner requirement)
+
+Spec §6.3b. The shipped 20k build was validated only to 70px; the room shows
+SAMSARA at ~360px, where its silhouette facets and the forehead monogram —
+modelled geometry, not texture — becomes unreadable.
+
+**Files:**
+- Create: `public/models/mascot.room.draco.glb` (2.1 MB, 200k tris, 2048² textures)
+- Modify: `package.json` (`build:mascot:room`)
+- Modify: `src/lib/mascot/MascotEngine.ts` (lazy detail swap)
+- Test: `docs/superpowers/verification/samsara-detail.mjs`
+
+**Interfaces:**
+- Produces: `MascotEngine.loadDetail(url: string): Promise<void>` — loads the
+  high-detail model and swaps it in, re-injecting the eye shader chunks.
+
+- [x] **Step 1: Add the build script and generate the asset** — done. Verified
+      reproducible (byte-identical size across two runs) and confirmed the hero's
+      own `mascot.draco.glb` is untouched.
+
+- [ ] **Step 2: `loadDetail()` on the engine**
+
+⚠️ The eye shader is injected through `onBeforeCompile` on the materials during
+`load()`. A naive second load produces a mascot with NO EYES — the socket mask
+and expression uniforms live on the material that was just replaced. Re-injection
+is the whole difficulty of this task, not the model swap.
+
+- [ ] **Step 3: Trigger it lazily from the sequence**
+
+Start the fetch when the sequence first leaves `idle` (beat 1), not at page load.
+Swap the model when it arrives, under cover of the fall while SAMSARA is small
+and moving. If it has not arrived by the landing, keep the 20k model — the room
+must never wait on a 2.1 MB download.
+
+- [ ] **Step 4: `samsara-detail.mjs`**
+
+Assert the swap happened (triangle count or a published flag), that the eyes
+still render after it (the failure mode above), and that the page is still
+usable if the request 404s.
+
+- [ ] **Step 5: Commit**

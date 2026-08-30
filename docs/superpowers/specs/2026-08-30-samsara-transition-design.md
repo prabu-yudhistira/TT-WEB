@@ -418,6 +418,48 @@ toward the camera so SAMSARA grows with every contact. After the third bounce it
 **not** come to rest — it rises into a hover, which is the correct ending for a floating
 mascot and hands off naturally into the idle.
 
+### 6.3b ⚠️ The room needs its own, higher-detail asset
+
+**Owner requirement, 2026-08-30:** *"Make sure samsara have a great detail,
+specially when it is in the big size"* and *"The logo on its forehead has to be
+in great detail."*
+
+The shipped `mascot.draco.glb` is **20,000 triangles with 1024² textures**. The
+mascot spec's decimation ladder validated that as indistinguishable from the
+1.96M-triangle source **"at every size the hero uses"** — and the hero uses
+**12.6px to 70px**. The room lands SAMSARA at 40% of viewport height: **360px on
+desktop, over 5× beyond anything that test covered.** The build script's own
+header even anticipated "the later fly-out", but only sized the *textures* for it.
+
+**Rendered and compared at 820px, same light, same pose, only the LOD differing:**
+
+| | 20k / 1024² | 200k / 2048² |
+|---|---|---|
+| Silhouette | faceted — reads as crumpled foil | smooth |
+| Filigree and scrollwork | melted into mush | crisp relief |
+| Gear teeth | lumpy | defined |
+| **Forehead monogram** | **unreadable** | **legible — black and red interlock** |
+| Size | 530 KB | 2.1 MB |
+
+**Why the monogram is the deciding detail.** The model is ONE mesh with ONE
+material, and its UVs carry `KHR_texture_transform` at scale ~16 — the skin
+texture tiles sixteen times over the body. A tiled texture cannot carry a unique
+mark, so the TAMPA TARUNO monogram on the forehead plaque is **modelled
+geometry**. It therefore lives or dies by the triangle budget, not the texture
+resolution. That makes both of the owner's requests the same technical question.
+
+**Decision: ship a second asset for the room only.**
+
+- Hero keeps `mascot.draco.glb` (530 KB, 20k). Unchanged, and still correct — at
+  12.6–70px the extra detail is genuinely invisible and would be pure cost.
+- Room loads `mascot.room.draco.glb` (2.1 MB, 200k / 2048²), built by
+  `npm run build:mascot:room`, **lazily, on entering the transit**. A visitor who
+  never scrolls past the hero never downloads it.
+- The swap happens under cover of the fall, when SAMSARA is small and moving.
+
+The 2.1 MB is the honest cost of the owner's requirement. It is paid only by
+visitors who reach the room, and only once.
+
 ### 6.4 Landed pose
 
 40% of viewport height in both cases. Desktop: right side. Mobile portrait: upper area,
