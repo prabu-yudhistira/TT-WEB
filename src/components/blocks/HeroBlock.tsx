@@ -82,6 +82,70 @@ export function HeroBlock({
   const cueRef = useRef<HTMLSpanElement>(null)
   const [stageLive, setStageLive] = useState(false)
   const [videoStarted, setVideoStarted] = useState(false)
+  const heroRef = useRef<HTMLElement>(null)
+
+  /**
+   * Rigid page shake for the SAMSARA freeze (spec §4.4, corrected in Task 10).
+   *
+   * ⚠️ Applied to the DOM layers ONLY — never to a wrapper around the 3D ones.
+   *
+   * Two constraints pull against each other here. A `transform` on an ancestor
+   * of MascotLayer would make that ancestor the containing block for
+   * `position: fixed`, restoring the hero's `overflow: hidden` clipping and
+   * trapping SAMSARA mid-fall — intermittently, only while shaking. But the
+   * obvious alternative, one shake wrapper around the hero's contents, is
+   * worse: satellites-back (z0), MascotLayer (z0), LogoStage (z0) and
+   * satellites-front (z2) all interleave inside ONE stacking context, and a
+   * transform creates a new one, collapsing them into a unit so the mascot
+   * could never pass behind the mark again.
+   *
+   * It costs nothing to leave the 3D layers alone: all three already shake from
+   * their own charge-driven jitter (HOLD_SHAKE_PX on the satellites and the
+   * mascot, the separation on the logo). The DOM is the part that was missing.
+   */
+  const [shakePx, setShakePx] = useState(0)
+  const shakeRef = useRef(0)
+  shakeRef.current = shakePx
+
+  useEffect(() => {
+    if (shakePx <= 0) return
+    const cfg = { hz: 14 }
+    let raf = 0
+    const t0 = performance.now()
+    const tick = (now: number) => {
+      const t = (now - t0) / 1000
+      const a = shakeRef.current
+      const x = Math.sin(t * cfg.hz * Math.PI * 2) * a
+      const y = Math.cos(t * cfg.hz * 1.31 * Math.PI * 2) * a
+      const el = heroRef.current
+      if (el) {
+        el.style.setProperty('--tt-shake-x', `${x.toFixed(2)}px`)
+        el.style.setProperty('--tt-shake-y', `${y.toFixed(2)}px`)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      const el = heroRef.current
+      if (el) {
+        el.style.setProperty('--tt-shake-x', '0px')
+        el.style.setProperty('--tt-shake-y', '0px')
+      }
+    }
+  }, [shakePx])
+
+  // Dev handle so the shake can be driven before the sequence wiring exists.
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__ttHeroShake = (px: number) => {
+      setShakePx(px)
+      return px
+    }
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__ttHeroShake
+    }
+  }, [])
+
   const [headlineStarted, setHeadlineStarted] = useState(false)
   const [headlineDismissed, setHeadlineDismissed] = useState(false)
   const onStageLive = useCallback(() => setStageLive(true), [])
@@ -151,7 +215,10 @@ export function HeroBlock({
   }, [])
 
   return (
-    <section style={{ position: 'relative', minHeight: '100svh', overflow: 'hidden' }}>
+    <section
+      ref={heroRef}
+      style={{ position: 'relative', minHeight: '100svh', overflow: 'hidden' }}
+    >
       {/* Mobile-only: the sketch video is a mid-screen band there, leaving
           bare site background above/below — fill the whole hero with the
           video's own paper (Paper-BG.jpg, same sheet/shoot) so it reads as
@@ -241,7 +308,7 @@ export function HeroBlock({
       </div>
 
       <div
-        className="tt-container"
+        className="tt-container tt-hero-domshake"
         style={{
           position: 'relative',
           zIndex: 1,
@@ -283,6 +350,14 @@ export function HeroBlock({
         }
         @media (prefers-reduced-motion: reduce) {
           .hero-char { animation: none; opacity: 1; }
+        }
+        /* SAMSARA freeze shake — DOM layers ONLY. See the shakePx comment in
+           this component: transforming an ancestor of MascotLayer would clip
+           the fall, and wrapping the 3D layers would collapse the z-sandwich
+           that lets the mascot pass behind the mark. */
+        .hero-headline-overlay,
+        .tt-hero-domshake {
+          transform: translate(var(--tt-shake-x, 0px), var(--tt-shake-y, 0px));
         }
         .tt-hero-paper { display: none; }
         @media (max-width: 639px) {

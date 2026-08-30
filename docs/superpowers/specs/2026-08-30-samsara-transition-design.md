@@ -166,10 +166,37 @@ SAMSARA inside the hero and clip the fall at the hero's bottom edge — and it w
 *only while shaking*, which is exactly the kind of intermittent bug that survives casual
 testing.
 
-**Resolution:** the shake transform goes on an **inner wrapper** containing the headline,
-logo and satellites. `MascotLayer` is a sibling *outside* that wrapper. SAMSARA then has
-no transformed ancestor, and the shake still moves everything a viewer reads as "the
-page." Cost: one `div`. Guarded by `samsara-fixed-clip.mjs` (§11).
+**⚠️ Correction, Task 10 — the resolution first written here would have broken the
+shipped mascot.** It said to wrap "the headline, logo and satellites" in one transformed
+shake wrapper, with `MascotLayer` outside it. That fixes the clipping and destroys
+something worse.
+
+Satellites-back (z0), `MascotLayer` (z0), `LogoStage` (z0) and satellites-front (z2) all
+interleave inside **one** stacking context. `MascotLayer`'s own source records why that
+matters: *"the root has NO z-index of its own: a positioned element with `z-index: auto`
+does not create a stacking context, so the canvas participates in the hero's stacking
+context directly and can straddle LogoStage."* A `transform` creates a new stacking
+context, collapsing the wrapped group into a single unit — after which the mascot could
+never pass behind the mark again. That is the load-bearing property of the entire shipped
+mascot, traded away to add a shake.
+
+**Actual resolution: the shake is applied to the DOM layers only** — the headline overlay
+and the bottom container. The three 3D layers are left untouched and unwrapped.
+
+This costs nothing, because **all three already shake.** The satellites and the mascot
+both jitter by `HOLD_SHAKE_PX` scaled by charge, and the logo shakes through its
+separation — the sequence drives that charge from beat 1. The DOM was the only part not
+already moving, which is precisely what "every component shaking" was asking for.
+
+Implemented as a `--tt-shake-x/y` custom property set on the hero from a rAF loop, read by
+a `transform: translate(...)` on `.hero-headline-overlay` and `.tt-hero-domshake`. No
+element above `MascotLayer` is ever transformed.
+
+Guarded by `samsara-fixed-clip.mjs`, which pins both halves: the shake really moves the
+DOM, **and** the mascot canvas has no transformed ancestor while it does — verified by
+injecting a `position: fixed` probe into the mascot layer and asserting it fills the
+viewport rather than the hero. `mascot-sorting.mjs` and `mascot-occlusion.mjs` re-run to
+prove the sandwich itself still works.
 
 ### 4.5 Context budget
 
