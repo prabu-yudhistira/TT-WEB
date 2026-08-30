@@ -264,40 +264,58 @@ continuous: SAMSARA is already at the back and at its smallest when it drops, wh
 precisely why it "falls into the **back** of the room." The three bounces then carry it
 forward and larger, so depth runs unbroken from orbit through landing.
 
-**Where that actually puts it.** Worked from shipped config at 1440×900 — illustrative,
-to be measured, not trusted:
+**Where that actually puts it.** Worked from the *shipped* values — `TILT 20`,
+`TILT_SIDEWAY 160`, `PERSPECTIVE 1300`, `OUTER_RADIUS 1.6`, mascot `RADIUS 0.71`,
+`HEIGHT 136` — at 1440×900. The disk carries 160° of roll, which dominates the result and
+must not be assumed away:
 
 ```
-belt outerR   = (min(1440,900)/2) x 0.8  ~= 360 px
-mascot radius = 0.71 x 360               ~= 256 px
+outerR        = (min(1440,900)/2) x 1.6   = 720 px
+mascot radius = 0.71 x 720                = 511 px
 
-at angle pi/2:
-  depth  z1 = -136*sin20 + 256*cos20     ~= +194 px   (positive = BEHIND the logo)
-  screen y  = +136*cos20 + 256*sin20     ~= +215 px   (BELOW the logo centre)
-  screen x  ~= 0                                     (modulo the disk's roll)
-  scale     = minimum — SAMSARA is at its smallest
+at angle pi/2 (maximum depth):
+  y1    = 136*cos20 + 511*sin20           =  302.6
+  z1    = -136*sin20 + 511*cos20          = +433.9    (positive = BEHIND the logo)
+  roll 160 deg:
+    x3  = -302.6 * sin160                 = -103.5
+    y3  = +302.6 * cos160                 = -284.4
+  scale = 1300 / (1300 + 433.9)           =  0.750    (SAMSARA at its smallest)
+
+  screen offset from the logo's centre    = (-77.6, -213.2)
 ```
 
-The mark's own on-screen half-height is about 184 px, so SAMSARA clears its box by
-roughly 31 px — and that margin varies with viewport.
+**SAMSARA's far point is ABOVE the mark and slightly left of it** — not below. It clears
+the logo's bounding box (half-height about 184 px) by only ~30 px, and it sits *inside*
+the logo's horizontal span. Both margins vary with viewport and must be measured.
 
-**⚠️ Consequence: the layer promotion is NOT a visual no-op at the far point.** §4.2's
-claim held for the widest horizontal excursion, where SAMSARA is far from the mark. At the
-back of the orbit it is directly below the mark, close to it, and rendering on the *back*
-canvas at z-index 0. Promoting it to a fixed top layer there would pop it from behind the
-mark to in front of it in a single frame.
+**Consequence — the fall goes down BEHIND the mark, and that is a feature.** From the far
+point SAMSARA drops straight into the logo's silhouette, falls behind it for roughly
+400 px, and emerges underneath. The occlusion costs nothing: SAMSARA is at `z > 0` and so
+is already drawing on the back canvas, which `LogoStage` paints over for free. This is the
+same sandwich that makes the orbit work, doing exactly what it was built to do.
+
+**Consequence — the layer promotion is NOT a no-op at the far point.** §4.2's claim held
+for the widest horizontal excursion, where SAMSARA is far from the mark. At the back of
+the orbit it overlaps the mark and is behind it, so promoting to a fixed top layer there
+would pop it in front of the logo in a single frame.
 
 **Resolution — a condition, not a timestamp.** The promotion fires on the first frame
-where SAMSARA's projected box has fallen **clear of the logo's bounding box**. Until then
-it keeps rendering on the hero's back canvas and stays correctly occluded. Because the
-fall is downward from roughly the mark's lower edge, this happens within the first ~100 ms.
+where SAMSARA's projected box no longer intersects the logo's bounding box, which given
+the geometry above means *after it has emerged below the mark* — roughly 400 px into the
+fall, not 100 ms into it. Until then it keeps drawing on the hero's back canvas, correctly
+occluded.
 
-Two things follow, and both are requirements rather than notes:
+Three requirements follow:
 
-- The room's fade-up must begin **after** the promotion. Starting it earlier would cover
-  SAMSARA while it is still drawing on the hero's back canvas.
-- `samsara-seam.mjs` must assert no z-order pop across the promotion frame, at several
-  viewports — the clearance margin is viewport-dependent and 31 px is not much.
+- **The fall's duration must be long enough to cover that 400 px descent before the
+  promotion**, or the sequence will try to promote while SAMSARA is still behind the mark.
+  The 0.8s starting value in the table below was chosen before this geometry was worked
+  out and is very likely too short. Settle it at the bench.
+- **The room's fade-up must begin after the promotion**, never before. Starting it earlier
+  would cover SAMSARA while it is still drawing on the hero's back canvas.
+- **`samsara-seam.mjs` must assert no z-order pop across the promotion frame**, at several
+  viewports. A ~30 px clearance at the far point is not much margin, and on a short or
+  narrow window it may vanish entirely.
 
 Starting values below. Subject to §9.
 
