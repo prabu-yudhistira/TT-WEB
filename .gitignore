@@ -17,3 +17,9 @@ next-env.d.ts
 
 .DS_Store
 .superpowers/
+
+# Verification harness outputs — screenshots and contact sheets
+shots/
+eyeshots/
+killswitch-*.png
+occlusion-sheet.png
