@@ -64,10 +64,20 @@ check(
 check('half-orbit is positive', DEFAULT_SEQUENCE.TRANSIT.HALF_ORBIT_MS > 0)
 check('settle is positive', DEFAULT_SEQUENCE.TRANSIT.SETTLE_MS > 0)
 
-// Spec §5.6: the far point sits ~213px ABOVE the mark, and SAMSARA must
-// descend ~400px behind it before the layer promotion may fire. A short fall
-// would try to promote while it is still behind the logo, popping it in front.
-check('fall is long enough to clear the mark', DEFAULT_SEQUENCE.TRANSIT.FALL_MS >= 900)
+// Structural, not taste: the initial drop must be the longest phase of the
+// transit. If a bounce ever outlasts the fall the arc reads as a stutter rather
+// than a fall, whatever the absolute durations are tuned to.
+//
+// (An earlier version asserted FALL_MS >= 900 on the grounds that SAMSARA had
+// to descend ~400px behind the mark before the layer could be promoted. That
+// premise was measured and found false — see transitScript.ts — so the
+// assertion went with it rather than being quietly kept for a reason that no
+// longer holds.)
+check(
+  'the initial fall is the longest phase',
+  DEFAULT_SEQUENCE.TRANSIT.BOUNCE_MS.every((d) => d < DEFAULT_SEQUENCE.TRANSIT.FALL_MS) &&
+    DEFAULT_SEQUENCE.TRANSIT.SETTLE_MS < DEFAULT_SEQUENCE.TRANSIT.FALL_MS,
+)
 
 // ── landing ─────────────────────────────────────────────────────────
 check('landed size is 40% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.4)

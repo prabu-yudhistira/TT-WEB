@@ -52,10 +52,9 @@ export type TransitConfig = {
    */
   HALF_ORBIT_MS: number
   /**
-   * The drop. ⚠️ Spec §5.6 — the far point is ~213px ABOVE the mark, and the
-   * layer promotion may not fire until SAMSARA's box has cleared the logo's,
-   * roughly 400px of descent. Too short a fall tries to promote while it is
-   * still behind the mark and pops it in front in a single frame.
+   * The drop, from the far point to the first floor contact. Must remain the
+   * longest phase of the transit, or the arc reads as a stutter rather than a
+   * fall.
    */
   FALL_MS: number
   BOUNCE_COUNT: number
@@ -147,8 +146,10 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   TRANSIT: {
     HALF_ORBIT_MS: 600,
-    // 1100, not the 800 first drafted: that value predated the far-point
-    // geometry being worked out and is too short to clear the mark. See §5.6.
+    // 1100 rather than the 800 first drafted. The original justification (that
+    // SAMSARA had to descend ~400px behind the mark before the layer could be
+    // promoted) was measured and found false, so this is now simply a starting
+    // value for the bench like every other number here.
     FALL_MS: 1100,
     BOUNCE_COUNT: 3,
     RESTITUTION: 0.45,

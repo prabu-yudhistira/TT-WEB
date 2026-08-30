@@ -107,12 +107,11 @@ and each is designed so that it changes nothing visible on the frame it happens:
 2. The camera goes orthographic to perspective, with FOV and distance solved so that
    SAMSARA's projected size at the handoff depth equals its current pixel size.
 
-**These do not both fire at the commit instant.** Because the far point is the *back* of
-the orbit (§5.6), SAMSARA is behind the mark and on the back canvas when the fall begins,
-so promoting the layer there would pop it in front of the logo. The promotion is instead
-gated on SAMSARA's projected box falling clear of the logo's bounding box — a condition,
-not a timestamp, reached within roughly the first 100 ms of the fall. Full reasoning,
-worked numbers and the resulting ordering constraint on the room's fade-up are in §5.6.
+**Both fire at the commit instant, and §5.6 records why that took two corrections to
+establish.** SAMSARA's box clears the mark's by 19.1px at the far point, so the promotion
+is a no-op there and it falls IN FRONT of the logo, staying visible. `hasClearedLogo`
+remains as a guard against a retune that erases that thin margin. The room's fade-up must
+follow the promotion, never precede it.
 
 Everything after the commit is one continuous perspective scene. SAMSARA and the room's
 geometry share **one renderer, one scene graph, one loaded model, one eye shader** — so
@@ -288,34 +287,52 @@ at angle pi/2 (maximum depth):
 the logo's bounding box (half-height about 184 px) by only ~30 px, and it sits *inside*
 the logo's horizontal span. Both margins vary with viewport and must be measured.
 
-**Consequence — the fall goes down BEHIND the mark, and that is a feature.** From the far
-point SAMSARA drops straight into the logo's silhouette, falls behind it for roughly
-400 px, and emerges underneath. The occlusion costs nothing: SAMSARA is at `z > 0` and so
-is already drawing on the back canvas, which `LogoStage` paints over for free. This is the
-same sandwich that makes the orbit work, doing exactly what it was built to do.
+### ⚠️ Correction, 2026-08-30 — this section originally drew the wrong conclusion
 
-**Consequence — the layer promotion is NOT a no-op at the far point.** §4.2's claim held
-for the widest horizontal excursion, where SAMSARA is far from the mark. At the back of
-the orbit it overlaps the mark and is behind it, so promoting to a fixed top layer there
-would pop it in front of the logo in a single frame.
+The paragraphs that stood here claimed SAMSARA would fall **behind** the mark for ~400 px
+and that the layer promotion had to wait until it emerged below. Both halves were wrong,
+and only running the numbers through the real `projectOrbit` and `transitScript` showed it.
+They are recorded rather than deleted, because the reasoning error is the useful part.
 
-**Resolution — a condition, not a timestamp.** The promotion fires on the first frame
-where SAMSARA's projected box no longer intersects the logo's bounding box, which given
-the geometry above means *after it has emerged below the mark* — roughly 400 px into the
-fall, not 100 ms into it. Until then it keeps drawing on the hero's back canvas, correctly
-occluded.
+**What was claimed:** at the far point SAMSARA overlaps the mark and sits behind it, so
+promoting there would pop it in front; therefore gate the promotion on its box clearing
+the logo's, roughly 400 px into the fall.
 
-Three requirements follow:
+**What is actually true, measured:**
 
-- **The fall's duration must be long enough to cover that 400 px descent before the
-  promotion**, or the sequence will try to promote while SAMSARA is still behind the mark.
-  The 0.8s starting value in the table below was chosen before this geometry was worked
-  out and is very likely too short. Settle it at the bench.
+1. **The boxes do not intersect at the far point.** SAMSARA's centre is ~213 px above the
+   logo's centre and its own radius is only ~10.5 px, so its lower edge clears the mark's
+   box by **19.1 px**. Promoting there is already a genuine visual no-op — the thing §4.2
+   promised, just for a different reason than assumed.
+2. **SAMSARA never emerges below the mark at all.** With the landed pose at `Y_FRAC 0.52`
+   it descends from y ≈ 237 to a floor at y ≈ 478, while the logo's box runs 266–634. It
+   stays inside the mark's vertical span for the entire transit. A gate waiting for it to
+   pass below **could never fire**, and the check suite caught exactly that.
+
+**Where the error came from:** "falls behind the mark" was an inference from the geometry,
+not something the owner asked for. The requirement was only that SAMSARA fall to the next
+section. Falling behind would additionally hide it for most of the descent, which is worse
+than the alternative.
+
+### Resolution
+
+**SAMSARA promotes at the far point and falls IN FRONT of the mark**, staying visible
+throughout, with the room rising beneath it.
+
+`hasClearedLogo` survives as a **guard, not a mechanism**: a plain box non-intersection
+test, consulted once at promotion time. With shipped geometry it is true immediately. If a
+future retune moves the far point so that it *does* overlap the mark, the promotion defers
+until it does not, rather than popping.
+
+Two requirements still follow:
+
 - **The room's fade-up must begin after the promotion**, never before. Starting it earlier
   would cover SAMSARA while it is still drawing on the hero's back canvas.
 - **`samsara-seam.mjs` must assert no z-order pop across the promotion frame**, at several
-  viewports. A ~30 px clearance at the far point is not much margin, and on a short or
-  narrow window it may vanish entirely.
+  viewports. **19.1 px of clearance is thin**, it is viewport-dependent, and on a short or
+  narrow window it may vanish entirely — which is precisely when the guard has to work.
+  `transitScript.check.ts` pins that margin so a retune erasing it fails in milliseconds
+  rather than on screen.
 
 Starting values below. Subject to §9.
 
