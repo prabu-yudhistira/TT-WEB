@@ -923,6 +923,19 @@ export class MascotEngine {
     return this.dragging
   }
 
+  /**
+   * Where the body is drawn on screen right now, in CSS px within the host box.
+   *
+   * Published so an affordance can be anchored TO SAMSARA rather than to the
+   * pointer. The site's cursor pill trails the cursor by design, which is right
+   * for a label that describes what you are pointing at and wrong for one that
+   * marks where a fixed target is — it reads as the target being somewhere it
+   * is not.
+   */
+  getBodyScreen() {
+    return { x: this.lastScreen.x, y: this.lastScreen.y, diameterPx: this.lastDiameterPx }
+  }
+
   /** Fires when the pointer moves onto or off SAMSARA's disc. */
   onMascotHover(cb: ((over: boolean) => void) | null) {
     this.overListeners.clear()

@@ -305,9 +305,11 @@ export function HeroBlock({
         eyes={eyes}
         onEngine={setMascotEngine}
         rootElRef={mascotRootRef}
-        // Matches the archive canvas's own pill, so the site has one word for
-        // "you can turn this" rather than two.
-        dragLabel={samsara.DRAG.ENABLED ? (locale === 'id' ? 'Seret' : 'Drag') : undefined}
+        // Names the interaction that is hardest to discover. Turning it is
+        // findable once you have grabbed it; that you can grab it at all is not.
+        holdHint={
+          samsara.DRAG.ENABLED ? (locale === 'id' ? 'Klik & Tahan' : 'Click & Hold') : undefined
+        }
       />
       <LogoStage
         onLive={onStageLive}

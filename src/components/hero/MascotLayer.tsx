@@ -28,6 +28,9 @@ import type { SatelliteConfig } from '../../lib/satellites/types'
  * deliberate and load-bearing: on this project a kill switch that left the
  * effect half-running has now shipped TWICE.
  */
+/** How many times the press-and-hold hint may appear per page load. */
+const HINT_MAX_SHOWS = 2
+
 export function MascotLayer({
   config,
   belt,
@@ -41,7 +44,7 @@ export function MascotLayer({
   inspect,
   onEngine,
   rootElRef,
-  dragLabel,
+  holdHint,
 }: {
   config: MascotConfig
   /** The belt the mascot orbits in — supplies the shared plane and radii. */
@@ -82,10 +85,21 @@ export function MascotLayer({
    */
   rootElRef?: React.MutableRefObject<HTMLDivElement | null>
   /**
-   * Cursor pill shown while the pointer is over a draggable SAMSARA — "Drag" /
-   * "Seret", matching the archive canvas. Omit to leave it undraggable-looking.
+   * Discovery hint shown over SAMSARA while the pointer is on it — "CLICK &
+   * HOLD". Omit to show nothing.
+   *
+   * ⚠️ Anchored to the BODY, not to the cursor, and deliberately not the site's
+   * `data-cursor` pill. That pill eases toward the pointer and extends to one
+   * side of it, so a label meaning "this thing here is interactive" ends up
+   * sitting beside SAMSARA rather than on it — which reads as the target being
+   * somewhere it is not. Measured separately: the hit circle itself is centred
+   * on the body to within 2px at 1440x900 and 1920x1080.
+   *
+   * ⚠️ Shown at most HINT_MAX_SHOWS times per page load. It teaches one thing
+   * once; past that it is noise sitting on top of the mascot every time the
+   * pointer crosses it.
    */
-  dragLabel?: string
+  holdHint?: string
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -93,6 +107,10 @@ export function MascotLayer({
   const engineRef = useRef<MascotEngine | null>(null)
   const [behind, setBehind] = useState(true)
   const [overMascot, setOverMascot] = useState(false)
+  const hintRef = useRef<HTMLDivElement>(null)
+  /** Counts hover-ins, so the hint can retire itself. See holdHint. */
+  const hintShowsRef = useRef(0)
+  const [hintVisible, setHintVisible] = useState(false)
 
   const statusRef = useRef(onStatus)
   statusRef.current = onStatus
@@ -196,6 +214,48 @@ export function MascotLayer({
     engineRef.current?.setActive(active)
   }, [active])
 
+  /**
+   * The hint appears on the first HINT_MAX_SHOWS hovers and then never again.
+   *
+   * Counted on hover-IN rather than on a timer, so a visitor who never goes near
+   * SAMSARA still gets both of their chances to see it.
+   */
+  useEffect(() => {
+    if (!holdHint) return
+    if (!overMascot) {
+      setHintVisible(false)
+      return
+    }
+    if (hintShowsRef.current >= HINT_MAX_SHOWS) return
+    hintShowsRef.current += 1
+    setHintVisible(true)
+  }, [overMascot, holdHint])
+
+  /**
+   * Follows the body every frame while visible.
+   *
+   * A rAF loop rather than React state: the body bobs, and re-rendering this
+   * component sixty times a second to carry two numbers a style write can set
+   * directly is the overhead the rest of this file exists to avoid. The loop
+   * only runs while the hint is actually on screen.
+   */
+  useEffect(() => {
+    if (!hintVisible) return
+    let raf = 0
+    const tick = () => {
+      const engine = engineRef.current
+      const el = hintRef.current
+      if (engine && el) {
+        const b = engine.getBodyScreen()
+        // Just below the body, so it never covers the face it is pointing at.
+        el.style.transform = `translate3d(${b.x}px, ${b.y + b.diameterPx / 2 + 14}px, 0) translateX(-50%)`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [hintVisible])
+
   if (!enabled) return null
 
   return (
@@ -203,9 +263,6 @@ export function MascotLayer({
       <canvas
         ref={canvasRef}
         data-mascot={behind ? 'behind' : 'front'}
-        // The pill only exists while the pointer is genuinely on the body — see
-        // the pointerEvents note below.
-        data-cursor={dragLabel && overMascot ? dragLabel : undefined}
         style={{
           position: 'absolute',
           inset: 0,
@@ -221,10 +278,45 @@ export function MascotLayer({
            *
            * Left permanently 'auto' this canvas would swallow every click in
            * the room, including the chatbox that lands on top of it.
+           *
+           * ⚠️ The site's `data-cursor` pill is deliberately NOT used here — see
+           * the holdHint prop. What this buys now is the grab cursor, which is
+           * the affordance that survives after the hint has retired itself.
            */
-          pointerEvents: dragLabel && overMascot ? 'auto' : 'none',
+          cursor: holdHint && overMascot ? 'grab' : 'default',
+          pointerEvents: holdHint && overMascot ? 'auto' : 'none',
         }}
       />
+      {holdHint ? (
+        <div
+          ref={hintRef}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            zIndex: 3,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            // Smaller than the site's cursor pill (0.75rem) — this sits ON the
+            // artwork rather than following the pointer, so it has to stay out
+            // of the way of what it is annotating.
+            font: '600 0.625rem/1 ui-monospace, SFMono-Regular, Menlo, monospace',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            padding: '6px 10px',
+            borderRadius: 999,
+            background: 'rgba(8,8,10,0.72)',
+            color: '#F6F1E7',
+            border: '1px solid rgba(246,241,231,0.22)',
+            opacity: hintVisible ? 1 : 0,
+            transition: 'opacity 0.25s ease',
+            willChange: 'transform, opacity',
+          }}
+        >
+          {holdHint}
+        </div>
+      ) : null}
       {/* The word sits at a FIXED z 2, deliberately not flipping with the
           canvas: a name that disappears behind the mark for half of every orbit
           is worse than one that stays readable. The engine dims it instead when

@@ -429,7 +429,7 @@ export default function SamsaraLab({
           eyes={eyes}
           onEngine={setEngine}
           rootElRef={mascotRootRef}
-          dragLabel={cfg.DRAG.ENABLED ? 'Drag' : undefined}
+          holdHint={cfg.DRAG.ENABLED ? 'Click & Hold' : undefined}
         />
         <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: showLogo ? 1 : 0 }}>
           <LogoCanvas
