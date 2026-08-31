@@ -35,17 +35,30 @@ const OVER = cfg.WHEEL_THRESHOLD
 }
 
 // ⚠️ A REAL mouse-wheel notch is ~100-120 in Chrome, and the approved threshold
-// is 205 — so a physical notch is deliberately NOT one beat any more. It takes
-// two. Recorded because it is a genuine consequence of the owner's tuning and
-// invisible from the config alone: with BEATS_TO_COMMIT down from 4 to 2, the
-// total wheel travel needed to reach the room is about what it always was, just
-// spent in fewer, larger beats.
+// is 410 — so a physical notch is deliberately NOT one beat. It takes several.
+//
+// Recorded because it is a genuine consequence of the owner's tuning that the
+// config does not show on its own: at 410, entering the room costs roughly
+// FOUR notches per beat and two beats, so about eight notches of deliberate
+// scrolling. That is the owner choosing "you have to mean it" over "one flick
+// and you are in", and it is the number to revisit first if the entry ever
+// feels heavy on a mouse. Trackpads are unaffected — one flick still clears any
+// sane threshold in a single gesture.
+const NOTCH = 120
+const NOTCHES_PER_BEAT = Math.ceil(cfg.WHEEL_THRESHOLD / NOTCH)
 {
   const s = createGestureState()
-  const first = feedWheel(s, 120, 1000, cfg)
-  const second = feedWheel(s, 120, 1040, cfg)
-  check('one physical notch is NOT a beat at the approved threshold', first === null)
-  check('two notches in quick succession are', second === 'down')
+  let beats = 0
+  let fired = -1
+  for (let i = 0; i < NOTCHES_PER_BEAT; i++) {
+    if (feedWheel(s, NOTCH, 1000 + i * 40, cfg)) {
+      beats++
+      if (fired < 0) fired = i + 1
+    }
+  }
+  check(`one physical notch is NOT a beat (needs ${NOTCHES_PER_BEAT})`, NOTCHES_PER_BEAT > 1)
+  check(`${NOTCHES_PER_BEAT} notches in quick succession make exactly one beat`, beats === 1)
+  check(`and it lands on the last of them (fired at ${fired})`, fired === NOTCHES_PER_BEAT)
 }
 
 // ── trackpad flick ──────────────────────────────────────────────────
@@ -124,11 +137,16 @@ check(
   const s = createGestureState()
   let beats = 0
   let t = 1000
-  for (let i = 0; i < 40; i++) {
-    if (feedWheel(s, 8, t, cfg)) beats++
+  // Enough events to clear the threshold twice over, derived rather than
+  // guessed — a fixed count silently stopped reaching it when the owner raised
+  // WHEEL_THRESHOLD to 410, turning a real property into a passing-by-luck test.
+  const DRIFT = 8
+  const steps = Math.ceil((cfg.WHEEL_THRESHOLD / DRIFT) * 2)
+  for (let i = 0; i < steps; i++) {
+    if (feedWheel(s, DRIFT, t, cfg)) beats++
     t += 30
   }
-  check(`a slow drift eventually beats (got ${beats})`, beats >= 1)
+  check(`a slow drift eventually beats (got ${beats} over ${steps} events)`, beats >= 1)
 }
 
 // ── touch ───────────────────────────────────────────────────────────

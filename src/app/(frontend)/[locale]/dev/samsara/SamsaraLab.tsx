@@ -51,6 +51,7 @@ type Row =
   | { kind: 'arr'; path: string; label: string; min: number; max: number; step: number }
   | { kind: 'color'; path: string; label: string }
   | { kind: 'weight'; path: string; label: string }
+  | { kind: 'expr'; path: string; label: string }
 
 const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
   {
@@ -152,7 +153,9 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     title: 'idle eyes — the room expression loop',
     note:
       'weights are RELATIVE, not percentages. one slider per expression, generated from ' +
-      'eyes.ts so a new expression can never be silently missing from the pool. 0 removes it.',
+      'eyes.ts so a new expression can never be silently missing. 0 removes it from the ' +
+      'random pool — which is what you want for whatever press-and-hold plays, or the ' +
+      'interaction stops being a reward.',
     rows: [
       // Generated, not listed. A hand-written list is how an expression ends up
       // untunable: it exists in eyes.ts, has a weight in the config, plays on
@@ -167,6 +170,7 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'IDLE_EYES.INTERVAL_MS', label: 'Interval ms', min: 200, max: 12000, step: 100 },
       { kind: 'num', path: 'IDLE_EYES.SMILE_SHAKE_PX', label: 'Smile shake px', min: 0, max: 80, step: 1 },
       { kind: 'num', path: 'IDLE_EYES.SMILE_SHAKE_MS', label: 'Smile shake ms', min: 100, max: 3000, step: 20 },
+      { kind: 'expr', path: 'IDLE_EYES.HOLD_EXPRESSION', label: 'Press & hold plays' },
     ],
   },
   {
@@ -601,6 +605,34 @@ export default function SamsaraLab({
               <div style={{ opacity: 0.55, marginBottom: 6, fontStyle: 'italic' }}>{g.note}</div>
             ) : null}
             {g.rows.map((r) => {
+              if (r.kind === 'expr') {
+                const v = getPath(cfg as unknown as Any, r.path) as string
+                return (
+                  <label key={r.path} style={{ display: 'block', marginBottom: 8 }}>
+                    <span style={{ display: 'block', marginBottom: 3 }}>{r.label}</span>
+                    <select
+                      value={v}
+                      onChange={(e) => set(r.path, e.target.value)}
+                      style={{
+                        width: '100%',
+                        font: 'inherit',
+                        color: 'inherit',
+                        background: 'rgba(255,255,255,0.6)',
+                        border: '1px solid rgba(43,42,39,0.25)',
+                        borderRadius: 3,
+                        padding: '3px 5px',
+                      }}
+                    >
+                      <option value="">(none — press does nothing)</option>
+                      {EXPRESSION_ORDER.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              }
               if (r.kind === 'color') {
                 const v = getPath(cfg as unknown as Any, r.path) as string
                 return (

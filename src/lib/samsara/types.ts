@@ -194,9 +194,31 @@ export type IdleEyesConfig = {
    */
   WEIGHTS: Record<string, number>
   INTERVAL_MS: number
-  /** Owner: "when smiling, samsara will be shaking up and down." */
+  /**
+   * Owner: "when smiling, samsara will be shaking up and down."
+   *
+   * Governs BOTH bobs, which are two different shapes of the same motion: a
+   * decaying one when a smile comes up on its own, and a continuous loop of the
+   * same amplitude and period while a visitor is holding it. SMILE_SHAKE_MS is
+   * the decay length in the first case and the loop period in the second.
+   */
   SMILE_SHAKE_PX: number
   SMILE_SHAKE_MS: number
+
+  /**
+   * Expression held while a visitor presses and holds SAMSARA in the room.
+   * Owner: "click&hold will make it laugh/smile until click is released."
+   *
+   * Empty string disables it, which is the setting for inspecting the resting
+   * face — otherwise SAMSARA grins at you the entire time you are turning it.
+   *
+   * ⚠️ Deliberately does NOT wait for a press-vs-drag threshold the way the
+   * mark's hold-to-separate does. Two reasons: the owner asked for hold, not for
+   * hold-without-moving; and a smile that appeared only if your hand was steady
+   * enough would read as a bug rather than as a rule. So SAMSARA is happy for as
+   * long as you are touching it, whether or not you also turn it.
+   */
+  HOLD_EXPRESSION: string
 }
 
 export type ChatboxConfig = {
@@ -224,7 +246,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   GESTURES: {
     BEATS_TO_COMMIT: 2,
-    WHEEL_THRESHOLD: 205,
+    WHEEL_THRESHOLD: 410,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
     TOUCH_THRESHOLD: 60,
@@ -245,8 +267,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FALL_MS: 950,
     BOUNCE_COUNT: 3,
     RESTITUTION: 0.8,
-    BOUNCE_MS: [500, 350, 250],
-    SETTLE_MS: 500,
+    BOUNCE_MS: [520, 430, 360],
+    SETTLE_MS: 300,
   },
 
   LANDING: {
@@ -278,7 +300,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     AMBIENT_INTENSITY: 1.45,
     FOG_DENSITY: 0.035,
     CAMERA_FOV_DEG: 55,
-    DEPTH: 42,
+    DEPTH: 51,
 
     // Warm bronze-brass, picked to be in the right neighbourhood once
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
@@ -318,24 +340,35 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      * each key against EXPRESSION_ORDER for exactly that reason.
      */
     WEIGHTS: {
-      neutral: 3,
-      blink: 10,
-      happy: 13,
+      neutral: 18,
+      blink: 6,
       squint: 2,
-      wide: 2,
-      wink: 2,
-      lookLeft: 2,
-      lookRight: 2,
-      lookUp: 2,
-      lookDown: 2,
-      lookUpLeft: 2,
-      lookUpRight: 2,
-      lookDownLeft: 2,
-      lookDownRight: 2,
+      // ⚠️ ZERO is a decision, not an omission. Every expression keeps its key
+      // so the bench always has a slider for it and pickWeighted can never miss
+      // one through a typo — but the owner settled the room on a calm resting
+      // face: mostly neutral, a periodic blink, an occasional squint.
+      //
+      // `happy` in particular is 0 ON PURPOSE. The smile moved out of the random
+      // idle pool and became a deliberate interaction — press and hold SAMSARA
+      // and it smiles at you (HOLD_EXPRESSION below). A smile that also fired on
+      // its own every few seconds would spend the thing that makes holding it
+      // worth doing.
+      happy: 0,
+      wide: 0,
+      wink: 0,
+      lookLeft: 0,
+      lookRight: 0,
+      lookUp: 0,
+      lookDown: 0,
+      lookUpLeft: 0,
+      lookUpRight: 0,
+      lookDownLeft: 0,
+      lookDownRight: 0,
     },
-    INTERVAL_MS: 1700,
-    SMILE_SHAKE_PX: 13,
-    SMILE_SHAKE_MS: 820,
+    INTERVAL_MS: 2700,
+    SMILE_SHAKE_PX: 16,
+    SMILE_SHAKE_MS: 900,
+    HOLD_EXPRESSION: 'happy',
   },
 
   CHATBOX: {

@@ -92,8 +92,12 @@ export class MascotEngine {
   private idleEyes: IdleEyesConfig = DEFAULT_SEQUENCE.IDLE_EYES
   /** ms since the last idle expression was picked. */
   private idleMs = 0
-  /** Seconds into the smile bob. -1 when not smiling. */
+  /** Seconds into the DECAYING smile bob. -1 when not smiling. */
   private smileShakeT = -1
+  /** True while a visitor is pressing SAMSARA — see IdleEyesConfig.HOLD_EXPRESSION. */
+  private holdingSmile = false
+  /** Seconds into the CONTINUOUS bob that runs while held. */
+  private holdSmileT = 0
   private envRT: THREE.WebGLRenderTarget | null = null
 
   private hemi: THREE.HemisphereLight
@@ -293,6 +297,8 @@ export class MascotEngine {
       rendered: this.lastRendered,
       /** The expression the current beat is playing. Verification instrument. */
       expr: this.glanceExpr,
+      /** True while a visitor is pressing SAMSARA. Verification instrument. */
+      holding: this.holdingSmile,
     })
 
     // Dev handle for the room, so frame rate can be measured against the real
@@ -957,6 +963,13 @@ export class MascotEngine {
   private onPointerDown = (e: PointerEvent) => {
     if (!this.dragAllowed() || this.dragging) return
     if (!this.hitsMascot(e.clientX, e.clientY)) return
+    // Owner: "click&hold will make it laugh/smile until click is released."
+    // Set on the same press that starts a drag, not behind a movement
+    // threshold — see HOLD_EXPRESSION.
+    if (this.idleEyes.HOLD_EXPRESSION) {
+      this.holdingSmile = true
+      this.holdSmileT = 0
+    }
     this.dragging = true
     this.dragPointerId = e.pointerId
     this.dragLastX = e.clientX
@@ -990,7 +1003,14 @@ export class MascotEngine {
   }
 
   private onPointerUp = (e: PointerEvent) => {
-    if (!this.dragging || e.pointerId !== this.dragPointerId) return
+    // Not gated on the pointer id: a press that never became a drag (drag
+    // disabled, or the config changed mid-press) still has a smile to release,
+    // and leaving that latched would freeze SAMSARA grinning.
+    if (!this.dragging) {
+      this.releaseSmile()
+      return
+    }
+    if (e.pointerId !== this.dragPointerId) return
     this.endDrag()
   }
 
@@ -998,10 +1018,23 @@ export class MascotEngine {
   private onBlur = () => this.endDrag()
 
   private endDrag() {
+    this.releaseSmile()
     if (!this.dragging) return
     this.dragging = false
     this.dragPointerId = -1
     this.dragIdleMs = 0
+  }
+
+  /**
+   * Let go of the held smile.
+   *
+   * Hands the continuous bob over to the decaying one rather than stopping it,
+   * so releasing settles instead of cutting the body's motion mid-swing.
+   */
+  private releaseSmile() {
+    if (!this.holdingSmile) return
+    this.holdingSmile = false
+    this.smileShakeT = 0
   }
 
   /**
@@ -1022,6 +1055,7 @@ export class MascotEngine {
       this.dragVelYaw = 0
       this.dragVelPitch = 0
       this.dragIdleMs = -1
+      this.releaseSmile()
       this.setOver(false)
       return
     }
@@ -1430,8 +1464,18 @@ export class MascotEngine {
       // smile was picked — the sequence has no view of the expression pool.
       // A decaying bob, so it settles rather than stopping mid-swing.
       let y = t.y
-      if (this.smileShakeT >= 0) {
-        const idle = this.idleEyes
+      const idle = this.idleEyes
+      if (this.holdingSmile) {
+        // Held: a CONTINUOUS bob, looping for as long as the visitor keeps
+        // hold. SMILE_SHAKE_MS is the loop period here rather than a decay
+        // length — same amplitude and rhythm as the idle smile, so the two read
+        // as one behaviour rather than two.
+        const period = Math.max(1, idle.SMILE_SHAKE_MS) / 1000
+        y += Math.sin((this.holdSmileT / period) * Math.PI * 2) * idle.SMILE_SHAKE_PX
+        this.holdSmileT += dtSec
+      } else if (this.smileShakeT >= 0) {
+        // Unheld: the same bob DECAYING to rest. Also what a release hands over
+        // to, so letting go settles instead of stopping mid-swing.
         const dur = Math.max(1, idle.SMILE_SHAKE_MS) / 1000
         const p01 = this.smileShakeT / dur
         if (p01 >= 1) this.smileShakeT = -1
@@ -1821,6 +1865,17 @@ export class MascotEngine {
 
     if (this.forcedExpr) {
       this.setExpression(this.forcedExpr)
+      return
+    }
+
+    // Owner: "click&hold will make it laugh/smile until click is released."
+    //
+    // Held above the charge reaction below, because in the room the charge is 0
+    // — the sequence stops publishing it once landed — so this is the only
+    // press SAMSARA can still answer. Snapped to full rather than blended in:
+    // a smile that faded up over a beat would lag the press it is reacting to.
+    if (this.holdingSmile && this.idleEyes.HOLD_EXPRESSION) {
+      this.setExpression(this.idleEyes.HOLD_EXPRESSION)
       return
     }
 

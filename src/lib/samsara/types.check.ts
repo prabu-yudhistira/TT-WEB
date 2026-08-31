@@ -181,23 +181,45 @@ check('smile shake is a vertical bob', DEFAULT_SEQUENCE.IDLE_EYES.SMILE_SHAKE_PX
 for (const name of Object.keys(DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS)) {
   check(`idle weight "${name}" is a real expression`, EXPRESSION_ORDER.includes(name))
 }
-// ⚠️ Owner 2026-08-31: "use all the expressions when parked and floating."
-// EVERY expression must be able to come up, not just the three originally
-// asked for — a missing key is invisible at runtime, since pickWeighted would
-// simply never choose it.
+// ⚠️ Every expression must be PRESENT as a key. Not non-zero — PRESENT.
+//
+// The distinction is the whole point. A weight of 0 is a decision the owner made
+// and pickWeighted honours it by design ("an owner who zeroes the pool wants the
+// face at rest"). A MISSING key is a typo, and it is invisible: nothing throws,
+// the expression is simply never chosen, and the bench has no slider to reveal
+// the gap. So the assertion guards the silent failure and leaves the decision
+// alone.
+//
+// (An earlier version of this required every weight > 0, written from the
+// owner's "use all the expressions". They then tuned the room down to a calm
+// resting face — see WEIGHTS — so that assertion was pinning an instruction
+// which had been superseded rather than a property that had to hold.)
 for (const name of EXPRESSION_ORDER) {
   check(
-    `"${name}" can come up in the room`,
-    (DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS[name] ?? 0) > 0,
+    `"${name}" has a weight key, so it is tunable rather than missing`,
+    name in DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS,
   )
 }
 check(
-  'the whole expression set is in the pool',
-  Object.keys(DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS).length === EXPRESSION_ORDER.length,
+  'no weight names an expression that does not exist',
+  Object.keys(DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS).every((k) => EXPRESSION_ORDER.includes(k)),
 )
-// The owner's own tuned emphasis, which the eleven added expressions must not
-// have quietly displaced.
-check('blink and happy still lead the pool', DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS.happy === 13 && DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS.blink === 10)
+
+// ── press and hold ──────────────────────────────────────────────────
+// Owner: "click&hold will make it laugh/smile until click is released."
+check(
+  'the hold expression is a real expression, or empty to disable',
+  DEFAULT_SEQUENCE.IDLE_EYES.HOLD_EXPRESSION === '' ||
+    EXPRESSION_ORDER.includes(DEFAULT_SEQUENCE.IDLE_EYES.HOLD_EXPRESSION),
+)
+// The smile is a REWARD for holding, so it must not also fire on its own — that
+// is why `happy` is 0 in the idle pool. If both were live the interaction would
+// stop being discoverable, because SAMSARA would already be doing it.
+check(
+  'the held expression is not also in the random idle pool',
+  DEFAULT_SEQUENCE.IDLE_EYES.HOLD_EXPRESSION === '' ||
+    (DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS[DEFAULT_SEQUENCE.IDLE_EYES.HOLD_EXPRESSION] ?? 0) === 0,
+)
 
 check('kill switch defaults on', DEFAULT_SEQUENCE.ENABLED === true)
 
