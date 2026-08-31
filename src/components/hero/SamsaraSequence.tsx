@@ -57,6 +57,12 @@ const PROMOTED_Z = 40
 /** Owner requirement, spec §6.3b. Lazy: never fetched by a hero-only visit. */
 const ROOM_MODEL_URL = '/models/mascot.room.draco.glb'
 
+export type SequenceControls = {
+  beat: (dir: 'down' | 'up') => void
+  reset: () => void
+  mode: () => Mode
+}
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 /** Smoothstep. Used for the half-orbit sweep so it leaves and arrives gently. */
 const smooth = (p: number) => p * p * (3 - 2 * p)
@@ -73,6 +79,7 @@ export function SamsaraSequence({
   chargeOutRef,
   onPointerHold,
   onMode,
+  controlsRef,
 }: {
   config: SequenceConfig
   /** The belt SAMSARA orbits in — supplies the shared plane, as the engine does. */
@@ -104,6 +111,16 @@ export function SamsaraSequence({
    */
   onPointerHold: (allowed: boolean) => void
   onMode?: (m: Mode) => void
+  /**
+   * Imperative handle for the /dev/samsara bench: fire a beat, or reset.
+   *
+   * The same ref-carrying-functions pattern as `chargeRef` and `labelBoxRef`,
+   * and for a related reason — the alternative is prop-drilling a control
+   * surface through a component that renders nothing, or having the bench reach
+   * for the `__ttSamsara*` window handles, which exist for verification scripts
+   * and should not be a component's API.
+   */
+  controlsRef?: React.MutableRefObject<SequenceControls | null>
 }) {
   const ctrlRef = useRef<SequenceController | null>(null)
   const cfgRef = useRef(config)
@@ -520,6 +537,16 @@ export function SamsaraSequence({
         depth01 = pose.depth01 * (1 - e)
       }
 
+      // ⚠️ The camera is re-solved EVERY frame while promoted, not once at the
+      // promotion. Two things move under it: a viewport resize mid-fall (the
+      // engine updates the perspective camera's aspect on resize but has no way
+      // to know the distance was solved against the old height), and the bench
+      // tuning ROOM.DEPTH or CAMERA_FOV_DEG live, which is the entire point of
+      // Task 13. The screen pose is unaffected either way — place() re-solves
+      // position and size at whatever distance it finds — so this reframes the
+      // ROOM around SAMSARA rather than moving SAMSARA.
+      eng.setCameraMode('perspective', solveCamera(ctx))
+
       // World Z from the bounce's own depth term, so SAMSARA really is deeper in
       // the room early on and really does come forward with each contact — which
       // is what puts its shadow where the body is rather than under the camera.
@@ -562,12 +589,18 @@ export function SamsaraSequence({
       applyBeat(dir)
       return ctrl.mode
     }
-    w.__ttSamsaraReset = () => {
+    const reset = () => {
       ctrl.reset()
       const eng = engineRef.current
       if (eng) demote(eng)
       chargeOutRef.current = 0
+      shakeCbRef.current(0)
       return ctrl.mode
+    }
+    w.__ttSamsaraReset = reset
+
+    if (controlsRef) {
+      controlsRef.current = { beat: applyBeat, reset, mode: () => ctrl.mode }
     }
 
     return () => {
@@ -589,6 +622,7 @@ export function SamsaraSequence({
       shakeCbRef.current(0)
       holdCbRef.current(true)
       ctrlRef.current = null
+      if (controlsRef) controlsRef.current = null
       delete w.__ttSamsara
       delete w.__ttSamsaraBeat
       delete w.__ttSamsaraReset

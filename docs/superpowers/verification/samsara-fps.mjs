@@ -25,20 +25,27 @@
  * 52.1 fps recorded at Task 8, and the 30 fps floor derived from it, describe
  * that smudge, not a room.
  *
- * With the camera correct the room fills the viewport, and the honest numbers
- * on this machine are:
+ * With the camera correct the honest numbers on this machine are:
  *
- *   SwiftShader (CPU raster)        orbit 42.2 -> room 16.3   (~58% cost)
- *   Intel UHD 630, ANGLE / D3D11    orbit 23.3 -> room 24.1   (no cost at all)
+ *   SwiftShader (CPU raster)     orbit  42 -> room  16   (~58% cost)
+ *   Intel UHD 630, D3D11         orbit  23 -> room  24   (vsync-bound, no cost)
+ *   RTX 3050 Laptop, D3D11       orbit 515 -> room 460   (11% cost)
  *
- * The two disagree because full-viewport fill of PBR-shaded planes is exactly
- * the work a GPU does for free and a CPU rasteriser cannot. On hardware the
- * room is free; both figures there are rAF-limited by the rest of the hero.
+ * The last row is the real one, measured with `--disable-frame-rate-limit` and
+ * interleaved orbit/room passes so GPU clock ramp cannot flatter either side
+ * (three passes: 424/361, 579/519, 543/498). **460 fps is roughly 8x a 60Hz
+ * display.** The room costs about a ninth of the frame budget on a mid-range
+ * laptop GPU and nothing at all on integrated, where both figures sit at the
+ * refresh ceiling.
+ *
+ * The software row disagrees because full-viewport fill of PBR-shaded planes is
+ * exactly the work a GPU does cheaply and a CPU rasteriser cannot. It is not a
+ * second estimate of the same number.
  *
  * So FLOOR_FPS is lowered to 12 — and its job changes. It is no longer a
  * performance target; it is a tripwire for a catastrophic regression of the
  * ember-gl_PointSize kind, which is all a software rasteriser can honestly
- * report. Performance claims about this room need the hardware line above.
+ * report. Performance claims about this room need the hardware rows above.
  */
 import puppeteer from './_puppeteer.mjs'
 

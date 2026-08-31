@@ -111,6 +111,8 @@ export class MascotEngine {
   private angle = 0
   /** Set by the SAMSARA sequence to sweep the orbit to the far point. */
   private angleOverride: number | null = null
+  /** See setSpinParked. Eases the face to the viewer instead of spinning. */
+  private spinParked = false
   /**
    * World Z the scripted pose sits on while the perspective camera is live.
    * 0 is the plane through the room's origin; negative is deeper into it.
@@ -816,6 +818,43 @@ export class MascotEngine {
     this.room?.setReveal(v)
   }
 
+  /**
+   * Stop the spin and turn the face to the viewer.
+   *
+   * Spec §6.5: in the room SAMSARA is stationary and front-facing, and that is
+   * what finally makes the eyes legible — in the hero the face points at the
+   * viewer roughly 25% of each 3.2s turn, which was an owner decision for the
+   * ORBIT and is not reopened.
+   *
+   * ⚠️ Not `setInspect`, which also hijacks the orbit angle and the size. This
+   * touches the spin and nothing else, so the landed pose stays the sequence's
+   * to decide.
+   */
+  setSpinParked(v: boolean) {
+    this.spinParked = v
+  }
+
+  getSpinParked() {
+    return this.spinParked
+  }
+
+  /**
+   * Throw the room away so the next setRoomVisible(true) builds a fresh one.
+   *
+   * `setRoomConfig` reaches colours and intensities, which are uniforms. DEPTH
+   * is GEOMETRY — the floor, four walls and the backdrop are sized from it at
+   * build time — so tuning it live needs a rebuild. No WebGL context is
+   * involved, so this is not the canvas-poisoning hazard `dispose(true)` is.
+   */
+  rebuildRoom() {
+    if (!this.room) return
+    const wasVisible = this.room.group.visible
+    this.scene.remove(this.room.group)
+    this.room.dispose()
+    this.room = null
+    if (wasVisible) this.setRoomVisible(true)
+  }
+
   /** The camera every render goes through. Ortho unless explicitly swapped. */
   private activeCamera(): THREE.Camera {
     return this.cameraMode === 'perspective' ? this.persp : this.camera
@@ -1033,7 +1072,18 @@ export class MascotEngine {
     } else {
       this.angle +=
         dir * motion * belt.ORBIT_SPEED * c.SPEED_SCALE * speedFactor * 0.012 * dt
-      this.spin += ((c.SPIN_SPEED * Math.PI) / 180) * (dt / 60)
+      if (this.spinParked) {
+        // Ease to the NEAREST frontal orientation, never snap. The face is +Z
+        // in model space and only the spin turns it, so a whole multiple of 2pi
+        // is frontal — rounding to the nearest one means SAMSARA turns at most
+        // half a revolution to face the viewer, in whichever direction it was
+        // already going.
+        const TAU = Math.PI * 2
+        const target = Math.round(this.spin / TAU) * TAU
+        this.spin += (target - this.spin) * Math.min(1, 0.08 * dt)
+      } else {
+        this.spin += ((c.SPIN_SPEED * Math.PI) / 180) * (dt / 60)
+      }
     }
 
     this.place(alpha, charge, dt / 60)

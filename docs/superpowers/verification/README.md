@@ -381,16 +381,29 @@ recorded at Task 8, and the 30 fps floor set from it, describe that smudge.
 
 Correctly framed, on this machine:
 
-| | orbit | room |
-|---|---|---|
-| SwiftShader (CPU raster) | 42.2 | 16.3 |
-| Intel UHD 630, ANGLE/D3D11 | 23.3 | 24.1 |
+| | orbit | room | |
+|---|---|---|---|
+| SwiftShader (CPU raster) | 42 | 16 | ~58% cost |
+| Intel UHD 630, D3D11 | 23 | 24 | vsync-bound, no cost |
+| **RTX 3050 Laptop, D3D11** | **515** | **460** | **11% cost** |
 
-**On hardware the room costs nothing.** Full-viewport fill of PBR planes is
-precisely the work a GPU does for free and a CPU rasteriser cannot, so the two
-figures are not two estimates of one number. The floor is now 12 and its job has
-changed: a tripwire for a catastrophic regression, which is all software raster
-can honestly report. Any performance claim about this room needs the GPU row.
+The last row is the real one: `--disable-frame-rate-limit`, with orbit and room
+passes interleaved so GPU clock ramp cannot flatter either side (424/361,
+579/519, 543/498). **460 fps is about 8× a 60Hz display.** The room costs roughly
+a ninth of the frame budget on a mid-range laptop GPU and nothing measurable on
+integrated, where both figures sit at the refresh ceiling.
+
+The software row disagrees because full-viewport fill of PBR planes is exactly
+the work a GPU does cheaply and a CPU rasteriser cannot — it is not a second
+estimate of the same number. The floor is now 12 and its job has changed: a
+tripwire for a catastrophic regression, which is all software raster can honestly
+report. Any performance claim about this room needs the hardware rows.
+
+**Measuring on the discrete GPU:** headless SwiftShader is the default here, and
+plain `headless: false` picks the INTEGRATED adapter on this laptop. To reach the
+3050: `headless: false` plus
+`--use-angle=d3d11 --force_high_performance_gpu --force-gpu-preference=high-performance --disable-frame-rate-limit`,
+and confirm with `WEBGL_debug_renderer_info` rather than assuming.
 
 ### `Material.needsUpdate` is not how you animate an opacity
 
@@ -398,3 +411,24 @@ The room's reveal ramp runs every frame of the fall. Setting `needsUpdate` there
 unconditionally recompiles four shader programs sixty times a second. Opacity is
 a uniform and needs no recompile; only `transparent` changes the render path, and
 that flips exactly twice per run.
+
+### `samsara-context-leak.mjs` — "replay 25 times" would have passed on anything
+
+The SAMSARA bench replays by RESETTING the state machine, not by remounting the
+canvas, so replay alone cannot leak a WebGL context and a script that only
+replayed would be green on every possible implementation — the same shape as the
+kill-switch check that passed because the canvas was gone while the bytes were
+already on the wire.
+
+What actually churns GPU resources on this bench is `rebuildRoom()`, which the
+DEPTH slider triggers: it disposes a floor, four walls, a backdrop and their
+materials and builds fresh ones. So the script interleaves both, and alternates
+the depth value each cycle — setting the same number twice would be swallowed by
+the slider's own 220ms debounce and quietly test nothing.
+
+The failure signature of a real leak is Chrome's "Too many active WebGL contexts"
+warning and the oldest context being dropped, which presents as a canvas still in
+the DOM, still sized, no longer drawing. Hence the assertions: no such warning,
+context obtainable and not lost, canvas count unchanged, **and the sequence still
+reaches `landed` and renders at size** — the last one being what separates a live
+context from a working one.

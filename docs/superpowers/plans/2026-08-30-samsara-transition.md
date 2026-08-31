@@ -1210,11 +1210,11 @@ Task 13 is therefore one layer short of the spec until that is decided.
 **Files:**
 - Create: `src/app/(frontend)/[locale]/dev/samsara/page.tsx`
 
-- [ ] **Step 1: Build the bench** — `notFound()` in production, sliders for every group in `SequenceConfig`, a replay button, and a `copy json` button emitting the full config.
+- [x] **Step 1: Build the bench** — `notFound()` in production, sliders for every group in `SequenceConfig`, a replay button, and a `copy json` button emitting the full config.
 
-- [ ] **Step 2: Apply the context-leak pattern** — `<canvas key={nonce}>`, `dispose(true)`, 220ms debounce on slider changes. `forceContextLoss()` is NOT an option; it permanently poisons a reused canvas.
+- [x] **Step 2: Apply the context-leak pattern** — `<canvas key={nonce}>`, `dispose(true)`, 220ms debounce on slider changes. `forceContextLoss()` is NOT an option; it permanently poisons a reused canvas.
 
-- [ ] **Step 3: Prove no leak**
+- [x] **Step 3: Prove no leak**
 
 ```bash
 node docs/superpowers/verification/samsara-context-leak.mjs
@@ -1222,7 +1222,55 @@ node docs/superpowers/verification/samsara-context-leak.mjs
 
 Expected: PASS — 25 rapid replays, canvas still live.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+
+### ⚠️ Notes from building it
+
+- **`data-lenis-prevent` on the panel is required, not defensive.** The pin is
+  `lenis.stop()`, and Lenis stops scrolling by preventing wheel events at the
+  WINDOW — so it blocks the tuning panel's own overflow scrolling too. Measured:
+  without the attribute a 900px wheel over the panel moved `scrollTop` from 0 to
+  0. That is Task 13 being impossible, not a rough edge — the owner cannot reach
+  any slider below the fold once the first beat lands.
+- **The panel is a SIBLING of the stage**, so the sequence's unconditional
+  `preventDefault()` on `wheel` never sees it. Both facts are needed; neither is
+  sufficient alone.
+- **The debounce landed on the room rebuild, not on "slider changes".** Every
+  other control is a uniform and updates live. `ROOM.DEPTH` is geometry — floor,
+  four walls and backdrop are sized from it at build time — so it needs
+  `rebuildRoom()`, and a range input fires an `input` event per pixel.
+- **`LogoCanvas` is mounted directly, not `LogoStage`**, to skip the 7.67s
+  sketch intro. The intro's own timing is not judgeable here; it has
+  /dev/ignition.
+- **No `save` button, unlike the other benches.** These values belong in a NEW
+  global (Task 15), and `hero-effects` carries owner-tuned values that diverge
+  from code defaults — a partial payload written back to it is how those get
+  lost.
+- **Query-string overrides use dotted paths** (`?ENABLED=0&LANDING.Y_FRAC=0.62`),
+  and `__ttSamsaraBench.set(path, value)` drives the same paths from a script.
+  Task 17's kill-switch and reduced-motion checks both need `?ENABLED=0`;
+  verified that it leaves `__ttSamsara` undefined, so the off path really is
+  absent rather than half-running.
+- **The spin is parked in the BENCH, per the owner's instruction** — a checkbox,
+  on by default, applied while landed or exiting. Whether the LANDING should do
+  this in the shipped hero is a Task 13 decision; turning the checkbox off shows
+  exactly what ships today.
+
+### Frame rate, measured on real hardware this time
+
+`samsara-fps.mjs` had been measuring the room through the ORTHOGRAPHIC camera —
+a ~40px smudge — which is where its old 30 fps floor came from. Corrected, and
+measured on the owner's discrete GPU:
+
+| | orbit | room | |
+|---|---|---|---|
+| SwiftShader (CPU raster) | 42 | 16 | ~58% cost |
+| Intel UHD 630, D3D11 | 23 | 24 | vsync-bound |
+| **RTX 3050 Laptop, D3D11** | **515** | **460** | **11% cost** |
+
+Interleaved passes, frame-rate limit disabled. **460 fps is ~8× a 60Hz display.**
+Risk 4 in spec §12 ("frame rate with a shadow-casting light") is closed.
+
 
 ---
 
@@ -1262,6 +1310,8 @@ git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" commit -m "feat(sam
 
 - [ ] **Step 1:** Add `SamsaraRoomBlock` to `src/blocks/index.ts` with slug `samsaraRoom` and localized `chatHeading` and `chatPlaceholder` text fields. Append it to `pageBlocks`.
 - [ ] **Step 2:** Build the component — a `100svh` dark section carrying `data-block="samsaraRoom"`, with the chatbox stub as real DOM: a labelled region, a heading, a disabled text input. Desktop top-left, mobile below SAMSARA, per the owner's composition.
+
+⚠️ Anything scrollable inside the chatbox — a message list, most obviously — needs `data-lenis-prevent`. Task 12 paid for this: the pin is `lenis.stop()`, which prevents wheel events at the WINDOW, so it blocks nested overflow scrolling as well as the page. A message list that silently refuses to scroll while the room is pinned is exactly the shape of bug that survives casual testing.
 - [ ] **Step 3:** Add the `case 'samsaraRoom'` to `RenderBlocks.tsx`.
 - [ ] **Step 4:** Push the schema and confirm no stale temp tables:
 
