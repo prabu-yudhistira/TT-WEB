@@ -20,6 +20,7 @@
  * real rAF deltas rather than eyeballed.
  */
 import * as THREE from 'three'
+import { solveHandoff } from './cameraHandoff'
 import type { RoomConfig } from './types'
 
 export type Room = {
@@ -27,7 +28,49 @@ export type Room = {
   /** The single shadow-casting key. Exposed so the bench can tune it live. */
   key: THREE.SpotLight
   setConfig(cfg: RoomConfig): void
+  /**
+   * 0 = invisible, 1 = fully present. Spec §5.7: the room fades up AFTER the
+   * layer promotion and, once opaque, is what hides the hero so the pin can be
+   * released without the visitor seeing the scroll jump.
+   *
+   * Both halves are needed. Fading only the lights leaves the walls lit by
+   * scene.environment and the room never truly arrives; fading only the
+   * materials leaves a fully-lit room appearing through its own alpha, which
+   * reads as a dissolve rather than a room coming up.
+   */
+  setReveal(v: number): void
   dispose(): void
+}
+
+/**
+ * Room interior height as a multiple of DEPTH.
+ *
+ * Exported because the sequence solves its camera distance from it — the
+ * perspective camera is framed so this height fills the viewport. A second
+ * copy of the number in the React layer would silently reframe the room the
+ * first time this one was tuned.
+ */
+export const ROOM_HEIGHT_FACTOR = 1.1
+
+/**
+ * The perspective camera that frames this room.
+ *
+ * Solved from the room's own interior height against the full viewport height,
+ * so the room fills the frame. Lives here, beside the geometry it is solved
+ * from, because two callers need it — the sequence at the promotion and the
+ * engine's dev handle — and a second copy would let the bench show a framing
+ * the real transition does not use.
+ *
+ * `solveHandoff` answers "at what distance does this world size render as this
+ * many pixels", which is exactly the question. It is NOT needed to make the
+ * seam continuous: place() re-solves position and size at the body's live depth
+ * every frame, so any distance reproduces the pixel pose. That is what frees
+ * this one to serve composition.
+ */
+export function roomCameraFor(cfg: RoomConfig, viewportH: number) {
+  const fovDeg = cfg.CAMERA_FOV_DEG
+  const { distance } = solveHandoff(viewportH, cfg.DEPTH * ROOM_HEIGHT_FACTOR, viewportH, fovDeg)
+  return { fovDeg, distance }
 }
 
 /**
@@ -47,7 +90,7 @@ export function buildRoom(cfg: RoomConfig): Room {
 
   const D = cfg.DEPTH
   const W = D * 1.6
-  const H = D * 1.1
+  const H = D * ROOM_HEIGHT_FACTOR
 
   const floorMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(cfg.FLOOR_COLOR),
@@ -98,7 +141,47 @@ export function buildRoom(cfg: RoomConfig): Room {
 
   const ambient = new THREE.AmbientLight(0xffffff, cfg.AMBIENT_INTENSITY)
 
-  group.add(floor, back, left, right, key, key.target, ambient)
+  // BG_COLOR as real geometry rather than scene.background, for the same reason
+  // this room carries no fog: the scene is SHARED with the orbit, so anything
+  // set on it would paint behind the mascot while it is still circling the mark
+  // in the hero. A single unlit quad, far enough back and large enough to
+  // outrun the frustum at any sane camera distance, closes the gap the four
+  // walls leave at the corners — which is what lets the fade-up actually hide
+  // the hero (spec §5.7) instead of merely dimming it.
+  const bgMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(cfg.BG_COLOR) })
+  const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(D * 20, D * 20), bgMat)
+  backdrop.position.set(0, 0, -D * 1.8)
+
+  group.add(backdrop, floor, back, left, right, key, key.target, ambient)
+
+  // Captured at build time so setReveal() scales against the configured values
+  // rather than against whatever it last wrote — otherwise a reveal ramp
+  // multiplies its own output and the room dims to nothing over a few frames.
+  let keyBase = cfg.KEY_LIGHT_INTENSITY
+  let ambientBase = cfg.AMBIENT_INTENSITY
+  let reveal = 1
+
+  const applyReveal = () => {
+    const v = reveal < 0 ? 0 : reveal > 1 ? 1 : reveal
+    key.intensity = keyBase * v
+    ambient.intensity = ambientBase * v
+    const wantTransparent = v < 1
+    for (const m of [floorMat, wallMat, bgMat]) {
+      m.opacity = v
+      // ⚠️ `needsUpdate` ONLY when the flag actually flips. This runs every
+      // frame of the fall, and needsUpdate forces three.js to recompile the
+      // material's program — setting it unconditionally rebuilds four shaders
+      // sixty times a second for the length of the fall, which is the most
+      // expensive possible way to change one float. Opacity is a uniform and
+      // needs no recompile at all; `transparent` changes the render path and
+      // does, exactly twice per run.
+      if (m.transparent !== wantTransparent) {
+        m.transparent = wantTransparent
+        m.depthWrite = !wantTransparent
+        m.needsUpdate = true
+      }
+    }
+  }
 
   return {
     group,
@@ -106,15 +189,23 @@ export function buildRoom(cfg: RoomConfig): Room {
     setConfig(next: RoomConfig) {
       floorMat.color.set(next.FLOOR_COLOR)
       wallMat.color.set(next.WALL_COLOR)
+      bgMat.color.set(next.BG_COLOR)
       key.color.set(next.KEY_LIGHT_COLOR)
-      key.intensity = next.KEY_LIGHT_INTENSITY
-      ambient.intensity = next.AMBIENT_INTENSITY
+      keyBase = next.KEY_LIGHT_INTENSITY
+      ambientBase = next.AMBIENT_INTENSITY
+      applyReveal()
+    },
+    setReveal(v: number) {
+      reveal = v
+      applyReveal()
     },
     dispose() {
+      backdrop.geometry.dispose()
       floor.geometry.dispose()
       back.geometry.dispose()
       left.geometry.dispose()
       right.geometry.dispose()
+      bgMat.dispose()
       floorMat.dispose()
       wallMat.dispose()
       key.dispose()

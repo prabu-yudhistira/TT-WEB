@@ -39,6 +39,8 @@ export function MascotLayer({
   onStatus,
   eyes,
   inspect,
+  onEngine,
+  rootElRef,
 }: {
   config: MascotConfig
   /** The belt the mascot orbits in — supplies the shared plane and radii. */
@@ -64,6 +66,20 @@ export function MascotLayer({
   eyes: MascotEyesConfig
   /** ⚠️ BENCH ONLY. Parks the mascot face-on and blown up for shape work. */
   inspect?: { on: boolean; angleDeg: number; sizePx: number }
+  /**
+   * Publishes the engine as it is built and torn down, for the SAMSARA
+   * sequence. Called with null on unmount, deliberately: the sequence drives a
+   * pin and a fixed-position promotion, and a handle left pointing at a
+   * disposed engine would strand the page stopped with the hero hidden.
+   */
+  onEngine?: (e: MascotEngine | null) => void
+  /**
+   * The layer root, so the sequence can promote it from hero-absolute to
+   * viewport-fixed (spec §4.2). Handed over rather than promoted from inside,
+   * because the promotion is only correct as part of the wider handoff — it
+   * fires on the same frame as the camera swap.
+   */
+  rootElRef?: React.MutableRefObject<HTMLDivElement | null>
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -73,6 +89,12 @@ export function MascotLayer({
 
   const statusRef = useRef(onStatus)
   statusRef.current = onStatus
+
+  // Same indirection as statusRef and for the same reason: the mount effect
+  // runs once, and capturing the callback in its closure would pin whichever
+  // identity the first render happened to produce.
+  const engineCbRef = useRef(onEngine)
+  engineCbRef.current = onEngine
 
   useEffect(() => {
     if (!enabled) return
@@ -88,6 +110,8 @@ export function MascotLayer({
       return
     }
     engineRef.current = engine
+    if (rootElRef) rootElRef.current = root
+    engineCbRef.current?.(engine)
 
     // Indirect through the ref on every call: LogoCanvas may not have built its
     // engine yet when this mounts, and a getter captured once would stay stuck
@@ -132,6 +156,8 @@ export function MascotLayer({
       // poisons it.
       engine.dispose(false)
       engineRef.current = null
+      engineCbRef.current?.(null)
+      if (rootElRef) rootElRef.current = null
       // Leaving a getter pointing at a disposed engine would freeze the
       // satellites' reserved box at the mascot's last position forever,
       // permanently blanking whichever word happened to be under it.

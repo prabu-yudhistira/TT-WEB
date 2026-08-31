@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { logoScreenBox } from '../three/calibration'
 import { projectOrbit, orbitGeometry } from '../satellites/project'
 import { placeLabels, EDGE_FADE_PX, type LabelBox } from '../satellites/labels'
+import { screenToWorld, worldSizeFor } from '../samsara/cameraHandoff'
 import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
 import { makeMotePool, TrailState } from './mascotTrail'
@@ -20,7 +21,7 @@ import {
   type EyeShape,
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
-import { buildRoom, type Room } from '../samsara/room'
+import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
 import { DEFAULT_SEQUENCE, type RoomConfig } from '../samsara/types'
 
 /**
@@ -108,6 +109,31 @@ export class MascotEngine {
   private innerR = 40
 
   private angle = 0
+  /** Set by the SAMSARA sequence to sweep the orbit to the far point. */
+  private angleOverride: number | null = null
+  /**
+   * World Z the scripted pose sits on while the perspective camera is live.
+   * 0 is the plane through the room's origin; negative is deeper into it.
+   */
+  private transitZ = 0
+  /**
+   * One snapshot per RENDERED frame, for verification. See recordProjection().
+   *
+   * ⚠️ `camera` and `mode` are in here rather than read live off their fields,
+   * and that is the whole point of the record. Both are mutated from OUTSIDE the
+   * engine's frame — the sequence swaps the camera in its own rAF, which runs
+   * after this one — so a script reading them live gets this frame's projection
+   * labelled with the next frame's camera. That mislabelling reported the seam
+   * as a 6px jump on a build whose placement check simultaneously read 0.000px.
+   */
+  private lastRendered = {
+    x: 0,
+    y: 0,
+    diameterPx: 0,
+    orbitAngle: 0,
+    camera: 'ortho' as 'ortho' | 'perspective',
+    mode: 'orbit' as 'orbit' | 'transit' | 'room',
+  }
   private spin = 0
   private elapsed = 0
   private active = false
@@ -127,7 +153,7 @@ export class MascotEngine {
   // was baselined before any of this existed.
   private mode: 'orbit' | 'transit' | 'room' = 'orbit'
   /** Pose supplied by transitScript while mode !== 'orbit'. Screen px. */
-  private transform: { x: number; y: number; sizePx: number } | null = null
+  private transform: { x: number; y: number; sizePx: number; z?: number } | null = null
   /**
    * The room's camera. Built alongside the orthographic one rather than
    * replacing it: the orbit's ortho camera in CSS-pixel units is what makes
@@ -213,26 +239,39 @@ export class MascotEngine {
       diameterPx: this.lastDiameterPx,
       spin: this.spin,
       inspect: this.inspect.on,
+      /** LIVE fields. For the seam, use `rendered` — see lastRendered. */
+      camera: this.cameraMode,
+      mode: this.mode,
+      // ⚠️ The MEASURED pose: the placer's real world transform pushed back
+      // through whichever camera is live, rather than the pose the script asked
+      // for. The two agree only if the placement is right, which is the whole
+      // question at the ortho→perspective seam — `pos` above would report a
+      // perfectly continuous handoff while the room rendered empty, because it
+      // is the input to the placement, not its result.
+      rendered: this.lastRendered,
     })
 
     // Dev handle for the room, so frame rate can be measured against the real
     // shadow-casting scene rather than deferred until the bench exists.
     ;(window as unknown as Record<string, unknown>).__ttSamsaraRoom = (on: boolean) => {
       this.setRoomVisible(on)
-      // ⚠️ Deliberately does NOT swap the camera.
+      // Swaps the camera as well, which it deliberately did NOT do between Task
+      // 8 and Task 11.
       //
-      // place() positions the mascot in ORTHOGRAPHIC screen-pixel space — X and
-      // Y in the hundreds, scale in pixels. Switching to the perspective camera
-      // without also converting that placement into world units puts the body
-      // far outside the frustum and renders an empty room, which is exactly
-      // what happened the first time this handle did swap it.
-      //
-      // Perspective PLACEMENT is the SequenceController's job (plan Task 11);
-      // until it exists, the camera swap has nothing correct to show.
+      // The reason it could not: place() positions the mascot in ORTHOGRAPHIC
+      // screen-pixel space — X and Y in the hundreds, scale in pixels — and
+      // switching cameras without converting that into world units puts the
+      // body far outside the frustum and renders an empty room, which is what
+      // happened the first time this handle tried. place() now does that
+      // conversion, so the handle can finally show the real thing: perspective
+      // camera, shadows, the landed pose. Measuring frame rate against anything
+      // less would measure a scene that never ships.
       if (on) {
         this.setMode('room')
-        this.setTransform({ x: this.W * 0.72, y: this.H * 0.52, sizePx: this.H * 0.4 })
+        this.setCameraMode('perspective', roomCameraFor(this.roomCfg, this.H))
+        this.setTransform({ x: this.W * 0.72, y: this.H * 0.52, sizePx: this.H * 0.4, z: 0 })
       } else {
+        this.setCameraMode('ortho')
         this.setMode('orbit')
       }
       return { room: !!this.room, mode: this.mode, camera: this.cameraMode }
@@ -673,9 +712,18 @@ export class MascotEngine {
     return this.mode
   }
 
-  /** Screen-space pose while mode !== 'orbit'. Null falls back to the orbit. */
-  setTransform(t: { x: number; y: number; sizePx: number } | null) {
+  /**
+   * Screen-space pose while mode !== 'orbit'. Null falls back to the orbit.
+   *
+   * x, y and sizePx stay in SCREEN PIXELS under both cameras — that is the
+   * contract, and it is what lets transitScript stay pure and camera-agnostic.
+   * The optional  is the world plane the pose is solved on once the
+   * perspective camera is live; it does nothing under the ortho camera, where
+   * there is no depth to have.
+   */
+  setTransform(t: { x: number; y: number; sizePx: number; z?: number } | null) {
     this.transform = t
+    this.transitZ = t?.z ?? 0
   }
 
   /**
@@ -699,6 +747,73 @@ export class MascotEngine {
 
   getCameraMode() {
     return this.cameraMode
+  }
+
+  /**
+   * The live orbit frame, so the sequence can build a TransitContext from where
+   * SAMSARA ACTUALLY is rather than from a second copy of the layout math.
+   *
+   * Read-only and additive. It exists because transitScript.ts is pure and
+   * takes its geometry as an argument — which is the property that makes the
+   * far point testable — and something has to hand it the real numbers. The
+   * alternative, re-running orbitGeometry()/logoScreenBox() in React, is the
+   * duplicate-projection failure projectOrbit was extracted to prevent.
+   */
+  getOrbitFrame() {
+    return {
+      W: this.W,
+      H: this.H,
+      cx: this.cx,
+      cy: this.cy,
+      orbitR: this.orbitR,
+      innerR: this.innerR,
+      angle: this.angle,
+      mobile: typeof window !== 'undefined' && window.innerWidth < 640,
+      /**
+       * The out-of-plane offset place() is CURRENTLY using — HEIGHT plus the
+       * live bob, not HEIGHT alone.
+       *
+       * BOB_PX ships at 0, so today the two are the same. It is a CMS field
+       * though, and the transit re-projects the far point from this number: a
+       * caller passing bare HEIGHT would put the scripted start pose a bob's
+       * amplitude away from where the body actually is, and the seam would open
+       * up the first time anyone tuned it — on a control that has nothing
+       * visibly to do with the handoff.
+       */
+      heightPx: this.orbitHeightPx(),
+      /** Base on-screen diameter before the belt depth cue. */
+      baseSizePx: this.sizePx(),
+      /** Last diameter actually drawn, depth cue included. */
+      diameterPx: this.lastDiameterPx,
+    }
+  }
+
+  /**
+   * Drive the orbit angle from outside instead of from the belt clock.
+   *
+   * ⚠️ Deliberately an override on the ORBIT branch, not a scripted transform.
+   *
+   * The half-orbit — beat 4 easing SAMSARA round to the far point — still
+   * happens IN the belt, so it must keep the belt's depth cue, its perspective
+   * divide and, above all, its z-flip: mid-sweep SAMSARA can still pass behind
+   * the mark. Routing those 600ms through setTransform() instead would force
+   * z = -1 (see place()) and pop the body in front of the logo the instant the
+   * fourth beat landed — a visible failure at the one moment the sequence is
+   * asking to be watched.
+   *
+   * null restores the belt clock.
+   */
+  setAngleOverride(a: number | null) {
+    this.angleOverride = a
+  }
+
+  getAngleOverride() {
+    return this.angleOverride
+  }
+
+  /** 0 = room invisible, 1 = fully present. See Room.setReveal. */
+  setRoomReveal(v: number) {
+    this.room?.setReveal(v)
   }
 
   /** The camera every render goes through. Ortho unless explicitly swapped. */
@@ -797,6 +912,15 @@ export class MascotEngine {
       m.depthWrite = opaque
       m.needsUpdate = true
     }
+  }
+
+  /** HEIGHT plus the live bob — the value place() feeds projectOrbit. */
+  private orbitHeightPx() {
+    const c = this.cfg
+    const bob = c.BOB_PX
+      ? Math.sin((this.elapsed / Math.max(0.1, c.BOB_SECONDS)) * Math.PI * 2) * c.BOB_PX
+      : 0
+    return c.HEIGHT + bob
   }
 
   private sizePx() {
@@ -946,16 +1070,24 @@ export class MascotEngine {
       scriptedDiameter = t.sizePx
     } else {
       const tiltRad = ((belt.TILT + c.TILT_OFFSET) * Math.PI) / 180
-      const bob = c.BOB_PX
-        ? Math.sin((this.elapsed / Math.max(0.1, c.BOB_SECONDS)) * Math.PI * 2) * c.BOB_PX
-        : 0
+      // The override replaces the WHOLE angle argument, PHASE included, so that
+      // an override of farPointAngle() lands on exactly the pose
+      // transitScript.transitPoseAt(0) computes. Adding PHASE on top would put
+      // the seam a few degrees off the far point and reintroduce the jump the
+      // whole handoff exists to avoid.
+      const orbitAngle = this.angleOverride ?? this.angle + (c.PHASE * Math.PI) / 180
+      // Recorded with the frame, not read live off the field. A verification
+      // script sampling on its own rAF cannot otherwise tell whether the angle
+      // it sees is the one that produced the pose it is looking at, and the
+      // seam assertion depends on picking exactly the frame the sweep settled.
+      this.lastRendered.orbitAngle = orbitAngle
       q = projectOrbit(
         belt,
         this.cx,
         this.cy,
         this.orbitR,
-        this.angle + (c.PHASE * Math.PI) / 180,
-        c.HEIGHT + bob,
+        orbitAngle,
+        this.orbitHeightPx(),
         tiltRad,
       )
 
@@ -975,6 +1107,9 @@ export class MascotEngine {
     const X = q.x - this.W / 2
     const Y = this.H / 2 - q.y
     this.placer.position.set(X, Y, 0)
+    // Overwritten below when the perspective camera is live — the ortho values
+    // are computed unconditionally because the trail and the label both consume
+    // X/Y in screen-centred space regardless of which camera renders them.
 
     // Beyond the perspective divide, matching SAT_DEPTH_SCALE so the mascot
     // and the beads share one depth cue rather than two different ones.
@@ -992,6 +1127,28 @@ export class MascotEngine {
     const radiusPx = diameterPx / 2
     this.placer.scale.setScalar(diameterPx)
 
+    // ── perspective placement ─────────────────────────────────────────
+    //
+    // ⚠️ This is the gap Task 8 left open and Task 11 closes. The two lines
+    // above place SAMSARA in ORTHOGRAPHIC screen-pixel space — position in the
+    // hundreds, scale in pixels. Under the perspective camera those numbers are
+    // world units, which puts the body far outside the frustum and renders an
+    // empty room. That is not hypothetical: it is what happened the first time
+    // the room's dev handle swapped cameras.
+    //
+    // The conversion is deliberately per frame rather than solved once at the
+    // handoff. Solving once matches the seam instant and nothing after it;
+    // solving position AND size at the body's CURRENT depth every frame makes
+    // the whole transit exact, which is strictly stronger and costs two
+    // divisions. transitZ is the plane it sits on — the sequence advances it
+    // through the room so the shadow falls where the body actually is.
+    if (this.cameraMode === 'perspective') {
+      const dist = Math.max(0.001, this.persp.position.z - this.transitZ)
+      const w = screenToWorld(q.x, q.y, dist, this.W, this.H, this.persp.fov)
+      this.placer.position.set(w.x, w.y, this.transitZ)
+      this.placer.scale.setScalar(worldSizeFor(diameterPx, dist, this.H, this.persp.fov))
+    }
+
     this.tilter.rotation.z = (c.SPIN_TILT * Math.PI) / 180
     this.spinner.rotation.y = this.spin
 
@@ -1001,6 +1158,8 @@ export class MascotEngine {
     this.updateTrail(dtSec, alpha, X, Y)
     this.updateEyes(dtSec, charge, diameterPx, alpha)
     this.placeLabel(q, radiusPx, alpha)
+
+    this.recordProjection()
 
     const behind = q.z >= 0
     if (behind !== this.behind) {
@@ -1061,6 +1220,36 @@ export class MascotEngine {
   }
 
   /** The mascot's current label box, for another layer's collision pass. */
+  /**
+   * Where the body ACTUALLY lands on screen, in CSS px, and how wide it
+   * actually renders — the placer's own transform pushed back through the
+   * camera that is about to draw it. Verification instrument; see __ttMascot.
+   *
+   * ⚠️ Recorded at the END of place(), not computed on demand from the dev
+   * handle. A caller sampling on its own rAF lands BETWEEN this engine's frame
+   * and the sequence's, where the camera can already have been swapped while
+   * the placement is still the previous frame's — which reads as a 2,300px jump
+   * at the seam that never appears on screen, because place() and render() are
+   * consecutive statements and can never disagree. Recording it here makes the
+   * instrument report frames the renderer actually drew.
+   */
+  private recordProjection() {
+    const cam = this.activeCamera()
+    // placer is a direct child of the scene, which sits at the identity, so its
+    // local position IS its world position — no matrixWorld, which has not been
+    // recomputed yet at this point in the frame.
+    const c = this.placer.position
+    const centre = c.clone().project(cam)
+    const top = new THREE.Vector3(c.x, c.y + this.placer.scale.y / 2, c.z).project(cam)
+    const toPxY = (ndcY: number) => (1 - (ndcY * 0.5 + 0.5)) * this.H
+    const y = toPxY(centre.y)
+    this.lastRendered.x = (centre.x * 0.5 + 0.5) * this.W
+    this.lastRendered.y = y
+    this.lastRendered.diameterPx = Math.abs(toPxY(top.y) - y) * 2
+    this.lastRendered.camera = this.cameraMode
+    this.lastRendered.mode = this.mode
+  }
+
   getLabelBox(): LabelBox | null {
     return this.labelBox
   }

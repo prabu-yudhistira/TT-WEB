@@ -323,3 +323,78 @@ shader removed the difference collapses to ~17.7, not to zero, because
 `facing > 0.97` still admits a few degrees of spin. A threshold of 2 was tried
 and passed a build with no eyes. Working builds measure 94–98; the floor is set
 at 40.
+
+## 2026-08-31 — Task 11, the React wiring
+
+### `samsara-seam.mjs` — sample the ENGINE's frame, not the page's
+
+Three separate false readings came out of one mistake: sampling engine state
+from a `requestAnimationFrame` callback in the page.
+
+Three rAF callbacks run per browser frame, in registration order — the engine's
+loop, the sequence's loop, then the sampler. So a sampler reading a field that
+the SEQUENCE mutates gets this frame's rendered pose labelled with next frame's
+value.
+
+- **`camera` read live reported a 6px seam** while the placement assertion on
+  the same run read 0.000px. The engine had rendered the frame in ortho; the
+  sequence swapped the camera afterwards; the sampler recorded "perspective".
+- **The projected pose read live reported a 2,332px jump**, for the same reason
+  one level down: the placer still held the previous frame's ortho values while
+  the camera field had already flipped.
+
+Fix: the engine writes ONE snapshot per rendered frame — position, size, orbit
+angle, camera and mode together, at the end of `place()`, from `placer.position`
+rather than `matrixWorld` (which has not been recomputed at that point). Scripts
+read `__ttMascot().rendered`. Its live siblings `camera`/`mode` are kept, but
+they are not what a seam is measured with.
+
+### Do not loosen a tolerance to absorb a frame-selection error
+
+The seam first missed by 3.5px at 1440×900, 4.9px at 1280×720 and 0.18px at
+390×844 — the shape of a viewport-dependent bug, and it was one: the sweep's
+smoothstep ended a sliver short of the far point, and an orbit radius of 511px
+turns a sliver of angle into pixels. Under software raster the sampler also
+drops frames, so the neighbour of the seam was sometimes the wrong frame
+entirely and the number moved between runs.
+
+Two fixes, neither of them the tolerance: the sequence now **parks the angle on
+the far point exactly and yields one frame** before promoting, and the script
+**selects the seam frame by the recorded orbit angle** instead of by index. The
+residual went to 0.000px on all three viewports and stayed there across three
+runs.
+
+### The transit clock starts at the PROMOTION, not at `HALF_ORBIT_MS`
+
+Only visible once the frame labelling above was correct. The promotion lands
+30–50ms after `tMs` crosses `HALF_ORBIT_MS` — one frame to notice, one to settle
+the angle, more if the clearance guard defers. Dividing from `half` evaluated
+the first scripted frame at t ≈ 0.012, so SAMSARA arrived a step down the fall:
+3.8px of size and 4.3px of x, in one frame, on all three viewports.
+
+### ⚠️ `samsara-fps.mjs` was measuring a ~40px smudge, and the floor came from it
+
+`__ttSamsaraRoom` deliberately did not swap the camera before Task 11, so the
+room was drawn through the ORTHOGRAPHIC camera — whose frustum is the viewport
+in CSS **pixels**, against a room ~42 **world** units across. The 52.1 fps
+recorded at Task 8, and the 30 fps floor set from it, describe that smudge.
+
+Correctly framed, on this machine:
+
+| | orbit | room |
+|---|---|---|
+| SwiftShader (CPU raster) | 42.2 | 16.3 |
+| Intel UHD 630, ANGLE/D3D11 | 23.3 | 24.1 |
+
+**On hardware the room costs nothing.** Full-viewport fill of PBR planes is
+precisely the work a GPU does for free and a CPU rasteriser cannot, so the two
+figures are not two estimates of one number. The floor is now 12 and its job has
+changed: a tripwire for a catastrophic regression, which is all software raster
+can honestly report. Any performance claim about this room needs the GPU row.
+
+### `Material.needsUpdate` is not how you animate an opacity
+
+The room's reveal ramp runs every frame of the fall. Setting `needsUpdate` there
+unconditionally recompiles four shader programs sixty times a second. Opacity is
+a uniform and needs no recompile; only `transparent` changes the render path, and
+that flips exactly twice per run.

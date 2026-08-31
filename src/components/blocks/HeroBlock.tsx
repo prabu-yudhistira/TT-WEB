@@ -5,6 +5,10 @@ import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
 import { SatelliteField } from '../hero/SatelliteField'
 import { MascotLayer } from '../hero/MascotLayer'
+import { SamsaraSequence } from '../hero/SamsaraSequence'
+import { DEFAULT_SEQUENCE } from '../../lib/samsara/types'
+import type { MascotEngine } from '../../lib/mascot/MascotEngine'
+import type { SequenceConfig } from '../../lib/samsara/types'
 import type { SeparationConfig } from '../../lib/three/shatter/types'
 import type { IgnitionConfig } from '../../lib/three/ignition/types'
 import type { SatelliteConfig } from '../../lib/satellites/types'
@@ -26,6 +30,15 @@ type Props = {
   mascot: MascotConfig
   eyes: MascotEyesConfig
   floatingWords?: string[]
+  /**
+   * The SAMSARA transition. Defaulted to DEFAULT_SEQUENCE until the CMS global
+   * lands in Task 15 — and defaulted, not required, so that the seven other
+   * places HeroBlock is constructed (benches, the archive) keep compiling.
+   *
+   * ⚠️ DEFAULT_SEQUENCE is NOT owner-approved. Every number in it is a starting
+   * value for the /dev/samsara bench and the freeze gate in plan Task 13.
+   */
+  samsara?: SequenceConfig
 }
 
 const TYPE_DUR_S = 1.4 // characters finish typing by this mark (owner 2026-07-17: 1.4s reveal / 7s full)
@@ -77,6 +90,7 @@ export function HeroBlock({
   mascot,
   eyes,
   floatingWords = [],
+  samsara = DEFAULT_SEQUENCE,
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
   const cueRef = useRef<HTMLSpanElement>(null)
@@ -166,6 +180,25 @@ export function HeroBlock({
   // re-render per frame.
   const labelBoxRef = useRef<(() => LabelBox | null) | null>(null)
 
+  // ── SAMSARA transition wiring (spec §5, plan Task 11) ───────────────
+
+  const [mascotEngine, setMascotEngine] = useState<MascotEngine | null>(null)
+  const mascotRootRef = useRef<HTMLDivElement | null>(null)
+  const [holdEnabled, setHoldEnabled] = useState(true)
+
+  /**
+   * The sequence's own charge, merged with the logo's below.
+   *
+   * Two independent sources drive the same freeze: hold-to-separate (pointer,
+   * via LogoEngine) and the scroll beats (this). They are never live at once —
+   * §5.8 disables the first from beat 1 — but merging with max() rather than
+   * switching means the handover cannot drop a frame to zero between them,
+   * which would read as the belt flinching back to life mid-freeze.
+   */
+  const seqChargeRef = useRef(0)
+  const mergedChargeRef = useRef<(() => number) | null>(null)
+  mergedChargeRef.current = () => Math.max(chargeRef.current?.() ?? 0, seqChargeRef.current)
+
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced) {
@@ -232,7 +265,7 @@ export function HeroBlock({
         words={floatingWords}
         config={satellites}
         active={stageLive}
-        chargeRef={chargeRef}
+        chargeRef={mergedChargeRef}
         labelBoxRef={labelBoxRef}
         enabled={satellites.SAT_ENABLED}
       />
@@ -244,9 +277,11 @@ export function HeroBlock({
         belt={satellites}
         active={stageLive}
         enabled={mascot.ENABLED}
-        chargeRef={chargeRef}
+        chargeRef={mergedChargeRef}
         labelBoxRef={labelBoxRef}
         eyes={eyes}
+        onEngine={setMascotEngine}
+        rootElRef={mascotRootRef}
       />
       <LogoStage
         onLive={onStageLive}
@@ -254,6 +289,22 @@ export function HeroBlock({
         separation={separation}
         ignition={ignition}
         onChargeSource={onChargeSource}
+        holdEnabled={holdEnabled}
+      />
+      {/* Renders nothing. Mounted here rather than around anything because the
+          hero's DOM order is load-bearing (see the two comments above) and a
+          wrapper would be one more chance to break it. */}
+      <SamsaraSequence
+        config={samsara}
+        belt={satellites}
+        mascot={mascot}
+        engine={mascotEngine}
+        rootElRef={mascotRootRef}
+        heroRef={heroRef}
+        armed={stageLive && mascot.ENABLED}
+        onShake={setShakePx}
+        chargeOutRef={seqChargeRef}
+        onPointerHold={setHoldEnabled}
       />
 
       <div

@@ -14,13 +14,41 @@
  *
  * Software rasterisation (SwiftShader) — treat these as a FLOOR, not as
  * real-device performance.
+ *
+ * ⚠️ CORRECTION, Task 11 — every number this file produced before Task 11 was
+ * measuring the wrong scene, and the floor was set from one of them.
+ *
+ * `__ttSamsaraRoom` deliberately did not swap the camera until the perspective
+ * placement existed. So the room was being rendered through the ORTHOGRAPHIC
+ * camera, whose frustum is the viewport in CSS PIXELS — and the room is ~42
+ * WORLD units across. It drew as a ~40px smudge in the middle of the frame. The
+ * 52.1 fps recorded at Task 8, and the 30 fps floor derived from it, describe
+ * that smudge, not a room.
+ *
+ * With the camera correct the room fills the viewport, and the honest numbers
+ * on this machine are:
+ *
+ *   SwiftShader (CPU raster)        orbit 42.2 -> room 16.3   (~58% cost)
+ *   Intel UHD 630, ANGLE / D3D11    orbit 23.3 -> room 24.1   (no cost at all)
+ *
+ * The two disagree because full-viewport fill of PBR-shaded planes is exactly
+ * the work a GPU does for free and a CPU rasteriser cannot. On hardware the
+ * room is free; both figures there are rAF-limited by the rest of the hero.
+ *
+ * So FLOOR_FPS is lowered to 12 — and its job changes. It is no longer a
+ * performance target; it is a tripwire for a catastrophic regression of the
+ * ember-gl_PointSize kind, which is all a software rasteriser can honestly
+ * report. Performance claims about this room need the hardware line above.
  */
 import puppeteer from './_puppeteer.mjs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const PAGE_URL = process.env.TT_URL ?? 'http://localhost:3000/en'
 const MEASURE_MS = 5000
-const FLOOR_FPS = 30
+// See the correction in the header: a tripwire, not a target. Measured 16.3 fps
+// with the room correctly framed, against high run-to-run variance from machine
+// load (22.5 fps on a loaded run, 16.3 on a quiet one).
+const FLOOR_FPS = 12
 
 let failures = 0
 const check = (label, cond) => {

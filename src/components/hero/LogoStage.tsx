@@ -35,6 +35,7 @@ export function LogoStage({
   separation,
   ignition,
   onChargeSource,
+  holdEnabled = true,
 }: {
   onLive?: () => void
   onIntroPlayStart?: () => void
@@ -42,6 +43,18 @@ export function LogoStage({
   ignition: IgnitionConfig
   /** See LogoCanvas — publishes the separation charge to effects outside the scene. */
   onChargeSource?: (get: (() => number) | null) => void
+  /**
+   * Spec §5.8. False while the SAMSARA sequence owns the charge, from beat 1
+   * until the return to idle.
+   *
+   * ⚠️ It has to gate `armed` here rather than be checked inside
+   * ShatterController, because during the pin `scrollY` never changes and the
+   * controller's own SCROLL_DISARM_FRAC guard therefore never fires — leaving
+   * hold-to-separate live throughout a cinematic the visitor could then fight.
+   * Routed through `armed` so it also picks up setArmed(false)'s cancel(),
+   * which reforms a charge already in flight instead of freezing it open.
+   */
+  holdEnabled?: boolean
 }) {
   const [introDone, setIntroDone] = useState(false)
   const [canvasReady, setCanvasReady] = useState(false)
@@ -97,7 +110,7 @@ export function LogoStage({
           onReady={() => setCanvasReady(true)}
           config={separation}
           ignition={ignition}
-          armed={ignited}
+          armed={ignited && holdEnabled}
           overlay={overlay}
           ignite={live}
           onIgnitionCue={onCue}
@@ -115,7 +128,7 @@ export function LogoStage({
       {/* Gated on `ignited`, not just hover: until the ignition's `done` fires
           the logo is not armed, so a hold does nothing and the hint would be
           telling the visitor to try something that cannot work yet. */}
-      <HoldHint active={ignited && logoHover} />
+      <HoldHint active={ignited && holdEnabled && logoHover} />
     </div>
   )
 }
