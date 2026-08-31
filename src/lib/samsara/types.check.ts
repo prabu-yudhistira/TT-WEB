@@ -1,9 +1,9 @@
 /**
- * Pins DEFAULT_SEQUENCE.
+ * Pins DEFAULT_SEQUENCE — owner-approved 2026-08-31, frozen at plan Task 13.
  *
- * ⚠️ These are STARTING values, not owner-approved ones — see spec §9. When the
- * bench freeze gate (plan Task 13) lands, update BOTH the config and these
- * assertions in the same commit, so a drift cannot pass silently.
+ * These are no longer starting values. Anything here that names an exact number
+ * is naming a decision someone made at the bench with the thing on screen, so a
+ * later edit has to be deliberate and has to come back through the owner.
  * Run: npm run verify:config
  */
 import { DEFAULT_SEQUENCE } from './types'
@@ -20,7 +20,10 @@ const check = (label: string, cond: boolean) => {
 }
 
 // ── gestures ────────────────────────────────────────────────────────
-check('3 charge beats then a commit', DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT === 4)
+// ⚠️ TWO, not the four the spec's state machine diagram draws: one charge beat,
+// then the commit. Owner-tuned, with WHEEL_THRESHOLD raised 120 -> 205 so each
+// beat still takes a deliberate scroll rather than a nudge.
+check('one charge beat then a commit', DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT === 2)
 check('wheel threshold is positive', DEFAULT_SEQUENCE.GESTURES.WHEEL_THRESHOLD > 0)
 // A trackpad flick's momentum tail runs a few hundred ms. A cooldown shorter
 // than that lets one flick fire the whole sequence.
@@ -29,17 +32,21 @@ check('quiet window is positive', DEFAULT_SEQUENCE.GESTURES.QUIET_MS > 0)
 check('touch threshold is positive', DEFAULT_SEQUENCE.GESTURES.TOUCH_THRESHOLD > 0)
 
 // ── freeze ──────────────────────────────────────────────────────────
+// >=, not ===, and the direction matters. Too FEW entries is the real hazard:
+// a beat with no amplitude falls back to `?? 0` and simply does not shake. Spare
+// entries are inert, and keeping them means raising BEATS_TO_COMMIT back up does
+// not silently produce a beat with no ramp behind it.
 check(
-  'one shake amplitude per charge beat',
-  DEFAULT_SEQUENCE.FREEZE.SHAKE_PX_PER_BEAT.length === DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT - 1,
+  'every charge beat has a shake amplitude',
+  DEFAULT_SEQUENCE.FREEZE.SHAKE_PX_PER_BEAT.length >= DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT - 1,
 )
 check(
   'shake ramps up across the beats',
   DEFAULT_SEQUENCE.FREEZE.SHAKE_PX_PER_BEAT.every((v, i, a) => i === 0 || v > a[i - 1]),
 )
 check(
-  'one charge level per charge beat',
-  DEFAULT_SEQUENCE.FREEZE.CHARGE_PER_BEAT.length === DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT - 1,
+  'every charge beat has a charge level',
+  DEFAULT_SEQUENCE.FREEZE.CHARGE_PER_BEAT.length >= DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT - 1,
 )
 check(
   'charge ramps and tops out at full',
@@ -80,7 +87,8 @@ check(
 )
 
 // ── landing ─────────────────────────────────────────────────────────
-check('landed size is 40% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.4)
+check('landed size is the approved 43.5% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.435)
+check('mobile lands smaller than desktop', DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 0.35)
 check(
   'mobile landed size is set independently',
   typeof DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 'number',
@@ -108,17 +116,17 @@ check('WALL is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.WALL_COLOR))
 check('KEY_LIGHT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.KEY_LIGHT_COLOR))
 
 // ── mascot material tint, room-only ─────────────────────────────────
-// A NEW capability, not a starting value in the usual sense — see its comment
-// in types.ts. Its whole point is to be inert until the owner turns it on, so
-// what is pinned here is the NO-OP, not a look.
+// Shipped OFF and turned ON by the owner at the freeze gate: the chrome-vs-brass
+// correction they asked for. The values are now a look someone chose, so they
+// are pinned exactly rather than as a range.
 check('MASCOT_TINT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_COLOR))
+check('mascot tint is the approved strength', DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0.32)
+check('roughness boost is the approved amount', DEFAULT_SEQUENCE.ROOM.MASCOT_ROUGHNESS_BOOST === 0.5)
+// Still room-only. If this ever stops being true the approved HERO material
+// changes too, which is a different decision from the one made here.
 check(
-  'mascot tint starts OFF — the hero material must not shift without the owner asking',
-  DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0,
-)
-check(
-  'roughness boost starts OFF for the same reason',
-  DEFAULT_SEQUENCE.ROOM.MASCOT_ROUGHNESS_BOOST === 0,
+  'the tint is only ever applied outside the orbit',
+  DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH > 0,
 )
 check(
   'tint strength is a fraction, not a percentage',
@@ -173,13 +181,23 @@ check('smile shake is a vertical bob', DEFAULT_SEQUENCE.IDLE_EYES.SMILE_SHAKE_PX
 for (const name of Object.keys(DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS)) {
   check(`idle weight "${name}" is a real expression`, EXPRESSION_ORDER.includes(name))
 }
-// The owner asked for normal, blink and smile specifically.
-for (const required of ['neutral', 'blink', 'happy']) {
+// ⚠️ Owner 2026-08-31: "use all the expressions when parked and floating."
+// EVERY expression must be able to come up, not just the three originally
+// asked for — a missing key is invisible at runtime, since pickWeighted would
+// simply never choose it.
+for (const name of EXPRESSION_ORDER) {
   check(
-    `owner-requested "${required}" is in the idle pool`,
-    (DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS[required] ?? 0) > 0,
+    `"${name}" can come up in the room`,
+    (DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS[name] ?? 0) > 0,
   )
 }
+check(
+  'the whole expression set is in the pool',
+  Object.keys(DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS).length === EXPRESSION_ORDER.length,
+)
+// The owner's own tuned emphasis, which the eleven added expressions must not
+// have quietly displaced.
+check('blink and happy still lead the pool', DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS.happy === 13 && DEFAULT_SEQUENCE.IDLE_EYES.WEIGHTS.blink === 10)
 
 check('kill switch defaults on', DEFAULT_SEQUENCE.ENABLED === true)
 

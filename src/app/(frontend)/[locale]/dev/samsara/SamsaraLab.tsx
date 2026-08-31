@@ -11,6 +11,7 @@ import type { Mode } from '@/lib/samsara/SequenceController'
 import type { SatelliteConfig } from '@/lib/satellites/types'
 import type { MascotConfig } from '@/lib/mascot/types'
 import type { MascotEyesConfig } from '@/lib/mascot/eyeTypes'
+import { EXPRESSION_ORDER } from '@/lib/mascot/eyes'
 import type { LabelBox } from '@/lib/satellites/labels'
 import type { SeparationConfig } from '@/lib/three/shatter/types'
 import type { IgnitionConfig } from '@/lib/three/ignition/types'
@@ -148,12 +149,21 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
-    title: 'idle eyes',
-    note: 'weighted picker — relative, not percentages',
+    title: 'idle eyes — the room expression loop',
+    note:
+      'weights are RELATIVE, not percentages. one slider per expression, generated from ' +
+      'eyes.ts so a new expression can never be silently missing from the pool. 0 removes it.',
     rows: [
-      { kind: 'weight', path: 'IDLE_EYES.WEIGHTS.neutral', label: 'neutral' },
-      { kind: 'weight', path: 'IDLE_EYES.WEIGHTS.blink', label: 'blink' },
-      { kind: 'weight', path: 'IDLE_EYES.WEIGHTS.happy', label: 'happy (smile)' },
+      // Generated, not listed. A hand-written list is how an expression ends up
+      // untunable: it exists in eyes.ts, has a weight in the config, plays on
+      // screen, and has no control here — with nothing to indicate the gap.
+      ...EXPRESSION_ORDER.map(
+        (name): Row => ({
+          kind: 'weight',
+          path: `IDLE_EYES.WEIGHTS.${name}`,
+          label: name === 'happy' ? 'happy (smile)' : name,
+        }),
+      ),
       { kind: 'num', path: 'IDLE_EYES.INTERVAL_MS', label: 'Interval ms', min: 200, max: 12000, step: 100 },
       { kind: 'num', path: 'IDLE_EYES.SMILE_SHAKE_PX', label: 'Smile shake px', min: 0, max: 80, step: 1 },
       { kind: 'num', path: 'IDLE_EYES.SMILE_SHAKE_MS', label: 'Smile shake ms', min: 100, max: 3000, step: 20 },

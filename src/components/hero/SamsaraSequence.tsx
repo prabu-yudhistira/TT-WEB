@@ -675,6 +675,7 @@ export function SamsaraSequence({
       z: config.LANDING.ROT_Z_DEG,
     })
     engine?.setDragConfig(config.DRAG)
+    engine?.setIdleEyes(config.IDLE_EYES)
   }, [config, engine])
 
   return null

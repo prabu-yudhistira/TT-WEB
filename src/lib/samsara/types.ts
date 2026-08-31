@@ -1,9 +1,10 @@
 /**
  * SAMSARA transition — configuration.
  *
- * ⚠️ Unlike DEFAULT_MASCOT, these numbers are NOT owner-approved. They are
- * STARTING values, to be tuned live at /dev/samsara and frozen by the gate in
- * spec §9. No task downstream of that gate may treat them as approved.
+ * Owner-approved on screen 2026-08-31 at /dev/samsara, and frozen here from
+ * that session's `copy json`. Pinned value-by-value by types.check.ts, so a
+ * later edit is a deliberate act with the owner in the loop rather than a
+ * silent diff — the same treatment DEFAULT_MASCOT and DEFAULT_MASCOT_EYES get.
  *
  * Spec: docs/superpowers/specs/2026-08-30-samsara-transition-design.md
  *
@@ -184,6 +185,12 @@ export type IdleEyesConfig = {
    * names from lib/mascot/eyes.ts. Spec §6.5: in the room SAMSARA is stationary
    * and front-facing, so expressions are scheduled on a clock rather than fired
    * as the face sweeps past the viewer.
+   *
+   * ⚠️ That clock is not a nicety. The orbit fires a glance on the RISING EDGE
+   * of the face turning toward the viewer — and once the spin is parked that
+   * edge never comes again, so a parked SAMSARA plays exactly one expression
+   * and then rests on neutral forever. The room needs its own scheduler or it
+   * has no expressions at all.
    */
   WEIGHTS: Record<string, number>
   INTERVAL_MS: number
@@ -216,8 +223,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   ENABLED: true,
 
   GESTURES: {
-    BEATS_TO_COMMIT: 4,
-    WHEEL_THRESHOLD: 120,
+    BEATS_TO_COMMIT: 2,
+    WHEEL_THRESHOLD: 205,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
     TOUCH_THRESHOLD: 60,
@@ -235,27 +242,27 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // SAMSARA had to descend ~400px behind the mark before the layer could be
     // promoted) was measured and found false, so this is now simply a starting
     // value for the bench like every other number here.
-    FALL_MS: 1100,
+    FALL_MS: 950,
     BOUNCE_COUNT: 3,
-    RESTITUTION: 0.45,
+    RESTITUTION: 0.8,
     BOUNCE_MS: [500, 350, 250],
     SETTLE_MS: 500,
   },
 
   LANDING: {
-    SIZE_FRAC: 0.4,
-    MOBILE_SIZE_FRAC: 0.4,
-    X_FRAC: 0.72,
+    SIZE_FRAC: 0.435,
+    MOBILE_SIZE_FRAC: 0.35,
+    X_FRAC: 0.59,
     Y_FRAC: 0.52,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.3,
     HOVER_BOB_PX: 8,
-    HOVER_BOB_MS: 3200,
+    HOVER_BOB_MS: 2500,
 
     // Frontal and level. The owner parks it for real at the bench.
-    ROT_X_DEG: 0,
-    ROT_Y_DEG: 0,
-    ROT_Z_DEG: 0,
+    ROT_X_DEG: -5,
+    ROT_Y_DEG: -21,
+    ROT_Z_DEG: -5,
   },
 
   ROOM: {
@@ -268,41 +275,71 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     WALL_COLOR: '#0E0E11',
     KEY_LIGHT_COLOR: '#FFF3D6',
     KEY_LIGHT_INTENSITY: 2.2,
-    AMBIENT_INTENSITY: 0.25,
+    AMBIENT_INTENSITY: 1.45,
     FOG_DENSITY: 0.035,
-    CAMERA_FOV_DEG: 45,
-    DEPTH: 26,
+    CAMERA_FOV_DEG: 55,
+    DEPTH: 42,
 
     // Warm bronze-brass, picked to be in the right neighbourhood once
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
     // reference: matte warm brass with green-blue verdigris in the recesses.
     MASCOT_TINT_COLOR: '#8A6A3A',
-    MASCOT_TINT_STRENGTH: 0,
-    MASCOT_ROUGHNESS_BOOST: 0,
+    MASCOT_TINT_STRENGTH: 0.32,
+    MASCOT_ROUGHNESS_BOOST: 0.5,
   },
 
   DRAG: {
     ENABLED: true,
-    SENSITIVITY_DEG_PER_PX: 0.5,
-    MAX_PITCH_DEG: 75,
-    DAMPING: 0.02,
+    SENSITIVITY_DEG_PER_PX: 0.75,
+    MAX_PITCH_DEG: 125,
+    DAMPING: 0.29,
     // Non-zero, because the shipped default is the VISITOR's setting: the room
     // is composed around a face that meets you, and it has to come back to that
     // on its own. Set to 0 at the bench to inspect the far side.
-    RETURN_DELAY_MS: 2500,
-    RETURN_MS: 900,
+    RETURN_DELAY_MS: 1800,
+    RETURN_MS: 1200,
   },
 
   IDLE_EYES: {
-    // Owner: "The eyes is normal then blink, sometimes smile."
-    WEIGHTS: { neutral: 6, blink: 3, happy: 2 },
-    INTERVAL_MS: 2400,
-    SMILE_SHAKE_PX: 10,
-    SMILE_SHAKE_MS: 620,
+    /**
+     * Owner 2026-08-31: "use all the expressions when parked and floating, for
+     * the rest of the scene."
+     *
+     * neutral/blink/happy carry the owner's own tuned numbers from the bench.
+     * The other eleven are seeded at 2 — present, but not enough to displace
+     * the resting behaviour that was actually dialled in. Collectively they take
+     * roughly 45% of picks, so something other than a blink or a smile happens
+     * about every other beat; individually each is ~4%, which reads as variety
+     * rather than as a tic. All fourteen have their own slider on the bench.
+     *
+     * ⚠️ Every key must name a real expression from eyes.ts. A typo does NOT
+     * throw — pickWeighted simply never selects it, and SAMSARA would sit on one
+     * face forever with nothing in the console to say why. types.check.ts pins
+     * each key against EXPRESSION_ORDER for exactly that reason.
+     */
+    WEIGHTS: {
+      neutral: 3,
+      blink: 10,
+      happy: 13,
+      squint: 2,
+      wide: 2,
+      wink: 2,
+      lookLeft: 2,
+      lookRight: 2,
+      lookUp: 2,
+      lookDown: 2,
+      lookUpLeft: 2,
+      lookUpRight: 2,
+      lookDownLeft: 2,
+      lookDownRight: 2,
+    },
+    INTERVAL_MS: 1700,
+    SMILE_SHAKE_PX: 13,
+    SMILE_SHAKE_MS: 820,
   },
 
   CHATBOX: {
-    DELAY_MS: 2600,
+    DELAY_MS: 2100,
     ENTER_MS: 400,
   },
 

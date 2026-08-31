@@ -21,10 +21,31 @@ const check = (label: string, cond: boolean) => {
   }
 }
 
-// ── mouse wheel: one notch, one event ───────────────────────────────
+// ── mouse wheel ─────────────────────────────────────────────────────
+//
+// ⚠️ Derived from the config, not written as 120. These fixtures are about the
+// ALGORITHM — one gesture, one beat — and WHEEL_THRESHOLD is an owner-tuned
+// number that moved from 120 to 205 at the freeze gate. A hardcoded delta turns
+// every future retune into three mysterious failures in a file that has nothing
+// to do with the thing that changed.
+const OVER = cfg.WHEEL_THRESHOLD
 {
   const s = createGestureState()
-  check('one notch emits one down beat', feedWheel(s, 120, 1000, cfg) === 'down')
+  check('a gesture past the threshold emits one down beat', feedWheel(s, OVER, 1000, cfg) === 'down')
+}
+
+// ⚠️ A REAL mouse-wheel notch is ~100-120 in Chrome, and the approved threshold
+// is 205 — so a physical notch is deliberately NOT one beat any more. It takes
+// two. Recorded because it is a genuine consequence of the owner's tuning and
+// invisible from the config alone: with BEATS_TO_COMMIT down from 4 to 2, the
+// total wheel travel needed to reach the room is about what it always was, just
+// spent in fewer, larger beats.
+{
+  const s = createGestureState()
+  const first = feedWheel(s, 120, 1000, cfg)
+  const second = feedWheel(s, 120, 1040, cfg)
+  check('one physical notch is NOT a beat at the approved threshold', first === null)
+  check('two notches in quick succession are', second === 'down')
 }
 
 // ── trackpad flick ──────────────────────────────────────────────────
@@ -79,16 +100,16 @@ check(
   let beats = 0
   let t = 1000
   for (let i = 0; i < 4; i++) {
-    if (feedWheel(s, 120, t, cfg)) beats++
+    if (feedWheel(s, OVER, t, cfg)) beats++
     t += cfg.COOLDOWN_MS + cfg.QUIET_MS + 50
   }
-  check(`four spaced notches emit four beats (got ${beats})`, beats === 4)
+  check(`four spaced gestures emit four beats (got ${beats})`, beats === 4)
 }
 
 // ── direction ───────────────────────────────────────────────────────
 {
   const s = createGestureState()
-  check('negative delta emits an up beat', feedWheel(s, -120, 1000, cfg) === 'up')
+  check('negative delta emits an up beat', feedWheel(s, -OVER, 1000, cfg) === 'up')
 }
 
 // ── sub-threshold noise ─────────────────────────────────────────────

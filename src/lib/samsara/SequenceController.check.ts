@@ -1,9 +1,17 @@
 /**
  * Pins the sequence state machine.
  *
- * Spec §5.1. Gestures 1–3 build the freeze and are REVERSIBLE; the 4th commits
- * to a fixed-duration cinematic that scroll can no longer scrub. Scrolling up
- * from the room plays a short exit, not a rewind of the fall.
+ * Spec §5.1. The charge beats build the freeze and are REVERSIBLE; the last one
+ * commits to a fixed-duration cinematic that scroll can no longer scrub.
+ * Scrolling up from the room plays a short exit, not a rewind of the fall.
+ *
+ * ⚠️ The machine is exercised against a LOCAL four-beat config, not the shipped
+ * one, and that separation is the point. The controller has to be correct at any
+ * BEATS_TO_COMMIT — walking charge1 -> charge2 -> charge3 and back needs three
+ * charge beats to walk THROUGH. The owner froze the live sequence at two
+ * (2026-08-31), which would leave charge2 and charge3 permanently unreachable
+ * and eleven assertions here quietly testing nothing. The shipped config's own
+ * shape is asserted separately at the end, so both stay honest.
  * Run: npm run verify:config
  */
 import { SequenceController } from './SequenceController'
@@ -19,13 +27,21 @@ const check = (label: string, cond: boolean, note = '') => {
   }
 }
 
-const cfg = DEFAULT_SEQUENCE
+// Four beats, to exercise the full charge1..charge3 walk. See the header.
+const cfg = {
+  ...DEFAULT_SEQUENCE,
+  GESTURES: { ...DEFAULT_SEQUENCE.GESTURES, BEATS_TO_COMMIT: 4 },
+  FREEZE: {
+    ...DEFAULT_SEQUENCE.FREEZE,
+    SHAKE_PX_PER_BEAT: [2, 3, 4],
+    CHARGE_PER_BEAT: [0.4, 0.7, 1],
+  },
+}
 const make = () => new SequenceController(cfg)
 
-// The Mode union names charge1..charge3, so the config must actually describe
-// three charge beats. If BEATS_TO_COMMIT is ever retuned, this fails first and
-// names the reason rather than letting the controller clamp silently.
-check('config describes exactly 3 charge beats', cfg.GESTURES.BEATS_TO_COMMIT === 4)
+// The Mode union names charge1..charge3, so a config claiming more charge beats
+// than that would have modes the union cannot express.
+check('the fixture stays within the Mode union', cfg.GESTURES.BEATS_TO_COMMIT - 1 <= 3)
 
 // ── forward through the charge ──────────────────────────────────────
 {
@@ -175,6 +191,29 @@ check('config describes exactly 3 charge beats', cfg.GESTURES.BEATS_TO_COMMIT ==
   c.beat('down')
   c.advance(99999)
   check('advancing while charging does nothing', c.mode === 'charge1')
+}
+
+// ── and the SHIPPED config, whatever it is tuned to ─────────────────
+// The machine above is generic; this is the one instance of it that ships.
+{
+  const live = DEFAULT_SEQUENCE
+  const steps = live.GESTURES.BEATS_TO_COMMIT
+  const c = new SequenceController(live)
+  for (let i = 0; i < steps - 1; i++) c.beat('down')
+  check(
+    `the approved ${steps}-beat config charges before it commits`,
+    c.mode !== 'idle' && c.mode !== 'committed',
+    c.mode,
+  )
+  c.beat('down')
+  check('and the last beat commits', c.mode === 'committed', c.mode)
+
+  // Reversible right up to the commit — the property a visitor relies on to
+  // back out of a freeze they started by accident.
+  const r = new SequenceController(live)
+  for (let i = 0; i < steps - 1; i++) r.beat('down')
+  for (let i = 0; i < steps - 1; i++) r.beat('up')
+  check('and it walks all the way back to idle', r.mode === 'idle', r.mode)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll sequence controller checks passed.')

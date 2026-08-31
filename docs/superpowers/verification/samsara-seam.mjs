@@ -38,6 +38,25 @@ const BASE = process.env.TT_URL ?? 'http://localhost:3000/en'
 /** Sub-pixel, per §11.2. One pixel is already visible on a hard cut. */
 const TOL_PX = 1
 
+/**
+ * ⚠️ Must track `LANDING.SIZE_FRAC` / `MOBILE_SIZE_FRAC` in
+ * src/lib/samsara/types.ts — owner-approved 0.435 and 0.35 on 2026-08-31.
+ *
+ * ⚠️ TWO values, not one. They were both 0.4 when this file was written, so a
+ * single constant happened to work; the owner set them independently at the
+ * freeze gate, and 390x844 is below the 640px mobile split. A shared constant
+ * now fails on portrait ONLY, which reads as a mobile seam bug rather than as a
+ * stale fixture.
+ *
+ * Restated rather than imported because this is a plain .mjs harness script and
+ * the config is TypeScript. `types.check.ts` pins the values themselves; what
+ * this asserts is that the LIVE PAGE actually arrives there.
+ */
+const LANDED_SIZE_FRAC = 0.435
+const LANDED_SIZE_FRAC_MOBILE = 0.35
+/** Matches the engine's own split — see MascotEngine.sizePx(). */
+const MOBILE_MAX_W = 640
+
 const VIEWPORTS = [
   { w: 1440, h: 900, label: '1440x900' },
   { w: 1280, h: 720, label: '1280x720' },
@@ -194,9 +213,11 @@ for (const vp of VIEWPORTS) {
 
   // ── and it actually arrives ─────────────────────────────────────────
   const last = samples[samples.length - 1]
+  const frac = vp.w < MOBILE_MAX_W ? LANDED_SIZE_FRAC_MOBILE : LANDED_SIZE_FRAC
+  const wantLanded = frac * vp.h
   check(
-    `[${vp.label}] lands at ${Math.round(0.4 * vp.h)}px (40% of viewport height)`,
-    Math.abs(last.got.d - 0.4 * vp.h) < 8,
+    `[${vp.label}] lands at ${Math.round(wantLanded)}px (${(frac * 100).toFixed(1)}% of viewport height)`,
+    Math.abs(last.got.d - wantLanded) < 8,
     `${last.got.d.toFixed(1)}px`,
   )
 

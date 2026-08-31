@@ -72,9 +72,15 @@ const samples = Array.from({ length: 400 }, (_, i) => transitPoseAt(i / 399, ctx
 {
   check('descends overall', samples[399].y > samples[0].y)
   check('grows overall', samples[399].sizePx > samples[0].sizePx)
+  // Read from the config, not restated. The fraction is owner-tuned (0.4 ->
+  // 0.435 at the freeze gate) and the thing under test here is that the script
+  // ARRIVES at the configured size — pinning the number itself is types.check's
+  // job, and doing it in both places means a retune fails in two files for one
+  // reason.
+  const wantDesktop = DEFAULT_SEQUENCE.LANDING.SIZE_FRAC * 900
   check(
-    `lands at 40% of viewport height (${samples[399].sizePx.toFixed(1)} vs ${0.4 * 900})`,
-    Math.abs(samples[399].sizePx - 0.4 * 900) < 6,
+    `lands at the configured size (${samples[399].sizePx.toFixed(1)} vs ${wantDesktop})`,
+    Math.abs(samples[399].sizePx - wantDesktop) < 6,
   )
   check(
     `lands right of centre (x ${samples[399].x.toFixed(0)} of 1440)`,
@@ -124,9 +130,12 @@ const samples = Array.from({ length: 400 }, (_, i) => transitPoseAt(i / 399, ctx
   const m: TransitContext = { ...ctx, W: 390, H: 844, mobile: true, cx: 195, cy: 300, hh: 101 }
   const end = transitPoseAt(1, m)
   check(`mobile lands in the upper half (y ${end.y.toFixed(0)} of 844)`, end.y < 844 * 0.5)
+  // MOBILE_SIZE_FRAC, which the owner set independently of the desktop one at
+  // the freeze gate (0.35 vs 0.435) — a phone has less room to give.
+  const wantMobile = DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC * 844
   check(
-    `mobile lands at 40% of viewport height (${end.sizePx.toFixed(1)} vs ${0.4 * 844})`,
-    Math.abs(end.sizePx - 0.4 * 844) < 6,
+    `mobile lands at the configured size (${end.sizePx.toFixed(1)} vs ${wantMobile})`,
+    Math.abs(end.sizePx - wantMobile) < 6,
   )
   check('mobile lands near horizontal centre', Math.abs(end.x - 195) < 60)
 }

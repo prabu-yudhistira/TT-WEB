@@ -22,7 +22,7 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
-import { DEFAULT_SEQUENCE, type DragConfig, type RoomConfig } from '../samsara/types'
+import { DEFAULT_SEQUENCE, type DragConfig, type IdleEyesConfig, type RoomConfig } from '../samsara/types'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -87,6 +87,13 @@ export class MascotEngine {
   private materialBase: { color: THREE.Color; roughness: number }[] = []
   /** Scratch object for applyMascotTint, reused so it allocates nothing per call. */
   private scratchTintColor = new THREE.Color()
+
+  // ── the room's timed expression loop (spec §6.5) ────────────────────
+  private idleEyes: IdleEyesConfig = DEFAULT_SEQUENCE.IDLE_EYES
+  /** ms since the last idle expression was picked. */
+  private idleMs = 0
+  /** Seconds into the smile bob. -1 when not smiling. */
+  private smileShakeT = -1
   private envRT: THREE.WebGLRenderTarget | null = null
 
   private hemi: THREE.HemisphereLight
@@ -284,6 +291,8 @@ export class MascotEngine {
       // perfectly continuous handoff while the room rendered empty, because it
       // is the input to the placement, not its result.
       rendered: this.lastRendered,
+      /** The expression the current beat is playing. Verification instrument. */
+      expr: this.glanceExpr,
     })
 
     // Dev handle for the room, so frame rate can be measured against the real
@@ -1138,6 +1147,18 @@ export class MascotEngine {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
   }
 
+  /**
+   * The room's expression schedule. See IdleEyesConfig.
+   *
+   * Separate from setEyeConfig(), which carries the owner-approved ORBIT
+   * behaviour (shapes, glance timing, the facing threshold) and is not reopened
+   * here. Only what SCHEDULES an expression changes in the room; eyes.ts is
+   * untouched, exactly as spec §6.5 requires.
+   */
+  setIdleEyes(cfg: IdleEyesConfig) {
+    this.idleEyes = cfg
+  }
+
   setRoomConfig(cfg: RoomConfig) {
     this.roomCfg = cfg
     this.room?.setConfig(cfg)
@@ -1404,7 +1425,20 @@ export class MascotEngine {
 
     if (this.mode !== 'orbit' && this.transform) {
       const t = this.transform
-      q = { x: t.x, y: t.y, z: -1, scale: 1 }
+      // Owner: "when smiling, samsara will be shaking up and down." Applied
+      // HERE rather than in the sequence because only the engine knows when a
+      // smile was picked — the sequence has no view of the expression pool.
+      // A decaying bob, so it settles rather than stopping mid-swing.
+      let y = t.y
+      if (this.smileShakeT >= 0) {
+        const idle = this.idleEyes
+        const dur = Math.max(1, idle.SMILE_SHAKE_MS) / 1000
+        const p01 = this.smileShakeT / dur
+        if (p01 >= 1) this.smileShakeT = -1
+        else y += Math.sin(p01 * Math.PI * 4) * idle.SMILE_SHAKE_PX * (1 - p01)
+        this.smileShakeT += dtSec
+      }
+      q = { x: t.x, y, z: -1, scale: 1 }
       scriptedDiameter = t.sizePx
     } else {
       const tiltRad = ((belt.TILT + c.TILT_OFFSET) * Math.PI) / 180
@@ -1730,19 +1764,55 @@ export class MascotEngine {
         ? Math.min(t.SCANLINE_MAX, (diameterPx - t.SCANLINE_MIN_PX) / Math.max(0.01, t.SCANLINE_RAMP))
         : 0
 
-    // The face is +Z in model space and only the spin turns it, so cos(spin) is
-    // the facing term. > 0 means the display is toward the viewer at all.
-    const isFacing = Math.cos(this.spin) > t.FACING_THRESHOLD
-    if (isFacing && !this.wasFacing) {
-      this.glanceT = 0
-      this.glanceExpr = pickWeighted(
-        t.WEIGHTS,
-        Math.random(),
-        t.NO_REPEAT ? this.lastGlance : null,
-      )
-      if (this.glanceExpr) this.lastGlance = this.glanceExpr
+    // ── what schedules an expression ──────────────────────────────────
+    //
+    // ⚠️ Two different clocks, because the orbit and the room are two different
+    // problems.
+    //
+    // In the belt the face sweeps past the viewer, so a glance fires on the
+    // RISING EDGE of `isFacing` — which is right there and is owner-approved.
+    // Parked in the room that edge NEVER COMES AGAIN: cos(spin) sits above the
+    // threshold permanently, `wasFacing` stays true, and SAMSARA plays exactly
+    // one expression on arrival and then rests on neutral for the rest of the
+    // scene. That is not a subtle bug; it is the whole face going quiet.
+    //
+    // So the room runs a timer instead (spec §6.5), over its OWN weight pool.
+    const roomIdle = this.mode === 'room'
+    if (roomIdle) {
+      const idle = this.idleEyes
+      this.idleMs += dtSec * 1000
+      if (this.idleMs >= Math.max(1, idle.INTERVAL_MS)) {
+        this.idleMs = 0
+        this.glanceT = 0
+        this.glanceExpr = pickWeighted(
+          idle.WEIGHTS,
+          Math.random(),
+          t.NO_REPEAT ? this.lastGlance : null,
+        )
+        if (this.glanceExpr) this.lastGlance = this.glanceExpr
+        // Owner: "when smiling, samsara will be shaking up and down."
+        if (this.glanceExpr === 'happy') this.smileShakeT = 0
+      }
+      // Kept in step so the orbit's edge detector cannot fire a second glance
+      // on the frame the room hands back.
+      this.wasFacing = Math.cos(this.spin) > t.FACING_THRESHOLD
+    } else {
+      this.idleMs = 0
+      this.smileShakeT = -1
+      // The face is +Z in model space and only the spin turns it, so cos(spin)
+      // is the facing term. > 0 means the display is toward the viewer at all.
+      const isFacing = Math.cos(this.spin) > t.FACING_THRESHOLD
+      if (isFacing && !this.wasFacing) {
+        this.glanceT = 0
+        this.glanceExpr = pickWeighted(
+          t.WEIGHTS,
+          Math.random(),
+          t.NO_REPEAT ? this.lastGlance : null,
+        )
+        if (this.glanceExpr) this.lastGlance = this.glanceExpr
+      }
+      this.wasFacing = isFacing
     }
-    this.wasFacing = isFacing
     // The beat runs a little shorter than the face-forward window so it lands
     // and resolves while it can actually be seen.
     if (this.glanceT < 1) {
