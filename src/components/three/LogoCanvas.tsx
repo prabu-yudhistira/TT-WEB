@@ -18,6 +18,7 @@ export default function LogoCanvas({
   onIgnitionDone,
   onLogoHover,
   onChargeSource,
+  externalChargeRef,
   releaseContextOnUnmount = false,
 }: {
   onReady?: () => void
@@ -38,6 +39,18 @@ export default function LogoCanvas({
    * onShatter/getCharge seam open for.
    */
   onChargeSource?: (get: (() => number) | null) => void
+  /**
+   * The INPUT side of the same seam: a separation charge driven from outside
+   * the pointer gesture. Spec §4.4 — during the SAMSARA freeze the mark shakes
+   * through its own separation, driven by the scroll beats.
+   *
+   * A ref carrying a getter, matching `chargeRef` on MascotLayer and
+   * SatelliteField: the value changes every frame, and re-rendering React at
+   * 60Hz to carry one number the render loop can pull is exactly the overhead
+   * that pattern exists to avoid. The engine indirects through the ref on every
+   * call, so a source published after this mounts is still found.
+   */
+  externalChargeRef?: React.MutableRefObject<(() => number) | null>
   /**
    * Release the WebGL context when this unmounts, not just the GPU resources.
    *
@@ -96,6 +109,7 @@ export default function LogoCanvas({
     // Safe to publish before load() resolves: getCharge() returns 0 while the
     // controller is still null rather than throwing.
     chargeSrcRef.current?.(() => engine.getCharge())
+    engine.setExternalChargeSource(() => externalChargeRef?.current?.() ?? 0)
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     engine.setInteractive(!reduced)

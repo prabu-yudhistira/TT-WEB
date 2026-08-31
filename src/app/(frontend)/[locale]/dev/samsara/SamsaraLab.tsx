@@ -215,6 +215,11 @@ export default function SamsaraLab({
   const seqChargeRef = useRef(0)
   const mergedChargeRef = useRef<(() => number) | null>(null)
   mergedChargeRef.current = () => Math.max(chargeRef.current?.() ?? 0, seqChargeRef.current)
+  // The mark's separation charge. Separate from the belt's, and deliberately
+  // NOT merged back in — see the same pair in HeroBlock for why.
+  const seqLogoChargeRef = useRef(0)
+  const logoChargeGetterRef = useRef<(() => number) | null>(null)
+  logoChargeGetterRef.current = () => seqLogoChargeRef.current
 
   const onChargeSource = useCallback((get: (() => number) | null) => {
     chargeRef.current = get
@@ -384,6 +389,7 @@ export default function SamsaraLab({
             armed={holdEnabled}
             onReady={() => setActive(true)}
             onChargeSource={onChargeSource}
+            externalChargeRef={logoChargeGetterRef}
           />
         </div>
         {/* The DOM shake, which in the hero lives on the headline and the
@@ -416,6 +422,7 @@ export default function SamsaraLab({
         armed={active && mascot.ENABLED}
         onShake={setShakePx}
         chargeOutRef={seqChargeRef}
+        logoChargeOutRef={seqLogoChargeRef}
         onPointerHold={setHoldEnabled}
         onMode={setMode}
         controlsRef={controlsRef}

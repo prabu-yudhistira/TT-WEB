@@ -35,6 +35,7 @@ export function LogoStage({
   separation,
   ignition,
   onChargeSource,
+  externalChargeRef,
   holdEnabled = true,
 }: {
   onLive?: () => void
@@ -43,6 +44,8 @@ export function LogoStage({
   ignition: IgnitionConfig
   /** See LogoCanvas — publishes the separation charge to effects outside the scene. */
   onChargeSource?: (get: (() => number) | null) => void
+  /** See LogoCanvas — the SAMSARA sequence's separation charge for the mark. */
+  externalChargeRef?: React.MutableRefObject<(() => number) | null>
   /**
    * Spec §5.8. False while the SAMSARA sequence owns the charge, from beat 1
    * until the return to idle.
@@ -117,6 +120,7 @@ export function LogoStage({
           onIgnitionDone={onDone}
           onLogoHover={setLogoHover}
           onChargeSource={onChargeSource}
+          externalChargeRef={externalChargeRef}
         />
       </div>
       <SketchIntro

@@ -48,6 +48,22 @@ export class ShatterController {
   private vibratePhase = 0
   private holding = false
   private armed = false
+  /**
+   * Separation driven from OUTSIDE the pointer gesture, 0..1.
+   *
+   * Spec §4.4: during the SAMSARA freeze all three 3D layers shake, and the
+   * mark shakes "through its separation — the sequence drives that charge from
+   * beat 1". The satellites and the mascot read a published number and jitter
+   * themselves; the mark has no such input, because until now the only thing
+   * that could separate it was a finger held on it.
+   *
+   * ⚠️ It does NOT go through the state machine, and that is deliberate. The
+   * machine models a GESTURE — press, charge, blast, release, reform — with a
+   * clock of its own. The sequence already owns its own clock and its own
+   * ramp, so feeding it in as a synthetic press would mean two authorities on
+   * one number and a fight over who gets to release it.
+   */
+  private external = 0
   private downX = 0
   private downY = 0
   private listeners = new Set<(e: ShatterEvent) => void>()
@@ -69,17 +85,52 @@ export class ShatterController {
     return () => this.listeners.delete(cb)
   }
 
+  /**
+   * Set the externally-driven separation. See `external`.
+   *
+   * Clamped rather than trusted: it is fed from a config-driven ramp the owner
+   * tunes on a bench, and a slider that overshoots 1 must not push the vertex
+   * displacement past what the shader was authored for.
+   */
+  setExternalCharge(v: number) {
+    this.external = v < 0 ? 0 : v > 1 ? 1 : v
+  }
+
+  /**
+   * What the POINTER has charged, 0..1.
+   *
+   * ⚠️ Deliberately excludes the external drive, and this is load-bearing.
+   * `LogoEngine.getCharge()` is published to the satellites and the mascot so
+   * they freeze and shake with the mark. During the SAMSARA sequence they are
+   * ALREADY being driven from the same source that drives `external` — folding
+   * it in here would make that value depend on itself through two components,
+   * and because the merge is a max(), it could then never fall again: the
+   * belt would latch at full freeze for the rest of the session.
+   *
+   * Anything that renders the separation wants getEffectiveCharge() instead.
+   */
   getCharge() {
     return this.charge
   }
 
+  /** What is actually DRAWN: the pointer's charge or the sequence's, whichever leads. */
+  getEffectiveCharge() {
+    return Math.max(this.charge, this.external)
+  }
+
   getState(): State {
+    // While the external drive leads, report the state that charge implies, so
+    // that everything keyed off the gesture's phase — the ignition's hold
+    // pulses, above all — behaves as it does under a real press. Without this
+    // the mark separates in silence: displaced, but with none of the electrical
+    // punctuation that makes the separation read as an event.
+    if (this.external > this.charge) return this.external >= 1 ? 'blasted' : 'charging'
     return this.state
   }
 
   /** Shake offset to apply to the logo group while charging. */
   getVibrateOffset(): { x: number; y: number } {
-    const amp = this.charge * this.config.VIBRATE_FRAC * this.logoHeight
+    const amp = this.getEffectiveCharge() * this.config.VIBRATE_FRAC * this.logoHeight
     return {
       x: Math.sin(this.vibratePhase) * amp,
       y: Math.cos(this.vibratePhase * 1.3) * amp,
@@ -128,7 +179,11 @@ export class ShatterController {
     else {
       this.state = 'idle'
       this.charge = 0
-      this.u.uBlast.value = 0
+      // Not 0: `setShatterArmed(false)` calls this, and the SAMSARA sequence
+      // disarms hold-to-separate from beat 1 (spec §5.8) at the exact moment it
+      // starts driving `external` — zeroing here would blank the separation for
+      // whatever remains of the frame.
+      this.u.uBlast.value = this.external
     }
   }
 
@@ -165,8 +220,9 @@ export class ShatterController {
       }
     }
 
-    if (this.charge > 0) this.vibratePhase += this.config.VIBRATE_PHASE_STEP
-    this.u.uBlast.value = this.charge
+    const effective = this.getEffectiveCharge()
+    if (effective > 0) this.vibratePhase += this.config.VIBRATE_PHASE_STEP
+    this.u.uBlast.value = effective
   }
 
   dispose() {

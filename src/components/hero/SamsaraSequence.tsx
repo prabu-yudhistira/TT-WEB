@@ -77,6 +77,7 @@ export function SamsaraSequence({
   armed,
   onShake,
   chargeOutRef,
+  logoChargeOutRef,
   onPointerHold,
   onMode,
   controlsRef,
@@ -103,6 +104,22 @@ export function SamsaraSequence({
    * to avoid.
    */
   chargeOutRef: React.MutableRefObject<number>
+  /**
+   * The mark's separation charge — SEPARATE from the belt's, and not an
+   * oversight that there are two.
+   *
+   * `chargeOutRef` fades to 0 across the sweep, because HOLD_SHAKE_PX jitters
+   * SAMSARA by 1.5px while it is still on the orbit path and the scripted pose
+   * that takes over has no jitter, so carrying the charge across the handoff
+   * would put a 1.5px step exactly where the seam is measured.
+   *
+   * The mark has no such constraint and the opposite requirement: the owner
+   * asked for "the logo runs its full hold-to-separate", so it must stay blown
+   * apart while SAMSARA leaves rather than snapping back together underneath
+   * it. It holds through the commit and reassembles across the EXIT instead, as
+   * the room clears and the hero comes back.
+   */
+  logoChargeOutRef?: React.MutableRefObject<number>
   /**
    * Spec §5.8, plan Task 11 step 4. Called with false from beat 1 and true again
    * on the return to idle. It reaches LogoEngine.setShatterArmed() through
@@ -416,6 +433,15 @@ export function SamsaraSequence({
             : ctrl.chargeLevel
       chargeOutRef.current = published
 
+      // The mark holds its separation right through the cinematic and lets go
+      // across the exit — see logoChargeOutRef. Ramped rather than dropped: at
+      // `idle` the hero is visible again, and a charge that fell to 0 in one
+      // frame would snap the mark back together in front of the visitor.
+      if (logoChargeOutRef) {
+        logoChargeOutRef.current =
+          mode === 'exiting' ? ctrl.chargeLevel * (1 - ctrl.exit01) : ctrl.chargeLevel
+      }
+
       if (mode === 'idle' || mode === 'charge1' || mode === 'charge2' || mode === 'charge3') {
         if (promoted) demote(eng)
         else if (eng.getAngleOverride() !== null) eng.setAngleOverride(null)
@@ -594,6 +620,7 @@ export function SamsaraSequence({
       const eng = engineRef.current
       if (eng) demote(eng)
       chargeOutRef.current = 0
+      if (logoChargeOutRef) logoChargeOutRef.current = 0
       shakeCbRef.current(0)
       return ctrl.mode
     }
@@ -619,6 +646,7 @@ export function SamsaraSequence({
       const eng = engineRef.current
       if (eng) demote(eng)
       chargeOutRef.current = 0
+      if (logoChargeOutRef) logoChargeOutRef.current = 0
       shakeCbRef.current(0)
       holdCbRef.current(true)
       ctrlRef.current = null

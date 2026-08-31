@@ -199,6 +199,26 @@ export function HeroBlock({
   const mergedChargeRef = useRef<(() => number) | null>(null)
   mergedChargeRef.current = () => Math.max(chargeRef.current?.() ?? 0, seqChargeRef.current)
 
+  /**
+   * The mark's own separation charge, driven by the scroll beats (spec §4.4).
+   *
+   * ⚠️ A SEPARATE number from `seqChargeRef`, and the two must not be merged.
+   * The belt's charge fades out across the sweep to keep the mascot's 1.5px
+   * hold-jitter off the handoff seam; the mark's holds, because the owner asked
+   * for the full hold-to-separate and a mark that reassembled while SAMSARA was
+   * still leaving would undo it.
+   *
+   * ⚠️ And it must never be fed back through `mergedChargeRef`. LogoEngine
+   * publishes `getCharge()` INTO that merge; routing this back in would make
+   * the value depend on itself through two components, and since the merge is a
+   * max() it could then never fall — the belt would latch at full freeze for the
+   * rest of the session. `ShatterController.getCharge()` excludes the external
+   * drive for exactly this reason; see its comment.
+   */
+  const seqLogoChargeRef = useRef(0)
+  const logoChargeGetterRef = useRef<(() => number) | null>(null)
+  logoChargeGetterRef.current = () => seqLogoChargeRef.current
+
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced) {
@@ -289,6 +309,7 @@ export function HeroBlock({
         separation={separation}
         ignition={ignition}
         onChargeSource={onChargeSource}
+        externalChargeRef={logoChargeGetterRef}
         holdEnabled={holdEnabled}
       />
       {/* Renders nothing. Mounted here rather than around anything because the
@@ -304,6 +325,7 @@ export function HeroBlock({
         armed={stageLive && mascot.ENABLED}
         onShake={setShakePx}
         chargeOutRef={seqChargeRef}
+        logoChargeOutRef={seqLogoChargeRef}
         onPointerHold={setHoldEnabled}
       />
 

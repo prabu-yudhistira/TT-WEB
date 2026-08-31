@@ -91,6 +91,8 @@ export class LogoEngine {
   private bodySurfaceMats: THREE.Material[] = []
   private wantIgnition = false
   private wantOverlay = false
+  /** See setExternalChargeSource. Returns 0 until something publishes one. */
+  private externalChargeSource: () => number = () => 0
   /** counts down to the next hold pulse while the skin is shedding */
   private pulseTimer = 0
   /** true once the seed/cue/done sequence has completed by ANY path */
@@ -392,6 +394,25 @@ export class LogoEngine {
   setShatterArmed(v: boolean) {
     this.wantArmed = v
     this.shatter?.setArmed(v)
+  }
+
+  /**
+   * Publish a separation charge driven from outside the pointer gesture.
+   *
+   * Spec §4.4: during the SAMSARA freeze the mark shakes through its own
+   * separation, driven by the scroll beats rather than by a held finger. The
+   * satellites and the mascot already read a published number and jitter
+   * themselves; this is the mark's equivalent input.
+   *
+   * A pull-based getter, not a value, for the reason `setChargeSource` on
+   * MascotEngine is: it changes every frame, and pushing it through React at
+   * 60Hz to carry one number the render loop can simply ask for is pure
+   * overhead. Indirect through the caller's own ref so a source published after
+   * this engine was built is still found — the same race the 2026-08-09 review
+   * caught on setShatterArmed.
+   */
+  setExternalChargeSource(get: (() => number) | null) {
+    this.externalChargeSource = get ?? (() => 0)
   }
 
   /**
@@ -716,7 +737,11 @@ export class LogoEngine {
     if (this.ignition?.isFinished() && this.shatter && this.ignitionConfig.PULSE_ENABLED) {
       const st = this.shatter.getState()
       const held = st === 'charging' || st === 'blasted'
-      const shedding = held && this.shatter.getCharge() >= this.config.SEPARATE_START
+      // getEffectiveCharge, not getCharge: the latter is the POINTER's charge
+      // only (see its comment), so gating on it would leave the sequence-driven
+      // separation silent — displaced panels with none of the electrical hold
+      // pulses that make it read as an event rather than a glitch.
+      const shedding = held && this.shatter.getEffectiveCharge() >= this.config.SEPARATE_START
       if (shedding) {
         this.pulseTimer -= dt * 1000
         if (this.pulseTimer <= 0) {
@@ -744,6 +769,9 @@ export class LogoEngine {
     }
 
     if (this.shatter) {
+      // Applied BEFORE update(), which is what writes uBlast — set it after and
+      // the mark renders one frame behind the beat that caused it.
+      this.shatter.setExternalCharge(this.externalChargeSource())
       this.shatter.update(dt)
       if (this.group) {
         const v = this.shatter.getVibrateOffset()
