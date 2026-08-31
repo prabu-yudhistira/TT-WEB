@@ -1278,27 +1278,68 @@ Risk 4 in spec §12 ("frame rate with a shadow-casting light") is closed.
 
 **This task is not code. Do not proceed past it without the owner.**
 
-- [ ] **Step 1: Start the dev server and hand the owner `/en/dev/samsara`**
+- [x] **Step 1: Start the dev server and hand the owner `/en/dev/samsara`**
 
-- [ ] **Step 2: Owner tunes live** — gesture feel, shake ramp, fall duration (the 1100ms starting value is a guess and spec §5.6 flags it as probably still wrong), bounce damping, landed size and position at both breakpoints, room palette and lighting, idle eye weights, chatbox timing.
+- [x] **Step 2: Owner tunes live** — gesture feel, shake ramp, fall duration (the 1100ms starting value is a guess and spec §5.6 flags it as probably still wrong), bounce damping, landed size and position at both breakpoints, room palette and lighting, idle eye weights, chatbox timing.
 
-- [ ] **Step 3: Owner presses `copy json`**
+- [x] **Step 3: Owner presses `copy json`**
 
-- [ ] **Step 4: Paste the approved values into `DEFAULT_SEQUENCE`** in `src/lib/samsara/types.ts` and **update `types.check.ts` in the same commit** so the pinned assertions match the approved numbers.
+- [x] **Step 4: Paste the approved values into `DEFAULT_SEQUENCE`** in `src/lib/samsara/types.ts` and **update `types.check.ts` in the same commit** so the pinned assertions match the approved numbers.
 
-- [ ] **Step 5: Replace the header comment** in `types.ts` — remove the "NOT owner-approved" warning and replace it with the approval date, matching the style of `mascot/types.ts`.
+- [x] **Step 5: Replace the header comment** in `types.ts` — remove the "NOT owner-approved" warning and replace it with the approval date, matching the style of `mascot/types.ts`.
 
-- [ ] **Step 6: Run the full suite**
+- [x] **Step 6: Run the full suite**
 
 ```bash
 npm run verify:config
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" commit -m "feat(samsara): freeze owner-approved sequence values"
 ```
+
+### ✅ CLEARED 2026-08-31 (commit `88b9a80`)
+
+The owner tuned live and pasted back. `DEFAULT_SEQUENCE` is frozen and the
+"NOT owner-approved" header is gone. Downstream tasks may now treat these
+numbers as approved.
+
+**What the owner changed, and what it means beyond the number:**
+
+| | was | now | consequence |
+|---|---|---|---|
+| `BEATS_TO_COMMIT` | 4 | **2** | one charge beat, then the commit |
+| `WHEEL_THRESHOLD` | 120 | **205** | a real mouse notch (~120) is no longer one beat — it takes two |
+| `FALL_MS` | 1100 | **950** | still the longest phase, so the arc holds |
+| `RESTITUTION` | 0.45 | **0.8** | much livelier bounces |
+| `SIZE_FRAC` | 0.4 | **0.435** | and `MOBILE_SIZE_FRAC` **0.35**, now set independently |
+| `X_FRAC` | 0.72 | **0.59** | less far right |
+| `CAMERA_FOV_DEG` / `DEPTH` | 45 / 26 | **55 / 42** | a wider, deeper room |
+| `AMBIENT_INTENSITY` | 0.25 | **1.45** | much brighter |
+| `MASCOT_TINT_STRENGTH` | 0 | **0.32** | the chrome→brass correction, turned on |
+
+⚠️ **`CHARGE_PER_BEAT` is `[0.4, 0.7, 1]` with only ONE charge beat now**, so
+entries 2 and 3 are dead and the freeze reaches **0.4** — a partial separation —
+before the commit takes it to 1. That is what the owner saw on the bench and
+approved. Raise `CHARGE_PER_BEAT[0]` if a fuller separation before the commit is
+ever wanted; the array is deliberately left at length 3 so restoring more beats
+does not produce a beat with no ramp behind it.
+
+### Also landed here: spec §6.5's room idle loop
+
+It did not exist. The orbit fires a glance on the **rising edge** of the face
+turning toward the viewer, and once the spin is parked that edge never comes
+again — a landed SAMSARA played exactly one expression and then rested on
+neutral for the rest of the scene. The room now runs its own timer over its own
+weight pool.
+
+Owner: *"use all the expressions when parked and floating, for the rest of the
+scene."* All 14 are in `IDLE_EYES.WEIGHTS`; the bench generates one slider per
+expression from `EXPRESSION_ORDER`, so an expression can never exist in eyes.ts,
+play on screen, and have no control — with nothing to indicate the gap.
+
 
 ---
 
