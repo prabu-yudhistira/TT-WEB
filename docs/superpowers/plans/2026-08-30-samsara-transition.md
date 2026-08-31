@@ -1122,23 +1122,23 @@ git -c safe.directory="D:/TAMPA TARUNO/WEBSITE/_WEB_PRODUCT" commit -m "refactor
 - Consumes: `SequenceController` (Task 9), `MascotEngine` surface (Task 7), `room` (Task 8)
 - Produces: `<SamsaraSequence config engineRef armed onLanded onExited />`
 
-- [ ] **Step 1: Wire gesture listeners**
+- [x] **Step 1: Wire gesture listeners**
 
 Non-passive `wheel` and `touchmove` on the hero, `touchend`, feeding `gestures.ts` and then `SequenceController.beat()`. `preventDefault()` while mode is not `idle`.
 
-- [ ] **Step 2: Wire the Lenis pin**
+- [x] **Step 2: Wire the Lenis pin**
 
 `lenis.stop()` on leaving `idle`; `lenis.start()` on reaching `landed`. Add `touch-action: none` and `overscroll-behavior: none` to the hero while pinned. Lenis is created in `SmoothScroll.tsx` and is not currently exposed — export it via a module-level ref or a small context, whichever matches the file's existing style.
 
-- [ ] **Step 3: Wire the promotion gate**
+- [x] **Step 3: Wire the promotion gate**
 
 Each frame in `committed`, compute the pose via `transitPoseAt` and call `hasClearedLogo`. On the first `true`: set the canvas root to `position: fixed`, raise its z-index above the hero, call `engine.setCameraMode('perspective')` with `solveHandoff`, and only THEN begin the room's fade-up.
 
-- [ ] **Step 4: Disable pointer-hold while the sequence owns the charge**
+- [x] **Step 4: Disable pointer-hold while the sequence owns the charge**
 
 Spec §5.8. From beat 1 until `idle` returns, `engine.setShatterArmed(false)` on the logo engine.
 
-- [ ] **Step 5: Verify the seam**
+- [x] **Step 5: Verify the seam**
 
 ```bash
 node docs/superpowers/verification/samsara-seam.mjs
@@ -1146,7 +1146,62 @@ node docs/superpowers/verification/samsara-seam.mjs
 
 Expected: PASS — no size or position discontinuity greater than 1px across the promotion frame, at 1440×900, 1280×720 and 390×844.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+
+### ⚠️ What this task actually touched, beyond the file list above
+
+Recorded rather than quietly absorbed — the plan's own list was short by four
+files, each for a reason worth keeping:
+
+- **`src/lib/mascot/MascotEngine.ts`** — additive only, as Task 7 established.
+  Perspective placement in `place()` (the gap Task 8 explicitly left open),
+  `getOrbitFrame()`, `setAngleOverride()`, `setRoomReveal()`, and a per-frame
+  render snapshot for verification.
+- **`src/lib/samsara/room.ts`** — `setReveal()`, because step 3's "fade-up" had
+  no mechanism; `roomCameraFor()`, shared with the engine's dev handle so the
+  bench cannot frame the room differently from the transition; and a backdrop
+  quad, because `ROOM.BG_COLOR` was defined but never rendered and §5.7 needs
+  the room to actually cover the hero.
+- **`src/components/hero/LogoStage.tsx`** — step 4 says `setShatterArmed(false)`
+  "on the logo engine", and the only route from the hero to that engine runs
+  through `LogoStage`'s `armed`, which it computes itself. It gained a
+  `holdEnabled` prop.
+- **`src/components/providers/SmoothScroll.tsx`** — as step 2 instructs.
+
+### ⚠️ Deviations from the steps as written
+
+- **The pin starts on ARM, not on leaving `idle`** (step 2). Beat 1 is itself a
+  wheel gesture and Lenis listens to the same event, so stopping it after the
+  beat is counted is one event too late — §5.3 requires beat 1 to move nothing.
+- **`preventDefault()` is unconditional while the sequence holds the hero**, not
+  "while mode is not idle" (step 1), for the same reason.
+- **`solveHandoff` is asked about the ROOM, not about SAMSARA** (step 3). The
+  seam no longer depends on it: `place()` re-solves position and size at the
+  body's live depth every frame, which is exact for the whole transit rather
+  than only at the handoff instant. That frees the camera distance to serve
+  composition, and the room's own height is what should decide it.
+
+### ⚠️ Not wired, and Task 12 needs it before the owner sits down
+
+**SAMSARA lands with its face turned away.** `SPIN_SPEED 113` keeps running
+through the transit, so the landed rotation is whatever the clock happened to
+reach. Spec §6.5 — "In the room SAMSARA is stationary, front-facing" — is not
+implemented; only the pose, size and depth are.
+
+This blocks part of Task 13: its step 2 has the owner tuning **idle eye weights**
+live, which cannot be judged against the back of the mascot's head. Either the
+bench parks the spin (`setInspect` already does exactly this) or the landing
+eases `spin` to 0. It is small, and it belongs with the room's idle loop rather
+than with the wiring.
+
+**The logo's separation is not driven by the sequence.** Spec §4.4 says all three
+3D layers shake during the freeze, "the logo shakes through its separation — the
+sequence drives that charge from beat 1". The satellites and the mascot do shake
+(they read the published charge through `chargeRef`); the mark itself does not,
+because `ShatterController` has no external charge input and neither the plan's
+file list nor Task 11's steps call for adding one. The freeze the owner tunes at
+Task 13 is therefore one layer short of the spec until that is decided.
+
 
 ---
 
