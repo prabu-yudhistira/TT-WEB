@@ -41,6 +41,7 @@ export function MascotLayer({
   inspect,
   onEngine,
   rootElRef,
+  dragLabel,
 }: {
   config: MascotConfig
   /** The belt the mascot orbits in — supplies the shared plane and radii. */
@@ -80,12 +81,18 @@ export function MascotLayer({
    * fires on the same frame as the camera swap.
    */
   rootElRef?: React.MutableRefObject<HTMLDivElement | null>
+  /**
+   * Cursor pill shown while the pointer is over a draggable SAMSARA — "Drag" /
+   * "Seret", matching the archive canvas. Omit to leave it undraggable-looking.
+   */
+  dragLabel?: string
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const labelRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<MascotEngine | null>(null)
   const [behind, setBehind] = useState(true)
+  const [overMascot, setOverMascot] = useState(false)
 
   const statusRef = useRef(onStatus)
   statusRef.current = onStatus
@@ -119,6 +126,7 @@ export function MascotLayer({
     // review caught.
     engine.setChargeSource(() => chargeRef?.current?.() ?? 0)
     engine.onDepth(setBehind)
+    engine.onMascotHover(setOverMascot)
     if (labelBoxRef) labelBoxRef.current = () => engine.getLabelBox()
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -195,11 +203,26 @@ export function MascotLayer({
       <canvas
         ref={canvasRef}
         data-mascot={behind ? 'behind' : 'front'}
+        // The pill only exists while the pointer is genuinely on the body — see
+        // the pointerEvents note below.
+        data-cursor={dragLabel && overMascot ? dragLabel : undefined}
         style={{
           position: 'absolute',
           inset: 0,
           zIndex: behind ? 0 : 2,
-          pointerEvents: 'none',
+          /**
+           * ⚠️ 'auto' ONLY while the pointer is actually over SAMSARA's disc.
+           *
+           * The drag itself does not need this — the engine listens on the
+           * window and hit-tests the circle itself, precisely so this layer can
+           * stay transparent to everything else. What needs it is the cursor:
+           * the site's Cursor component reads `data-cursor` off the event
+           * TARGET, and a `pointer-events: none` element is never the target.
+           *
+           * Left permanently 'auto' this canvas would swallow every click in
+           * the room, including the chatbox that lands on top of it.
+           */
+          pointerEvents: dragLabel && overMascot ? 'auto' : 'none',
         }}
       />
       {/* The word sits at a FIXED z 2, deliberately not flipping with the

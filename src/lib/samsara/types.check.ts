@@ -125,6 +125,33 @@ check(
   DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH >= 0 && DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH <= 1,
 )
 
+// ── parked orientation and drag ─────────────────────────────────────
+// Owner requirement: SAMSARA has to be parked where its eyes meet the visitor,
+// so the room's orientation is an explicit decision rather than whatever the
+// orbit's spin clock happened to reach.
+const DEG = (v: number) => v >= -360 && v <= 360
+check('parked pitch is a sane angle', DEG(DEFAULT_SEQUENCE.LANDING.ROT_X_DEG))
+check('parked yaw is a sane angle', DEG(DEFAULT_SEQUENCE.LANDING.ROT_Y_DEG))
+check('parked roll is a sane angle', DEG(DEFAULT_SEQUENCE.LANDING.ROT_Z_DEG))
+
+check('drag turns something per pixel', DEFAULT_SEQUENCE.DRAG.SENSITIVITY_DEG_PER_PX > 0)
+check(
+  'pitch is clamped short of a flip — past vertical the yaw axis inverts',
+  DEFAULT_SEQUENCE.DRAG.MAX_PITCH_DEG > 0 && DEFAULT_SEQUENCE.DRAG.MAX_PITCH_DEG <= 180,
+)
+check(
+  'damping is a per-SECOND survival fraction, not a per-frame multiplier',
+  DEFAULT_SEQUENCE.DRAG.DAMPING >= 0 && DEFAULT_SEQUENCE.DRAG.DAMPING < 1,
+)
+check('the return is quicker than the delay that triggers it', DEFAULT_SEQUENCE.DRAG.RETURN_MS > 0)
+// The SHIPPED default is the visitor's, not the bench's: a room composed around
+// a face that meets you has to reassert that after someone lets go. 0 (stay put)
+// is the inspection setting and lives on the bench, not here.
+check(
+  'the shipped default springs back to the parked pose',
+  DEFAULT_SEQUENCE.DRAG.RETURN_DELAY_MS > 0,
+)
+
 // ── idle eyes ───────────────────────────────────────────────────────
 // Spec §6.5: in the room SAMSARA is stationary and front-facing, so the eyes
 // are driven by a timed loop rather than by the face sweeping past.

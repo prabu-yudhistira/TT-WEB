@@ -99,6 +99,30 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: 'parked orientation',
+    note:
+      'where the face points once landed. 0/0/0 is frontal and level. ' +
+      'drag SAMSARA directly to find an angle, then read it back off these.',
+    rows: [
+      { kind: 'num', path: 'LANDING.ROT_X_DEG', label: 'Pitch ° (nod)', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'LANDING.ROT_Y_DEG', label: 'Yaw ° (turn)', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'LANDING.ROT_Z_DEG', label: 'Roll ° (tilt)', min: -180, max: 180, step: 1 },
+    ],
+  },
+  {
+    title: 'drag to turn',
+    note:
+      'RETURN DELAY 0 = stays where you put it, for inspecting the far side. ' +
+      'non-zero = springs back to the parked pose, which is what a visitor should get.',
+    rows: [
+      { kind: 'num', path: 'DRAG.SENSITIVITY_DEG_PER_PX', label: '° per pixel', min: 0.05, max: 3, step: 0.05 },
+      { kind: 'num', path: 'DRAG.MAX_PITCH_DEG', label: 'Max pitch °', min: 0, max: 180, step: 5 },
+      { kind: 'num', path: 'DRAG.DAMPING', label: 'Spin-down (kept/sec)', min: 0, max: 0.9, step: 0.01 },
+      { kind: 'num', path: 'DRAG.RETURN_DELAY_MS', label: 'Return delay ms (0 = stay)', min: 0, max: 10000, step: 100 },
+      { kind: 'num', path: 'DRAG.RETURN_MS', label: 'Return ms', min: 100, max: 4000, step: 50 },
+    ],
+  },
+  {
     title: 'room',
     note: 'DEPTH is geometry — changing it rebuilds the room, which is why it is not instant',
     rows: [
@@ -391,6 +415,7 @@ export default function SamsaraLab({
           eyes={eyes}
           onEngine={setEngine}
           rootElRef={mascotRootRef}
+          dragLabel={cfg.DRAG.ENABLED ? 'Drag' : undefined}
         />
         <div style={{ position: 'absolute', inset: 0, zIndex: 0, opacity: showLogo ? 1 : 0 }}>
           <LogoCanvas
@@ -536,6 +561,16 @@ export default function SamsaraLab({
             <span>{label}</span>
           </label>
         ))}
+        <label style={{ display: 'flex', gap: 6, marginBottom: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={cfg.DRAG.ENABLED}
+            onChange={(e) => set('DRAG.ENABLED', e.target.checked)}
+          />
+          <span title="Click-hold-drag SAMSARA to turn it. Landed only.">
+            drag to turn
+          </span>
+        </label>
         <label style={{ display: 'flex', gap: 6, marginBottom: 12, cursor: 'pointer' }}>
           <input
             type="checkbox"

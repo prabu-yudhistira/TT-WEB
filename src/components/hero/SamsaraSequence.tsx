@@ -354,6 +354,12 @@ export function SamsaraSequence({
     }
     const onTouchMove = (e: TouchEvent) => {
       e.preventDefault()
+      // ⚠️ A finger dragged across SAMSARA is BOTH a rotation and an upward
+      // swipe, and an upward swipe means "leave the room". Without this,
+      // inspecting the far side of the body on a phone exits the room instead
+      // of turning it. The drag wins: it started ON the mascot, which is as
+      // explicit as intent gets.
+      if (engineRef.current?.isDragging()) return
       const y = e.touches[0]?.clientY
       if (y == null || touchY == null) return
       // Screen y grows downward, so a finger moving UP is a scroll DOWN.
@@ -663,6 +669,12 @@ export function SamsaraSequence({
   useEffect(() => {
     ctrlRef.current?.setConfig(config)
     engine?.setRoomConfig(config.ROOM)
+    engine?.setRoomPose({
+      x: config.LANDING.ROT_X_DEG,
+      y: config.LANDING.ROT_Y_DEG,
+      z: config.LANDING.ROT_Z_DEG,
+    })
+    engine?.setDragConfig(config.DRAG)
   }, [config, engine])
 
   return null

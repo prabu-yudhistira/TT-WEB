@@ -79,6 +79,61 @@ export type LandingConfig = {
   /** Idle float once landed. */
   HOVER_BOB_PX: number
   HOVER_BOB_MS: number
+
+  /**
+   * The parked orientation in the room, in degrees — pitch, yaw, roll.
+   *
+   * Owner requirement: "samsara has to be parked on certain position that
+   * suits the eyes of visitor/user." In the hero the orientation is whatever
+   * SPIN_SPEED's clock happens to reach, which is fine for a body sweeping past
+   * at 12.6-70px and useless for one parked at 40% of viewport height with a
+   * face that is supposed to meet the visitor.
+   *
+   * 0/0/0 is frontal and level: the face is +Z in model space and only the yaw
+   * turns it, so yaw 0 IS facing the viewer. Note this drops the orbit's
+   * SPIN_TILT 12-degree roll at the landing, deliberately — the room's pose is
+   * an explicit decision now, not an inheritance.
+   */
+  ROT_X_DEG: number
+  ROT_Y_DEG: number
+  ROT_Z_DEG: number
+}
+
+/**
+ * Click-hold-drag to turn SAMSARA. Owner request.
+ *
+ * Two jobs at once, which is why it is config rather than a bench-only handle:
+ * it is how the owner inspects the whole surface while tuning, AND it is a real
+ * visitor interaction in the room, in the same spirit as the hero's
+ * drag-to-spin on the mark.
+ *
+ * ⚠️ Landed only. Dragging a body that is still mid-bounce would fight the
+ * scripted pose, and the transit is uninterruptible by design (spec §5.1).
+ */
+export type DragConfig = {
+  ENABLED: boolean
+  /** Degrees turned per pixel of pointer travel. */
+  SENSITIVITY_DEG_PER_PX: number
+  /**
+   * How far off the parked pitch a drag may go, degrees. Clamped rather than
+   * free: past vertical the yaw axis flips and the body reads as tumbling
+   * rather than turning.
+   */
+  MAX_PITCH_DEG: number
+  /**
+   * Fraction of the flick's velocity still left one second after release.
+   * 0 stops dead; the spin-down is what makes a flick feel like it has mass.
+   */
+  DAMPING: number
+  /**
+   * Stillness after release before it eases back to the parked pose.
+   *
+   * ⚠️ 0 means STAY WHERE PUT, which is the setting for inspecting a surface.
+   * Non-zero is the setting for a live visitor, where the composition and the
+   * eye contact have to reassert themselves after someone lets go.
+   */
+  RETURN_DELAY_MS: number
+  RETURN_MS: number
 }
 
 export type RoomConfig = {
@@ -150,6 +205,7 @@ export type SequenceConfig = {
   TRANSIT: TransitConfig
   LANDING: LandingConfig
   ROOM: RoomConfig
+  DRAG: DragConfig
   IDLE_EYES: IdleEyesConfig
   CHATBOX: ChatboxConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
@@ -195,6 +251,11 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     MOBILE_Y_FRAC: 0.3,
     HOVER_BOB_PX: 8,
     HOVER_BOB_MS: 3200,
+
+    // Frontal and level. The owner parks it for real at the bench.
+    ROT_X_DEG: 0,
+    ROT_Y_DEG: 0,
+    ROT_Z_DEG: 0,
   },
 
   ROOM: {
@@ -218,6 +279,18 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     MASCOT_TINT_COLOR: '#8A6A3A',
     MASCOT_TINT_STRENGTH: 0,
     MASCOT_ROUGHNESS_BOOST: 0,
+  },
+
+  DRAG: {
+    ENABLED: true,
+    SENSITIVITY_DEG_PER_PX: 0.5,
+    MAX_PITCH_DEG: 75,
+    DAMPING: 0.02,
+    // Non-zero, because the shipped default is the VISITOR's setting: the room
+    // is composed around a face that meets you, and it has to come back to that
+    // on its own. Set to 0 at the bench to inspect the far side.
+    RETURN_DELAY_MS: 2500,
+    RETURN_MS: 900,
   },
 
   IDLE_EYES: {

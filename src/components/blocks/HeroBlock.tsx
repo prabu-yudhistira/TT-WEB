@@ -39,6 +39,8 @@ type Props = {
    * value for the /dev/samsara bench and the freeze gate in plan Task 13.
    */
   samsara?: SequenceConfig
+  /** Only for the drag-to-turn cursor pill. Defaults to English. */
+  locale?: string
 }
 
 const TYPE_DUR_S = 1.4 // characters finish typing by this mark (owner 2026-07-17: 1.4s reveal / 7s full)
@@ -91,6 +93,7 @@ export function HeroBlock({
   eyes,
   floatingWords = [],
   samsara = DEFAULT_SEQUENCE,
+  locale = 'en',
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
   const cueRef = useRef<HTMLSpanElement>(null)
@@ -302,6 +305,9 @@ export function HeroBlock({
         eyes={eyes}
         onEngine={setMascotEngine}
         rootElRef={mascotRootRef}
+        // Matches the archive canvas's own pill, so the site has one word for
+        // "you can turn this" rather than two.
+        dragLabel={samsara.DRAG.ENABLED ? (locale === 'id' ? 'Seret' : 'Drag') : undefined}
       />
       <LogoStage
         onLive={onStageLive}

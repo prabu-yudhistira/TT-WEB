@@ -46,6 +46,7 @@ export async function RenderBlocks({
                   floatingWords={(block.floatingWords || [])
                     .map((w) => w.word)
                     .filter((w): w is string => !!w)}
+                  locale={locale}
                 />
               )
             }

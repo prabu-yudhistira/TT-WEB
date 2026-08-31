@@ -22,7 +22,7 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
-import { DEFAULT_SEQUENCE, type RoomConfig } from '../samsara/types'
+import { DEFAULT_SEQUENCE, type DragConfig, type RoomConfig } from '../samsara/types'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -122,6 +122,30 @@ export class MascotEngine {
   private angleOverride: number | null = null
   /** See setSpinParked. Eases the face to the viewer instead of spinning. */
   private spinParked = false
+
+  // ── the room's orientation, and turning it by hand ──────────────────
+  /** Parked orientation, radians. Pitch, yaw, roll. See LandingConfig. */
+  private roomPose = { x: 0, y: 0, z: 0 }
+  /** What is actually drawn, easing toward roomPose so a park never snaps. */
+  private posed = { x: 0, y: 0, z: 0 }
+  private dragCfg: DragConfig = DEFAULT_SEQUENCE.DRAG
+  private dragging = false
+  private dragPointerId = -1
+  private dragLastX = 0
+  private dragLastY = 0
+  /** Offsets ADDED to the parked pose, so a drag never destroys the tuning. */
+  private dragYaw = 0
+  private dragPitch = 0
+  private dragVelYaw = 0
+  private dragVelPitch = 0
+  /** ms since the drag ended, for RETURN_DELAY_MS. -1 while held. */
+  private dragIdleMs = -1
+  /** Last pointer position seen, for the polled hover test. */
+  private ptrX = 0
+  private ptrY = 0
+  private ptrSeen = false
+  private overMascot = false
+  private overListeners = new Set<(over: boolean) => void>()
   /**
    * World Z the scripted pose sits on while the perspective camera is live.
    * 0 is the plane through the room's origin; negative is deeper into it.
@@ -317,6 +341,20 @@ export class MascotEngine {
     }
 
     window.addEventListener('scroll', this.onScroll, { passive: true })
+
+    // ⚠️ On WINDOW, not on the canvas, and that is not laziness.
+    //
+    // The mascot layer is `pointer-events: none` so the room stays clickable
+    // through it — the chatbox lands on top of this canvas. A `pointerdown`
+    // bound to the canvas would therefore never fire at all. Listening on the
+    // window and hit-testing the circle ourselves keeps the layer transparent
+    // to every pointer that is not actually on SAMSARA, which is the behaviour
+    // both halves need.
+    window.addEventListener('pointerdown', this.onPointerDown)
+    window.addEventListener('pointermove', this.onPointerMove)
+    window.addEventListener('pointerup', this.onPointerUp)
+    window.addEventListener('pointercancel', this.onPointerUp)
+    window.addEventListener('blur', this.onBlur)
   }
 
   /** Set by the bench / verification to pin one expression. null = live. */
@@ -844,6 +882,200 @@ export class MascotEngine {
     this.room?.setReveal(v)
   }
 
+  // ── the room pose, and turning it by hand ───────────────────────────
+
+  /** The parked orientation, in DEGREES. See LandingConfig's ROT_*_DEG. */
+  setRoomPose(deg: { x: number; y: number; z: number }) {
+    const R = Math.PI / 180
+    this.roomPose = { x: deg.x * R, y: deg.y * R, z: deg.z * R }
+  }
+
+  setDragConfig(cfg: DragConfig) {
+    this.dragCfg = cfg
+    if (!cfg.ENABLED) this.endDrag()
+  }
+
+  /**
+   * True while a pointer is actively turning SAMSARA.
+   *
+   * ⚠️ The SAMSARA sequence must consult this before feeding a `touchmove` to
+   * the gesture normaliser. On a touch screen one finger dragged across the
+   * mascot is BOTH a rotation and an upward swipe, and the swipe means "leave
+   * the room" — so without this, inspecting the far side of SAMSARA on a phone
+   * exits the room instead.
+   */
+  isDragging() {
+    return this.dragging
+  }
+
+  /** Fires when the pointer moves onto or off SAMSARA's disc. */
+  onMascotHover(cb: ((over: boolean) => void) | null) {
+    this.overListeners.clear()
+    if (cb) {
+      this.overListeners.add(cb)
+      cb(this.overMascot)
+    }
+  }
+
+  /**
+   * Is a viewport point on SAMSARA?
+   *
+   * A circle test against the last drawn centre and diameter, NOT a raycast.
+   * The mascot is a sphere, so the circle is not an approximation of its
+   * silhouette — it IS its silhouette, exactly, at any orientation. The mark
+   * needs a raycast because it is a knot full of holes; this does not, and a
+   * per-move raycast against 200k triangles is not something to pay for when
+   * the closed form is two subtractions.
+   */
+  private hitsMascot(clientX: number, clientY: number) {
+    if (!this.model || this.lastDiameterPx <= 0) return false
+    // host, not the canvas: resize() measures W/H from the host, so lastScreen
+    // is in the HOST's box. Measuring against a different element would put the
+    // hit circle wherever the two happened to disagree.
+    const rect = this.host.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return false
+    const dx = clientX - rect.left - this.lastScreen.x
+    const dy = clientY - rect.top - this.lastScreen.y
+    const r = this.lastDiameterPx / 2
+    return dx * dx + dy * dy <= r * r
+  }
+
+  /** Draggable only once it has arrived — see DragConfig. */
+  private dragAllowed() {
+    return this.dragCfg.ENABLED && this.mode === 'room' && !!this.model
+  }
+
+  private onPointerDown = (e: PointerEvent) => {
+    if (!this.dragAllowed() || this.dragging) return
+    if (!this.hitsMascot(e.clientX, e.clientY)) return
+    this.dragging = true
+    this.dragPointerId = e.pointerId
+    this.dragLastX = e.clientX
+    this.dragLastY = e.clientY
+    this.dragVelYaw = 0
+    this.dragVelPitch = 0
+    this.dragIdleMs = -1
+  }
+
+  private onPointerMove = (e: PointerEvent) => {
+    this.ptrX = e.clientX
+    this.ptrY = e.clientY
+    this.ptrSeen = true
+    if (!this.dragging || e.pointerId !== this.dragPointerId) return
+
+    const R = Math.PI / 180
+    const k = this.dragCfg.SENSITIVITY_DEG_PER_PX * R
+    const dx = (e.clientX - this.dragLastX) * k
+    const dy = (e.clientY - this.dragLastY) * k
+    this.dragLastX = e.clientX
+    this.dragLastY = e.clientY
+
+    this.dragYaw += dx
+    const max = this.dragCfg.MAX_PITCH_DEG * R
+    this.dragPitch = Math.max(-max, Math.min(max, this.dragPitch + dy))
+    // Recorded per event rather than differentiated per frame: a flick's last
+    // move can land between two frames, and a velocity sampled on the frame
+    // boundary would read it as a dead stop.
+    this.dragVelYaw = dx
+    this.dragVelPitch = dy
+  }
+
+  private onPointerUp = (e: PointerEvent) => {
+    if (!this.dragging || e.pointerId !== this.dragPointerId) return
+    this.endDrag()
+  }
+
+  /** A drag whose pointerup lands in another window would otherwise never end. */
+  private onBlur = () => this.endDrag()
+
+  private endDrag() {
+    if (!this.dragging) return
+    this.dragging = false
+    this.dragPointerId = -1
+    this.dragIdleMs = 0
+  }
+
+  /**
+   * Spin-down, the return to the parked pose, and the hover flag.
+   *
+   * Split out of place() because it is the only part of the pose that runs on
+   * wall-clock time rather than on the frame's own progress through the transit.
+   */
+  private updateDrag(dtSec: number) {
+    const cfg = this.dragCfg
+    const allowed = this.dragAllowed()
+
+    // Leaving the room drops any turn on the floor: coming back should present
+    // the pose the owner tuned, not wherever the last visitor left it.
+    if (!allowed) {
+      this.dragYaw = 0
+      this.dragPitch = 0
+      this.dragVelYaw = 0
+      this.dragVelPitch = 0
+      this.dragIdleMs = -1
+      this.setOver(false)
+      return
+    }
+
+    this.setOver(this.ptrSeen && this.hitsMascot(this.ptrX, this.ptrY))
+
+    if (this.dragging) return
+
+    // Inertia. DAMPING is the fraction of velocity SURVIVING one second, so the
+    // decay is framerate-independent rather than a per-frame multiplier that
+    // would spin longer on a faster display.
+    const keep = Math.pow(Math.max(1e-6, cfg.DAMPING), dtSec)
+    if (Math.abs(this.dragVelYaw) > 1e-6 || Math.abs(this.dragVelPitch) > 1e-6) {
+      const R = Math.PI / 180
+      const max = cfg.MAX_PITCH_DEG * R
+      this.dragYaw += this.dragVelYaw * dtSec * 60
+      this.dragPitch = Math.max(-max, Math.min(max, this.dragPitch + this.dragVelPitch * dtSec * 60))
+      this.dragVelYaw *= keep
+      this.dragVelPitch *= keep
+      if (Math.abs(this.dragVelYaw) < 1e-4) this.dragVelYaw = 0
+      if (Math.abs(this.dragVelPitch) < 1e-4) this.dragVelPitch = 0
+    }
+
+    if (this.dragIdleMs < 0) return
+    this.dragIdleMs += dtSec * 1000
+
+    // 0 means stay put — the inspection setting. Never returns, by design.
+    if (cfg.RETURN_DELAY_MS <= 0) return
+    if (this.dragIdleMs < cfg.RETURN_DELAY_MS) return
+
+    const rate = 1 - Math.exp((-dtSec * 1000 * 4) / Math.max(1, cfg.RETURN_MS))
+    this.dragYaw += (0 - this.dragYaw) * rate
+    this.dragPitch += (0 - this.dragPitch) * rate
+    if (Math.abs(this.dragYaw) < 1e-4 && Math.abs(this.dragPitch) < 1e-4) {
+      this.dragYaw = 0
+      this.dragPitch = 0
+      this.dragIdleMs = -1
+    }
+  }
+
+  /** Has a drag left the body somewhere other than its parked pose? */
+  private dragTouched() {
+    return (
+      this.dragging ||
+      this.dragYaw !== 0 ||
+      this.dragPitch !== 0 ||
+      this.dragVelYaw !== 0 ||
+      this.dragVelPitch !== 0
+    )
+  }
+
+  private setOver(v: boolean) {
+    if (v === this.overMascot) return
+    this.overMascot = v
+    this.overListeners.forEach((cb) => {
+      try {
+        cb(v)
+      } catch (err) {
+        console.error('MascotEngine: hover listener threw', err)
+      }
+    })
+  }
+
   /**
    * Stop the spin and turn the face to the viewer.
    *
@@ -1255,8 +1487,37 @@ export class MascotEngine {
       this.placer.scale.setScalar(worldSizeFor(diameterPx, dist, this.H, this.persp.fov))
     }
 
-    this.tilter.rotation.z = (c.SPIN_TILT * Math.PI) / 180
-    this.spinner.rotation.y = this.spin
+    // ── orientation ───────────────────────────────────────────────────
+    //
+    // In the belt this is one number: SPIN_TILT rolls the axis, `spin` turns the
+    // body, and that was the right shape for a mascot sweeping past at 12.6-70px.
+    //
+    // Parked in the room it is a POSE, because the owner has to aim the face at
+    // the visitor. Both live here rather than in two branches of the caller, so
+    // there is exactly one place that decides what SAMSARA is pointing at.
+    //
+    // `posed` chases the target instead of taking it, and the yaw target is
+    // wrapped to the nearest turn — otherwise parking a body that has spun 40
+    // times would unwind all 40 on screen before it settled.
+    this.updateDrag(dtSec)
+    const parked = this.mode === 'room' && (this.spinParked || this.dragTouched())
+    if (parked) {
+      const TAU = Math.PI * 2
+      const yawTarget = this.roomPose.y + Math.round((this.posed.y - this.roomPose.y) / TAU) * TAU
+      // Time-based, so the settle takes the same wall-clock time on a 144Hz
+      // display as on a 60Hz one.
+      const k = 1 - Math.exp(-dtSec * 6)
+      this.posed.x += (this.roomPose.x - this.posed.x) * k
+      this.posed.y += (yawTarget - this.posed.y) * k
+      this.posed.z += (this.roomPose.z - this.posed.z) * k
+    } else {
+      this.posed.x = 0
+      this.posed.y = this.spin
+      this.posed.z = (c.SPIN_TILT * Math.PI) / 180
+    }
+
+    this.tilter.rotation.z = this.posed.z
+    this.spinner.rotation.set(this.posed.x + this.dragPitch, this.posed.y + this.dragYaw, 0)
 
     // Motes are shed at the mascot's own position, so the wake traces the real
     // orbit rather than an idealised one — the hold-shake jitter above is
@@ -1570,6 +1831,12 @@ export class MascotEngine {
     this.disposed = true
     this.stop()
     window.removeEventListener('scroll', this.onScroll)
+    window.removeEventListener('pointerdown', this.onPointerDown)
+    window.removeEventListener('pointermove', this.onPointerMove)
+    window.removeEventListener('pointerup', this.onPointerUp)
+    window.removeEventListener('pointercancel', this.onPointerUp)
+    window.removeEventListener('blur', this.onBlur)
+    this.overListeners.clear()
     this.depthCb = null
     // Before the generic scene traversal below, so the room's own lights and
     // shadow map are released explicitly rather than left to the mesh sweep,
