@@ -107,6 +107,24 @@ check('FLOOR is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.FLOOR_COLOR))
 check('WALL is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.WALL_COLOR))
 check('KEY_LIGHT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.KEY_LIGHT_COLOR))
 
+// ── mascot material tint, room-only ─────────────────────────────────
+// A NEW capability, not a starting value in the usual sense — see its comment
+// in types.ts. Its whole point is to be inert until the owner turns it on, so
+// what is pinned here is the NO-OP, not a look.
+check('MASCOT_TINT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_COLOR))
+check(
+  'mascot tint starts OFF — the hero material must not shift without the owner asking',
+  DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0,
+)
+check(
+  'roughness boost starts OFF for the same reason',
+  DEFAULT_SEQUENCE.ROOM.MASCOT_ROUGHNESS_BOOST === 0,
+)
+check(
+  'tint strength is a fraction, not a percentage',
+  DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH >= 0 && DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH <= 1,
+)
+
 // ── idle eyes ───────────────────────────────────────────────────────
 // Spec §6.5: in the room SAMSARA is stationary and front-facing, so the eyes
 // are driven by a timed loop rather than by the face sweeping past.

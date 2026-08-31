@@ -78,6 +78,15 @@ export class MascotEngine {
   private detailLoaded = false
   private detailLoading = false
   private materials: THREE.MeshStandardMaterial[] = []
+  /**
+   * Captured once per model load, parallel to `materials`. What
+   * `applyMascotTint` lerps FROM — without this a repeated call would lerp
+   * from whatever the last call left behind, and a strength of 1 held for two
+   * calls would not be the same colour as strength 1 held for one.
+   */
+  private materialBase: { color: THREE.Color; roughness: number }[] = []
+  /** Scratch object for applyMascotTint, reused so it allocates nothing per call. */
+  private scratchTintColor = new THREE.Color()
   private envRT: THREE.WebGLRenderTarget | null = null
 
   private hemi: THREE.HemisphereLight
@@ -506,13 +515,16 @@ export class MascotEngine {
       norm.scale.setScalar(1 / maxDim)
 
       this.materials = []
+      this.materialBase = []
       model.traverse((o) => {
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const mat = m.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]
         for (const mm of Array.isArray(mat) ? mat : [mat]) {
           if ((mm as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-            this.materials.push(mm as THREE.MeshStandardMaterial)
+            const std = mm as THREE.MeshStandardMaterial
+            this.materials.push(std)
+            this.materialBase.push({ color: std.color.clone(), roughness: std.roughness })
           }
         }
       })
@@ -521,6 +533,7 @@ export class MascotEngine {
       this.model = norm
       this.patchEyes()
       this.applyLook()
+      this.applyMascotTint()
     } catch (err) {
       // No mascot is an acceptable outcome; a broken hero is not.
       console.error('MascotEngine: model failed to load', err)
@@ -593,13 +606,16 @@ export class MascotEngine {
       }
 
       this.materials = []
+      this.materialBase = []
       model.traverse((o) => {
         const m = o as THREE.Mesh
         if (!m.isMesh) return
         const mat = m.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]
         for (const mm of Array.isArray(mat) ? mat : [mat]) {
           if ((mm as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-            this.materials.push(mm as THREE.MeshStandardMaterial)
+            const std = mm as THREE.MeshStandardMaterial
+            this.materials.push(std)
+            this.materialBase.push({ color: std.color.clone(), roughness: std.roughness })
           }
         }
       })
@@ -612,6 +628,10 @@ export class MascotEngine {
       // material and the socket flashes as plain brass.
       this.patchEyes()
       this.applyLook()
+      // The high-detail swap happens mid-fall, already in the room — reapply
+      // immediately, or the tint the owner dialled in vanishes for however many
+      // frames until something else happens to trigger it again.
+      this.applyMascotTint()
 
       // The room enables shadows on the renderer; a freshly adopted mesh does
       // not inherit the castShadow flag set on the model it replaced.
@@ -706,8 +726,14 @@ export class MascotEngine {
    * the pose from setTransform() instead of from projectOrbit().
    */
   setMode(m: 'orbit' | 'transit' | 'room') {
+    const wasOrbit = this.mode === 'orbit'
     this.mode = m
     if (m === 'orbit') this.transform = null
+    // Only re-evaluate on an actual orbit <-> non-orbit crossing — the tint is
+    // gated on exactly that boundary, and calling it every frame's mode write
+    // (this fires from the sequence's own per-frame setMode calls) would be
+    // work with no observable effect the other 59 times a second.
+    if (wasOrbit !== (m === 'orbit')) this.applyMascotTint()
   }
 
   getMode() {
@@ -883,6 +909,36 @@ export class MascotEngine {
   setRoomConfig(cfg: RoomConfig) {
     this.roomCfg = cfg
     this.room?.setConfig(cfg)
+    this.applyMascotTint()
+  }
+
+  /**
+   * SAMSARA's material as it renders in the room. See RoomConfig's own comment
+   * for why this exists and why it defaults to a no-op.
+   *
+   * ⚠️ NEVER sets `needsUpdate`. Color and roughness are plain shader uniforms
+   * on a MeshStandardMaterial — `needsUpdate` forces a full program recompile,
+   * which is the exact trap this project's own reveal-ramp bug was: see the
+   * `Material.needsUpdate` note in docs/superpowers/verification/README.md.
+   * Recompiling four programs to change a colour would be that bug's sibling.
+   */
+  private applyMascotTint() {
+    const cfg = this.roomCfg
+    const active = this.mode !== 'orbit' && cfg.MASCOT_TINT_STRENGTH > 0
+    const target = active ? this.scratchTintColor.set(cfg.MASCOT_TINT_COLOR) : null
+    for (let i = 0; i < this.materials.length; i++) {
+      const base = this.materialBase[i]
+      if (!base) continue
+      const m = this.materials[i]
+      if (active && target) {
+        m.color.copy(base.color).lerp(target, cfg.MASCOT_TINT_STRENGTH)
+        const boosted = base.roughness + cfg.MASCOT_ROUGHNESS_BOOST
+        m.roughness = boosted < 0 ? 0 : boosted > 1 ? 1 : boosted
+      } else {
+        m.color.copy(base.color)
+        m.roughness = base.roughness
+      }
+    }
   }
 
   hasRoom() {

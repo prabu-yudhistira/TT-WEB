@@ -92,6 +92,35 @@ export type RoomConfig = {
   CAMERA_FOV_DEG: number
   /** Room depth in world units — how far back SAMSARA falls. */
   DEPTH: number
+
+  /**
+   * SAMSARA's own material, as it renders in the ROOM only (spec §6.3b's
+   * follow-on). The hero's material is untouched at any strength here —
+   * gated on mode !== 'orbit' in the engine — because at 12.6-70px it was
+   * already validated and is "genuinely invisible" at that scale (§6.3b);
+   * this problem is specific to rendering the same one-material mesh at
+   * 360px, where it reads as polished chrome rather than the reference's
+   * warm patinated brass with verdigris.
+   *
+   * ⚠️ Lighting alone cannot fix this. KEY_LIGHT_COLOR can push the colour
+   * TEMPERATURE of what the material reflects, but the material's own
+   * roughness/metalness — baked into the model's one shared texture, per
+   * §6.3b — is what makes a hard specular highlight read as chrome instead
+   * of the softer, more diffuse look of oxidised metal, and no light can
+   * add a green-blue patina tint that is not in the surface colour at all.
+   * This is a genuine material control, not another light.
+   *
+   * STARTING at a no-op (STRENGTH 0), deliberately, unlike most of this
+   * file's other starting values: this is a NEW capability that did not
+   * exist before, and its default must not silently reshade an
+   * already-approved-elsewhere material out from under a session that
+   * never asked for it. The owner turns it on.
+   */
+  MASCOT_TINT_COLOR: string
+  /** 0 = the material's own baked colour, 1 = fully MASCOT_TINT_COLOR. */
+  MASCOT_TINT_STRENGTH: number
+  /** Added to the material's own baked roughness, clamped to [0, 1]. */
+  MASCOT_ROUGHNESS_BOOST: number
 }
 
 export type IdleEyesConfig = {
@@ -182,6 +211,13 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FOG_DENSITY: 0.035,
     CAMERA_FOV_DEG: 45,
     DEPTH: 26,
+
+    // Warm bronze-brass, picked to be in the right neighbourhood once
+    // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
+    // reference: matte warm brass with green-blue verdigris in the recesses.
+    MASCOT_TINT_COLOR: '#8A6A3A',
+    MASCOT_TINT_STRENGTH: 0,
+    MASCOT_ROUGHNESS_BOOST: 0,
   },
 
   IDLE_EYES: {

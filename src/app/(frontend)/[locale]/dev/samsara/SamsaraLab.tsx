@@ -113,6 +113,17 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: 'SAMSARA material (room only)',
+    note:
+      'starts OFF (strength 0) — the hero material at 12.6–70px is untouched at any setting. ' +
+      'lighting alone cannot fix chrome-vs-brass or add verdigris; this is a real material control.',
+    rows: [
+      { kind: 'color', path: 'ROOM.MASCOT_TINT_COLOR', label: 'Tint colour' },
+      { kind: 'num', path: 'ROOM.MASCOT_TINT_STRENGTH', label: 'Tint strength', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'ROOM.MASCOT_ROUGHNESS_BOOST', label: 'Roughness boost', min: -0.5, max: 0.5, step: 0.01 },
+    ],
+  },
+  {
     title: 'idle eyes',
     note: 'weighted picker — relative, not percentages',
     rows: [
