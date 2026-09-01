@@ -417,6 +417,31 @@ export function SamsaraSequence({
         return
       }
 
+      /**
+       * Park the spin once it has arrived, so the face SAMSARA lands with is the
+       * one LANDING.ROT_X/Y/Z_DEG aims at the visitor.
+       *
+       * ⚠️ Without this the whole parked orientation is DEAD CONFIG. `place()`
+       * only uses that pose when `spinParked` is true, so the owner could tune
+       * ROT_X/Y/Z across four passes at the bench, watch it work there, and still
+       * get a body turning at SPIN_SPEED 113 on the live page — approved values
+       * loaded and doing nothing. SamsaraLab had called this since Task 12; the
+       * component that runs on the real page never did.
+       *
+       * Set every frame rather than on the mode transition. It is a field
+       * assignment, so it costs nothing, and a transition-only write is lost for
+       * good if the engine happens to be null on the one frame that fires it —
+       * the mode block above runs before the engine guard and would still have
+       * advanced `lastMode`.
+       *
+       * The condition mirrors SamsaraLab's checkbox exactly, on purpose: the
+       * moment the two disagree the bench stops predicting the site, which is the
+       * only thing the bench is for. (`exiting` is inert today — the engine is in
+       * `transit` mode by then and the pose eases back to the spin — but it is
+       * kept so the intent survives a change to that mapping.)
+       */
+      eng.setSpinParked(mode === 'landed' || mode === 'exiting')
+
       const total = ctrl.transitTotalMs
       const half = cfg.TRANSIT.HALF_ORBIT_MS
       const tMs = ctrl.transit01 * total
