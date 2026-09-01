@@ -16,10 +16,11 @@ import { DEFAULT_SEQUENCE } from '../../lib/samsara/types'
  *
  * So the background colour here is not decoration: it is what the visitor sees
  * BEHIND the WebGL layer, and a mismatch reads as a seam along the edges of the
- * canvas. It is taken from `ROOM.BG_COLOR` rather than written as a hex,
- * because the bench owns that value and a literal here would be a second copy
- * of it — the failure mode that cost this project two stale duplicates on
- * 2026-09-01 alone.
+ * canvas. It comes from the RESOLVED `samsara-sequence` global via RenderBlocks
+ * — the same `ROOM.BG_COLOR` the 3D room is built from — rather than being
+ * written as a hex here, because a literal would be a second copy of a value
+ * the owner can edit. That is the failure mode that cost this project two
+ * stale duplicates on 2026-09-01 alone.
  *
  * ⚠️ The chatbox is a STUB. Styled, positioned, labelled and reachable by
  * keyboard; the input is DISABLED and there is nothing behind it. Spec §6.6
@@ -31,10 +32,17 @@ export function SamsaraRoomBlock({
   chatHeading,
   chatPlaceholder,
   locale,
+  bgColor = DEFAULT_SEQUENCE.ROOM.BG_COLOR,
 }: {
   chatHeading?: string | null
   chatPlaceholder?: string | null
   locale: string
+  /**
+   * `ROOM.BG_COLOR` from the resolved `samsara-sequence` global, so editing
+   * the room's black in /admin moves the DOM behind the canvas with it.
+   * Defaulted rather than required so the block still renders standalone.
+   */
+  bgColor?: string
 }) {
   const id = 'samsara-chat'
   const heading = chatHeading || (locale === 'id' ? 'Tanya SAMSARA' : 'Ask SAMSARA')
@@ -53,7 +61,7 @@ export function SamsaraRoomBlock({
         // 100vh section sits partly behind the retracting URL bar and the
         // chatbox's lower edge is cut off on first paint.
         minHeight: '100svh',
-        background: DEFAULT_SEQUENCE.ROOM.BG_COLOR,
+        background: bgColor,
         display: 'flex',
         alignItems: 'flex-start',
         // ⚠️ NO z-index here, and that is load-bearing rather than an omission.

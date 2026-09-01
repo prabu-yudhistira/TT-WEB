@@ -31,12 +31,13 @@ type Props = {
   eyes: MascotEyesConfig
   floatingWords?: string[]
   /**
-   * The SAMSARA transition. Defaulted to DEFAULT_SEQUENCE until the CMS global
-   * lands in Task 15 — and defaulted, not required, so that the seven other
-   * places HeroBlock is constructed (benches, the archive) keep compiling.
+   * The SAMSARA transition. RenderBlocks passes the resolved `samsara-sequence`
+   * global; the default remains so the seven other places HeroBlock is
+   * constructed (benches, the archive) keep compiling without one.
    *
-   * ⚠️ DEFAULT_SEQUENCE is NOT owner-approved. Every number in it is a starting
-   * value for the /dev/samsara bench and the freeze gate in plan Task 13.
+   * DEFAULT_SEQUENCE is the owner-approved frozen config — four tuning passes,
+   * pinned value-by-value by types.check.ts — so falling back to it renders
+   * exactly what ships, which is what makes a never-saved global harmless.
    */
   samsara?: SequenceConfig
   /** Only for the drag-to-turn cursor pill. Defaults to English. */

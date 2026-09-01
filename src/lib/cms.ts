@@ -2,7 +2,15 @@ import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
-import type { Page, Work, Service, ManifestoStatement, SiteSetting, HeroEffect } from '../payload-types'
+import type {
+  Page,
+  Work,
+  Service,
+  ManifestoStatement,
+  SiteSetting,
+  HeroEffect,
+  SamsaraSequence,
+} from '../payload-types'
 import { defaultLocale, type Locale } from './i18n'
 
 export type { Locale }
@@ -29,6 +37,20 @@ export const getHeroEffects = (): Promise<HeroEffect> =>
     },
     ['hero-effects'],
     { tags: ['hero-effects'] },
+  )()
+
+/**
+ * The SAMSARA transition's behaviour. Separate from `hero-effects` on purpose
+ * — see the note on the global itself.
+ */
+export const getSamsaraSequence = (): Promise<SamsaraSequence> =>
+  unstable_cache(
+    async () => {
+      const payload = await payloadPromise
+      return payload.findGlobal({ slug: 'samsara-sequence' })
+    },
+    ['samsara-sequence'],
+    { tags: ['samsara-sequence'] },
   )()
 
 export const getPage = (slug: string, locale: Locale): Promise<Page | null> =>

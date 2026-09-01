@@ -98,10 +98,12 @@ export interface Config {
   globals: {
     'site-settings': SiteSetting;
     'hero-effects': HeroEffect;
+    'samsara-sequence': SamsaraSequence;
   };
   globalsSelect: {
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
     'hero-effects': HeroEffectsSelect<false> | HeroEffectsSelect<true>;
+    'samsara-sequence': SamsaraSequenceSelect<false> | SamsaraSequenceSelect<true>;
   };
   locale: 'en' | 'id';
   widgets: {
@@ -1341,6 +1343,294 @@ export interface HeroEffect {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "samsara-sequence".
+ */
+export interface SamsaraSequence {
+  id: number;
+  /**
+   * Turning this OFF removes the whole transition from the page — no scroll listeners, no pin, no room. The hero keeps its orbiting mascot exactly as it was before Section 2 existed.
+   */
+  sequenceEnabled?: boolean | null;
+  /**
+   * One trackpad flick must stay ONE beat. Test any change with a flick, not a mouse wheel.
+   */
+  gestures?: {
+    /**
+     * Scroll gestures before SAMSARA leaves the hero. The last one commits, so 3 means two charge beats then the launch.
+     */
+    beatsToCommit?: number | null;
+    /**
+     * Wheel distance per beat. 230 is about two mouse notches, so roughly six notches to enter. Raise it if entry feels too easy; this is the first number to revisit if it feels heavy on a mouse.
+     */
+    wheelThreshold?: number | null;
+    /**
+     * Ignore further scrolling for this long after a beat lands.
+     */
+    cooldownMs?: number | null;
+    /**
+     * Stillness that ends a gesture. This is what keeps one long trackpad flick from counting as several beats.
+     */
+    quietMs?: number | null;
+    /**
+     * Finger travel in px per beat on touch.
+     */
+    touchThreshold?: number | null;
+  };
+  /**
+   * Beat 1 must be unmistakable. A page that does not visibly respond to the first scroll reads as broken.
+   */
+  freeze?: {
+    /**
+     * Shake amplitude in px, one row per beat. Rows past the beat count are unused; deleting rows falls back to the built-in values.
+     */
+    shakePxPerBeat?:
+      | {
+          value: number;
+          id?: string | null;
+        }[]
+      | null;
+    /**
+     * Shake frequency.
+     */
+    shakeHz?: number | null;
+    /**
+     * How far the logo has pulled apart at each beat, 0–1. The commit takes it to 1 regardless, so the last row only matters if the beat count is raised.
+     */
+    chargePerBeat?:
+      | {
+          value: number;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  transit?: {
+    /**
+     * The sweep from wherever SAMSARA was to the far point of the orbit, before the camera hands over.
+     */
+    halfOrbitMs?: number | null;
+    /**
+     * The drop from the back of the room to the first contact.
+     */
+    fallMs?: number | null;
+    /**
+     * 0 lands it dead, with no bounce at all.
+     */
+    bounceCount?: number | null;
+    /**
+     * Energy kept per bounce. Apex heights go h, then this fraction of h, then that fraction again.
+     */
+    restitution?: number | null;
+    /**
+     * One duration per bounce, shortening. Rows past the bounce count are unused.
+     */
+    bounceMs?:
+      | {
+          value: number;
+          id?: string | null;
+        }[]
+      | null;
+    /**
+     * The rise from the last contact into the resting hover.
+     */
+    settleMs?: number | null;
+  };
+  /**
+   * Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because the chatbox moves from beside SAMSARA to below it.
+   */
+  landing?: {
+    /**
+     * Landed height as a fraction of viewport height, desktop.
+     */
+    sizeFrac?: number | null;
+    /**
+     * The same, portrait (under 640px wide).
+     */
+    mobileSizeFrac?: number | null;
+    /**
+     * Landed centre across the viewport, desktop. 0.75 is right of centre.
+     */
+    xFrac?: number | null;
+    /**
+     * Landed centre down the viewport, desktop.
+     */
+    yFrac?: number | null;
+    /**
+     * Portrait: centred, with the chatbox below.
+     */
+    mobileXFrac?: number | null;
+    /**
+     * Portrait height. Lowering this pushes SAMSARA down into the chatbox — the check at docs/superpowers/verification/samsara-room-chatbox.mjs measures the real gap.
+     */
+    mobileYFrac?: number | null;
+    /**
+     * Idle float once landed. 0 parks it perfectly still.
+     */
+    hoverBobPx?: number | null;
+    /**
+     * One full bob, up and back.
+     */
+    hoverBobMs?: number | null;
+    /**
+     * Where the face points once landed — pitch. 0/0/0 is frontal and level. Drag SAMSARA directly at /dev/samsara to find an angle, rather than guessing here.
+     */
+    rotXDeg?: number | null;
+    /**
+     * Yaw. This is the one that turns the face toward or away from the visitor.
+     */
+    rotYDeg?: number | null;
+    /**
+     * Roll — the head tilt.
+     */
+    rotZDeg?: number | null;
+  };
+  /**
+   * Graphite on black: the Atelier drawing language inverted. The Section 2 block reads the background colour from here too, so the DOM behind the 3D layer always matches.
+   */
+  room?: {
+    /**
+     * Behind everything, and the page background of Section 2.
+     */
+    bgColor?: string | null;
+    floorColor?: string | null;
+    wallColor?: string | null;
+    /**
+     * The single shadow-casting light.
+     */
+    keyLightColor?: string | null;
+    keyLightIntensity?: number | null;
+    /**
+     * Fill light. Too much and the room stops reading as dark.
+     */
+    ambientIntensity?: number | null;
+    /**
+     * Depth falloff on the room geometry. The scene is SHARED with the hero orbit, so this is not scene fog — it would tint the mascot while it is still circling the mark.
+     */
+    fogDensity?: number | null;
+    /**
+     * Changing this moves the camera to keep the landed size identical, so it changes how deep the room LOOKS rather than how big SAMSARA is.
+     */
+    cameraFovDeg?: number | null;
+    /**
+     * How far back the room runs. SAMSARA enters at the far wall.
+     */
+    depth?: number | null;
+    /**
+     * Warm bronze-brass. Inert while the strength below is 0.
+     */
+    mascotTintColor?: string | null;
+    /**
+     * How much of the tint colour is mixed into the body in the room.
+     */
+    mascotTintStrength?: number | null;
+    /**
+     * Pushes the metal from polished toward matte. Independent of the tint — they were coupled once, and turning the tint off silently killed this as well.
+     */
+    mascotRoughnessBoost?: number | null;
+    /**
+     * What the metal REFLECTS. On a fully metallic surface this does most of the colouring, far more than the lights do.
+     */
+    envColor?: string | null;
+    envIntensity?: number | null;
+  };
+  /**
+   * Only while landed. The hero orbit is never draggable.
+   */
+  drag?: {
+    enabled?: boolean | null;
+    sensitivityDegPerPx?: number | null;
+    /**
+     * How far up and down it can be turned before it stops.
+     */
+    maxPitchDeg?: number | null;
+    /**
+     * Spin kept per second after release. Lower stops it sooner.
+     */
+    damping?: number | null;
+    /**
+     * Stillness before it springs back to the parked orientation.
+     */
+    returnDelayMs?: number | null;
+    /**
+     * How long that return takes.
+     */
+    returnMs?: number | null;
+  };
+  /**
+   * The room shows SAMSARA still and close, so this is a slow resting face rather than the hero orbit’s glance beat.
+   */
+  idleEyes?: {
+    /**
+     * Between expression changes.
+     */
+    intervalMs?: number | null;
+    /**
+     * The little shake when a visitor presses and holds. 0 turns it off.
+     */
+    smileShakePx?: number | null;
+    smileShakeMs?: number | null;
+    /**
+     * What the face does while a visitor presses and holds it.
+     */
+    holdExpression?:
+      | (
+          | 'neutral'
+          | 'blink'
+          | 'squint'
+          | 'happy'
+          | 'wide'
+          | 'wink'
+          | 'lookLeft'
+          | 'lookRight'
+          | 'lookUp'
+          | 'lookDown'
+          | 'lookUpLeft'
+          | 'lookUpRight'
+          | 'lookDownLeft'
+          | 'lookDownRight'
+        )
+      | null;
+    /**
+     * How often each is picked in the room. 0 removes it. The owner settled on a calm resting face — mostly neutral, an occasional blink — so most of these are 0 by design, not by oversight.
+     */
+    weights?: {
+      neutral?: number | null;
+      blink?: number | null;
+      squint?: number | null;
+      happy?: number | null;
+      wide?: number | null;
+      wink?: number | null;
+      lookLeft?: number | null;
+      lookRight?: number | null;
+      lookUp?: number | null;
+      lookDown?: number | null;
+      lookUpLeft?: number | null;
+      lookUpRight?: number | null;
+      lookDownLeft?: number | null;
+      lookDownRight?: number | null;
+    };
+  };
+  /**
+   * Its wording lives on the SAMSARA room block, in Pages. These are only its timings.
+   */
+  chatbox?: {
+    /**
+     * From the moment SAMSARA leaves the hero. It should overlap the settle, so the box arrives as the body stops moving rather than after it.
+     */
+    delayMs?: number | null;
+    /**
+     * The fade and rise.
+     */
+    enterMs?: number | null;
+  };
+  /**
+   * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
+   */
+  exitMs?: number | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "site-settings_select".
  */
 export interface SiteSettingsSelect<T extends boolean = true> {
@@ -1676,6 +1966,133 @@ export interface HeroEffectsSelect<T extends boolean = true> {
         lookDownRight?: T;
         wink?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "samsara-sequence_select".
+ */
+export interface SamsaraSequenceSelect<T extends boolean = true> {
+  sequenceEnabled?: T;
+  gestures?:
+    | T
+    | {
+        beatsToCommit?: T;
+        wheelThreshold?: T;
+        cooldownMs?: T;
+        quietMs?: T;
+        touchThreshold?: T;
+      };
+  freeze?:
+    | T
+    | {
+        shakePxPerBeat?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        shakeHz?: T;
+        chargePerBeat?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+      };
+  transit?:
+    | T
+    | {
+        halfOrbitMs?: T;
+        fallMs?: T;
+        bounceCount?: T;
+        restitution?: T;
+        bounceMs?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        settleMs?: T;
+      };
+  landing?:
+    | T
+    | {
+        sizeFrac?: T;
+        mobileSizeFrac?: T;
+        xFrac?: T;
+        yFrac?: T;
+        mobileXFrac?: T;
+        mobileYFrac?: T;
+        hoverBobPx?: T;
+        hoverBobMs?: T;
+        rotXDeg?: T;
+        rotYDeg?: T;
+        rotZDeg?: T;
+      };
+  room?:
+    | T
+    | {
+        bgColor?: T;
+        floorColor?: T;
+        wallColor?: T;
+        keyLightColor?: T;
+        keyLightIntensity?: T;
+        ambientIntensity?: T;
+        fogDensity?: T;
+        cameraFovDeg?: T;
+        depth?: T;
+        mascotTintColor?: T;
+        mascotTintStrength?: T;
+        mascotRoughnessBoost?: T;
+        envColor?: T;
+        envIntensity?: T;
+      };
+  drag?:
+    | T
+    | {
+        enabled?: T;
+        sensitivityDegPerPx?: T;
+        maxPitchDeg?: T;
+        damping?: T;
+        returnDelayMs?: T;
+        returnMs?: T;
+      };
+  idleEyes?:
+    | T
+    | {
+        intervalMs?: T;
+        smileShakePx?: T;
+        smileShakeMs?: T;
+        holdExpression?: T;
+        weights?:
+          | T
+          | {
+              neutral?: T;
+              blink?: T;
+              squint?: T;
+              happy?: T;
+              wide?: T;
+              wink?: T;
+              lookLeft?: T;
+              lookRight?: T;
+              lookUp?: T;
+              lookDown?: T;
+              lookUpLeft?: T;
+              lookUpRight?: T;
+              lookDownLeft?: T;
+              lookDownRight?: T;
+            };
+      };
+  chatbox?:
+    | T
+    | {
+        delayMs?: T;
+        enterMs?: T;
+      };
+  exitMs?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
