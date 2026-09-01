@@ -386,6 +386,8 @@ export class MascotEngine {
    * front cap ends there and the bezel relief begins (see ./eyes.ts).
    */
   private eyeUniforms: Record<string, { value: unknown }> = {
+    /** See the roughnessmap_fragment injection. 0 = the map exactly as authored. */
+    uTtRough: { value: 0 },
     uEyesOn: { value: 1 },
     uFaceRadius: { value: 0.5 },
     // Amber, not the reference video's cyan: the owner asked for the display to
@@ -1235,20 +1237,23 @@ export class MascotEngine {
    */
   private applyMascotTint() {
     const cfg = this.roomCfg
-    const active = this.mode !== 'orbit' && cfg.MASCOT_TINT_STRENGTH > 0
-    const target = active ? this.scratchTintColor.set(cfg.MASCOT_TINT_COLOR) : null
+    const inRoom = this.mode !== 'orbit'
+
+    // ⚠️ Roughness is INDEPENDENT of the tint, and coupling them was a bug.
+    // Both used to be gated behind `TINT_STRENGTH > 0`, so turning the colour
+    // tint off silently disabled the roughness the owner had dialled in — two
+    // unrelated controls where moving one killed the other, with nothing on
+    // screen or in the console to say so.
+    this.eyeUniforms.uTtRough.value = inRoom ? Math.max(0, cfg.MASCOT_ROUGHNESS_BOOST) : 0
+
+    const tinting = inRoom && cfg.MASCOT_TINT_STRENGTH > 0
+    const target = tinting ? this.scratchTintColor.set(cfg.MASCOT_TINT_COLOR) : null
     for (let i = 0; i < this.materials.length; i++) {
       const base = this.materialBase[i]
       if (!base) continue
       const m = this.materials[i]
-      if (active && target) {
-        m.color.copy(base.color).lerp(target, cfg.MASCOT_TINT_STRENGTH)
-        const boosted = base.roughness + cfg.MASCOT_ROUGHNESS_BOOST
-        m.roughness = boosted < 0 ? 0 : boosted > 1 ? 1 : boosted
-      } else {
-        m.color.copy(base.color)
-        m.roughness = base.roughness
-      }
+      if (tinting && target) m.color.copy(base.color).lerp(target, cfg.MASCOT_TINT_STRENGTH)
+      else m.color.copy(base.color)
     }
   }
 
@@ -1880,7 +1885,33 @@ export class MascotEngine {
       return
     }
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${EYES_FRAGMENT_CHUNK}`)
+      .replace(
+        '#include <common>',
+        // ⚠️ The uniform DECLARATION rides along here, and it is not optional.
+        // Adding a uniform to `shader.uniforms` only binds a VALUE — GLSL still
+        // has to be told the symbol exists, or the program fails to compile and
+        // the material renders NOTHING. That is exactly what happened when the
+        // roughness lever below was added without it: SAMSARA vanished
+        // completely, and the only trace was a console entry.
+        `#include <common>\nuniform float uTtRough;\n${EYES_FRAGMENT_CHUNK}`,
+      )
+      /**
+       * ⚠️ A REAL roughness lever, and it has to live in the shader.
+       *
+       * `material.roughness` MULTIPLIES the roughness map. The source material
+       * ships `roughness: 1` — already the maximum — so ADDING to the factor
+       * cannot make anything rougher: it clamps and does nothing. That is why
+       * "still too shiny" survived a roughness boost of 0.5.
+       *
+       * Blending the sampled value TOWARD 1 after the map is read is the only
+       * way to actually take gloss out, and it keeps the map's variation
+       * instead of flattening every surface to a single value.
+       */
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+  roughnessFactor = mix(roughnessFactor, 1.0, clamp(uTtRough, 0.0, 1.0));`,
+      )
       // After lighting and tone mapping: the display is emissive and must
       // not be shaded by the scene.
       .replace(
