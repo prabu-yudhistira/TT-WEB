@@ -89,8 +89,47 @@ export const MediaFullBlock: Block = {
   ],
 }
 
+/**
+ * Section 2 — the dark room SAMSARA lands in. Spec §7.7.
+ *
+ * ⚠️ Text ONLY. Everything about how the room looks and behaves — palette, key
+ * light, camera, the landing pose, the gesture thresholds — lives in the
+ * `samsara-sequence` GLOBAL, not here, because it is behaviour rather than
+ * content and because it is tuned at /dev/samsara and frozen into
+ * `lib/samsara/types.ts` by hand. A colour field here would be a second,
+ * silently-diverging source for a value the bench already owns.
+ */
+export const SamsaraRoomBlock: Block = {
+  slug: 'samsaraRoom',
+  labels: { singular: 'SAMSARA room', plural: 'SAMSARA rooms' },
+  fields: [
+    {
+      name: 'chatHeading',
+      type: 'text',
+      localized: true,
+      admin: {
+        description:
+          'Heading above the chat box in the dark room. The box is a STUB — it is styled and positioned but does not send anything yet.',
+      },
+    },
+    {
+      name: 'chatPlaceholder',
+      type: 'text',
+      localized: true,
+      admin: {
+        description:
+          'Placeholder inside the disabled input. Say what SAMSARA will eventually answer, so the stub reads as a promise rather than a broken field.',
+      },
+    },
+  ],
+}
+
 export const pageBlocks = [
   HeroBlock,
+  SamsaraRoomBlock,
+  // ⚠️ The five below are RETIRED from the homepage but MUST stay registered.
+  // Removing a block definition drops its child tables on the next schema
+  // push, which is content destroyed rather than content hidden.
   ManifestoStripBlock,
   FeaturedWorksBlock,
   ServicesRowsBlock,

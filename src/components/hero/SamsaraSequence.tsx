@@ -175,6 +175,8 @@ export function SamsaraSequence({
     // ── state that lives for one run of the sequence ──────────────────
     let promoted = false
     let promotedAtMs = 0
+    /** Only written on change: this runs every frame. */
+    let lastChatIn = false
     let startSizePx = 0
     let sweepFrom = 0
     let sweepBy = 0
@@ -446,6 +448,31 @@ export function SamsaraSequence({
       const half = cfg.TRANSIT.HALF_ORBIT_MS
       const tMs = ctrl.transit01 * total
 
+      /**
+       * The chatbox stub's reveal — spec §6.6, `CHATBOX.DELAY_MS` / `ENTER_MS`.
+       *
+       * Published as an ATTRIBUTE on the document rather than through a ref,
+       * because the box is not ours: it belongs to the `samsaraRoom` block, which
+       * RenderBlocks mounts as a sibling of the hero. Reaching across for its
+       * element would couple two blocks that the owner can reorder in /admin, and
+       * would break the moment Section 2 is moved or removed. An attribute is a
+       * one-way contract that simply goes unread if nothing is listening.
+       *
+       * ⚠️ The attribute's PRESENCE is what lifts the box onto the fixed layer
+       * above the promoted canvas; its VALUE is what fades it in. That split is
+       * deliberate and it is what makes the block fail OPEN: with no sequence
+       * running — disabled, reduced motion, WebGL unavailable — the attribute is
+       * never written, and the chatbox stays ordinary in-flow content in a section
+       * the visitor can still scroll to and read. Gating on the value alone would
+       * leave a blank black panel in every one of those cases.
+       */
+      const chatIn =
+        (mode === 'committed' || mode === 'landed') && tMs >= cfg.CHATBOX.DELAY_MS
+      if (chatIn !== lastChatIn) {
+        lastChatIn = chatIn
+        document.documentElement.dataset.ttChatbox = chatIn ? 'in' : 'out'
+      }
+
       // The charge the BELT sees, which is not the same as the controller's.
       //
       // The controller holds it at 1 through the whole cinematic, which is right
@@ -661,8 +688,19 @@ export function SamsaraSequence({
       controlsRef.current = { beat: applyBeat, reset, mode: () => ctrl.mode }
     }
 
+    // The entrance duration is owner-tuned, so the block cannot hardcode it. A
+    // custom property is the only channel that reaches a stylesheet.
+    document.documentElement.style.setProperty(
+      '--tt-chatbox-enter',
+      `${cfgRef.current.CHATBOX.ENTER_MS}ms`,
+    )
+
     return () => {
       cancelAnimationFrame(raf)
+      // Both removed, not left at 'out': a torn-down sequence must leave the
+      // chatbox exactly as a page without one, which is in-flow and visible.
+      delete document.documentElement.dataset.ttChatbox
+      document.documentElement.style.removeProperty('--tt-chatbox-enter')
       heroEl.removeEventListener('wheel', onWheel)
       heroEl.removeEventListener('touchstart', onTouchStart)
       heroEl.removeEventListener('touchmove', onTouchMove)

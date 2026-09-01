@@ -6,6 +6,7 @@ import { FeaturedWorks } from './FeaturedWorks'
 import { ServicesRows } from './ServicesRows'
 import { ArchiveTeaser } from './ArchiveTeaser'
 import { ContactMailto } from './ContactMailto'
+import { SamsaraRoomBlock } from './SamsaraRoomBlock'
 import { resolveSeparation } from '../../lib/three/shatter/resolveSeparation'
 import { resolveIgnition } from '../../lib/three/ignition/resolveIgnition'
 import { resolveSatellites } from '../../lib/satellites/resolveSatellites'
@@ -50,6 +51,18 @@ export async function RenderBlocks({
                 />
               )
             }
+
+            // Section 2. Text only — everything about how the room looks and
+            // behaves comes from the `samsara-sequence` global, not from here.
+            case 'samsaraRoom':
+              return (
+                <SamsaraRoomBlock
+                  key={block.id}
+                  chatHeading={block.chatHeading}
+                  chatPlaceholder={block.chatPlaceholder}
+                  locale={locale}
+                />
+              )
 
             case 'manifestoStrip': {
               const statements = await getManifesto(locale)

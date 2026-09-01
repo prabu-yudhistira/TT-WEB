@@ -311,6 +311,19 @@ export interface Page {
             blockType: 'hero';
           }
         | {
+            /**
+             * Heading above the chat box in the dark room. The box is a STUB — it is styled and positioned but does not send anything yet.
+             */
+            chatHeading?: string | null;
+            /**
+             * Placeholder inside the disabled input. Say what SAMSARA will eventually answer, so the stub reads as a promise rather than a broken field.
+             */
+            chatPlaceholder?: string | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'samsaraRoom';
+          }
+        | {
             heading?: string | null;
             id?: string | null;
             blockName?: string | null;
@@ -609,6 +622,14 @@ export interface PagesSelect<T extends boolean = true> {
                     word?: T;
                     id?: T;
                   };
+              id?: T;
+              blockName?: T;
+            };
+        samsaraRoom?:
+          | T
+          | {
+              chatHeading?: T;
+              chatPlaceholder?: T;
               id?: T;
               blockName?: T;
             };
