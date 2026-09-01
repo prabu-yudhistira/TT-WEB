@@ -414,6 +414,7 @@ export class MascotEngine {
     uScanline: { value: 0 },
     uSocketSpan: { value: 1.34 },
     uSocketSpanY: { value: 0.95 },
+    uSocketFeather: { value: 0.1 },
     uEyeL: { value: new Float32Array(12) },
     uEyeR: { value: new Float32Array(12) },
     uObjCenter: { value: new THREE.Vector3() },
@@ -758,6 +759,7 @@ export class MascotEngine {
     u.uEyeGap.value = c.GAP
     u.uSocketSpan.value = c.SOCKET_SPAN
     u.uSocketSpanY.value = c.SOCKET_SPAN_Y
+    u.uSocketFeather.value = c.SOCKET_FEATHER
     u.uFaceRadius.value = c.FACE_RADIUS
 
     // Toggling the switch has to rebuild the material: when off, the display's
@@ -1667,6 +1669,16 @@ export class MascotEngine {
     this.lastDiameterPx = diameterPx
     const radiusPx = diameterPx / 2
     this.placer.scale.setScalar(diameterPx)
+    // Room-only reshape. Applied to the PLACER, so the eye display is
+    // unaffected: the shader works in object space from the pre-transform
+    // `position`, which this never touches.
+    if (this.mode !== 'orbit') {
+      this.placer.scale.set(
+        diameterPx * this.roomCfg.MASCOT_STRETCH_X,
+        diameterPx * this.roomCfg.MASCOT_STRETCH_Y,
+        diameterPx,
+      )
+    }
 
     // ── perspective placement ─────────────────────────────────────────
     //
@@ -1687,7 +1699,12 @@ export class MascotEngine {
       const dist = Math.max(0.001, this.persp.position.z - this.transitZ)
       const w = screenToWorld(q.x, q.y, dist, this.W, this.H, this.persp.fov)
       this.placer.position.set(w.x, w.y, this.transitZ)
-      this.placer.scale.setScalar(worldSizeFor(diameterPx, dist, this.H, this.persp.fov))
+      const world = worldSizeFor(diameterPx, dist, this.H, this.persp.fov)
+      this.placer.scale.set(
+        world * this.roomCfg.MASCOT_STRETCH_X,
+        world * this.roomCfg.MASCOT_STRETCH_Y,
+        world,
+      )
     }
 
     // ── orientation ───────────────────────────────────────────────────

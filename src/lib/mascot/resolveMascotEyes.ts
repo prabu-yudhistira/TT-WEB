@@ -84,6 +84,7 @@ export function resolveMascotEyes(
     // plaque and the chin band actually sit, and a field inviting someone to
     // move it could only ever put the black back over them.
     SOCKET_SPAN_Y: d.SOCKET_SPAN_Y,
+    SOCKET_FEATHER: d.SOCKET_FEATHER,
     // Never CMS-mapped. Measured: the smooth front cap ends at 0.50.
     FACE_RADIUS: d.FACE_RADIUS,
 

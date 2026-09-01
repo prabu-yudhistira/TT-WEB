@@ -63,6 +63,16 @@ export type MascotEyesConfig = {
    * should infer.
    */
   SOCKET_SPAN_Y: number
+  /**
+   * Width of the fade at the cover's edge, in the ellipse's own normalised
+   * space. 0.10 holds full darkness to 90% and fades over the last tenth.
+   *
+   * ⚠️ Wider is not softer, it is LEAKIER. The model's painted amber eyes carry
+   * fine horizontal scanlines, and a fade that begins too far in lets them read
+   * THROUGH the half-covered band as striping around the display's upper edge —
+   * which is what the original 0.22 did.
+   */
+  SOCKET_FEATHER: number
   /** ⚠️ MEASURED, not taste. Not a CMS field. See the file header. */
   FACE_RADIUS: number
 
@@ -115,6 +125,7 @@ export const DEFAULT_MASCOT_EYES: MascotEyesConfig = Object.freeze({
   GAP: 0.38,
   SOCKET_SPAN: 1.34,
   SOCKET_SPAN_Y: 0.95,
+  SOCKET_FEATHER: 0.1,
   FACE_RADIUS: 0.5,
 
   SCANLINE_MAX: 9,

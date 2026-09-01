@@ -255,6 +255,7 @@ uniform float uEyeGap;        // half-distance between the two eyes, display uni
 uniform float uScanline;      // 0 = off; gated by on-screen size on the CPU side
 uniform float uSocketSpan;    // how far past the display radius the darkening reaches
 uniform float uSocketSpanY;   // the same, vertically — the opening is an OVAL
+uniform float uSocketFeather; // width of the fade at the cover's edge, 0..1
 uniform float uEyeL[12];
 uniform float uEyeR[12];
 varying vec3 vTtObjPos;
@@ -337,7 +338,7 @@ vec3 tt_eyes(vec3 base, out float coverage) {
   // THROUGH the half-faded cover as striping around the display's upper edge.
   // Holding full darkness to 90% and fading over the last tenth keeps the edge
   // soft without letting the old eyes read through the new ones.
-  float cap = 1.0 - smoothstep(0.90, 1.0, rSock);
+  float cap = 1.0 - smoothstep(1.0 - clamp(uSocketFeather, 0.001, 0.9), 1.0, rSock);
   vec3 col = mix(base, uSocketColor, cap * uEyesOn);
 
   // hot core inside the blob, saturated body toward its edge.

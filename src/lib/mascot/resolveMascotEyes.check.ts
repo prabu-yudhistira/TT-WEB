@@ -105,6 +105,7 @@ check('FACE_RADIUS is never overridable', resolveMascotEyes({}).FACE_RADIUS === 
     // round trip below asserts every field survives, and a non-mapped field can
     // only survive as whatever the resolver hands back.
     SOCKET_SPAN_Y: 0.95,
+    SOCKET_FEATHER: 0.1,
     FACE_RADIUS: 0.5, // not mapped; must survive as the measured value
     SCANLINE_MAX: 14,
     SCANLINE_MIN_PX: 61,

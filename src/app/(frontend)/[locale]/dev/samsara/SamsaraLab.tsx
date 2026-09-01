@@ -149,6 +149,8 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'ROOM.MASCOT_ROUGHNESS_BOOST', label: 'Roughness boost', min: -0.5, max: 0.5, step: 0.01 },
       { kind: 'color', path: 'ROOM.ENV_COLOR', label: 'Reflected env colour' },
       { kind: 'num', path: 'ROOM.ENV_INTENSITY', label: 'Reflected env strength', min: 0, max: 4, step: 0.05 },
+      { kind: 'num', path: 'ROOM.MASCOT_STRETCH_X', label: 'Shape — width ×', min: 0.7, max: 1.3, step: 0.005 },
+      { kind: 'num', path: 'ROOM.MASCOT_STRETCH_Y', label: 'Shape — height ×', min: 0.7, max: 1.3, step: 0.005 },
     ],
   },
   {
@@ -236,7 +238,7 @@ export default function SamsaraLab({
   ignition,
   satellites,
   mascot,
-  eyes,
+  eyes: eyesInitial,
   words,
 }: {
   separation: SeparationConfig
@@ -247,6 +249,19 @@ export default function SamsaraLab({
   words: string[]
 }) {
   const [cfg, setCfg] = useState<SequenceConfig>(() => structuredClone(DEFAULT_SEQUENCE))
+  /**
+   * The eye config is tunable HERE too, not just at /dev/mascot.
+   *
+   * The socket cover is the one eye control whose correct value can only be
+   * judged in the ROOM: at the hero's 12.6-70px there is no monogram plaque or
+   * chin band to see it overrun, which is exactly how it shipped covering both.
+   */
+  const [eyes, setEyes] = useState<MascotEyesConfig>(() => ({ ...eyesInitial }))
+  const setEye = useCallback(
+    <K extends keyof MascotEyesConfig>(k: K, v: MascotEyesConfig[K]) =>
+      setEyes((e) => ({ ...e, [k]: v })),
+    [],
+  )
   const [mode, setMode] = useState<Mode>('idle')
   const [engine, setEngine] = useState<MascotEngine | null>(null)
   const [shakePx, setShakePx] = useState(0)
@@ -386,6 +401,30 @@ export default function SamsaraLab({
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
   }, [cfg])
+
+  /**
+   * The socket lives in the EYE config, not the sequence config, so it cannot
+   * ride along in `copy json` without changing the shape of what that button
+   * emits — and that shape is what gets pasted into DEFAULT_SEQUENCE. A second
+   * button keeps both paste targets honest.
+   */
+  const [copiedEyes, setCopiedEyes] = useState(false)
+  const copyEyes = useCallback(() => {
+    void navigator.clipboard?.writeText(
+      JSON.stringify(
+        {
+          SOCKET: eyes.SOCKET,
+          SOCKET_SPAN: eyes.SOCKET_SPAN,
+          SOCKET_SPAN_Y: eyes.SOCKET_SPAN_Y,
+          SOCKET_FEATHER: eyes.SOCKET_FEATHER,
+        },
+        null,
+        2,
+      ),
+    )
+    setCopiedEyes(true)
+    setTimeout(() => setCopiedEyes(false), 1200)
+  }, [eyes])
 
   /** Four beats, spaced past the cooldown, so one press runs the whole thing. */
   const runAll = useCallback(() => {
@@ -554,14 +593,21 @@ export default function SamsaraLab({
             onClick={() => {
               controlsRef.current?.reset()
               setCfg(structuredClone(DEFAULT_SEQUENCE))
+              setEyes({ ...eyesInitial })
             }}
             style={btn('rgba(43,42,39,0.35)')}
           >
             reset
           </button>
         </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <button type="button" onClick={copyEyes} style={btn('rgba(43,42,39,0.55)')}>
+            {copiedEyes ? 'copied' : 'copy eye socket'}
+          </button>
+        </div>
         <div style={{ marginBottom: 12, opacity: 0.7 }}>
-          ⚠ nothing saves. `copy json` → paste into `lib/samsara/types.ts` and update
+          ⚠ nothing saves. `copy eye socket` → `lib/mascot/eyeTypes.ts`.
+          `copy json` → paste into `lib/samsara/types.ts` and update
           `types.check.ts` in the same commit (plan Task 13).
         </div>
 
@@ -704,6 +750,48 @@ export default function SamsaraLab({
             })}
           </div>
         ))}
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            eye socket — the darkening cover
+          </div>
+          <div style={{ opacity: 0.55, marginBottom: 6, fontStyle: 'italic' }}>
+            hides the model&apos;s PAINTED amber eyes. an ELLIPSE, because a circle wide enough
+            for the gaze also blacks out the forehead plaque and the chin band. widen the
+            feather and the painted scanlines start reading through it.
+          </div>
+          {(
+            [
+              ['SOCKET_SPAN', 'Span — width', 0.4, 2.4, 0.01],
+              ['SOCKET_SPAN_Y', 'Span — height', 0.4, 2.4, 0.01],
+              ['SOCKET_FEATHER', 'Edge feather', 0.01, 0.6, 0.005],
+            ] as const
+          ).map(([k, label, min, max, step]) => (
+            <label key={k} style={{ display: 'block', marginBottom: 6 }}>
+              <span style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{label}</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{eyes[k]}</span>
+              </span>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={eyes[k]}
+                onChange={(e) => setEye(k, Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+            </label>
+          ))}
+          <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span>Socket colour</span>
+            <input
+              type="color"
+              value={eyes.SOCKET}
+              onChange={(e) => setEye('SOCKET', e.target.value.toUpperCase())}
+            />
+          </label>
+        </div>
 
         <div style={{ marginTop: 14, opacity: 0.55 }}>
           ⚠ `ROOM.FOG_DENSITY` has no slider on purpose: the room deliberately

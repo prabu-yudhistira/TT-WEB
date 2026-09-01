@@ -193,6 +193,26 @@ export type RoomConfig = {
    */
   ENV_COLOR: string
   ENV_INTENSITY: number
+
+  /**
+   * Non-uniform scale on SAMSARA's body in the room. 1/1 is the mesh as
+   * modelled.
+   *
+   * ⚠️ The renderer is NOT distorting the model, and this exists to override
+   * the mesh rather than to correct a bug. MEASURED face-on: the silhouette
+   * renders 785x745 (1.0537) against the source mesh's own 2.00 x 1.91
+   * (1.0471) — within 0.6%, which is the eye glow bleeding horizontally. The
+   * body simply IS about 4.7% wider than it is tall.
+   *
+   * So `STRETCH_X` 0.955 makes it a true circle. Left at 1 by default, because
+   * "as modelled" is the honest starting point and squashing the mesh is a
+   * decision, not a fix.
+   *
+   * Room-only, like the rest of the mascot material block: at the hero's
+   * 12.6-70px nobody is measuring its roundness.
+   */
+  MASCOT_STRETCH_X: number
+  MASCOT_STRETCH_Y: number
 }
 
 export type IdleEyesConfig = {
@@ -328,6 +348,10 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // Warm, so the metal reflects brass rather than steel. See ENV_COLOR.
     ENV_COLOR: '#FFD9A8',
     ENV_INTENSITY: 1,
+
+    // As modelled. 0.955 on X would make the silhouette a true circle.
+    MASCOT_STRETCH_X: 1,
+    MASCOT_STRETCH_Y: 1,
   },
 
   DRAG: {
