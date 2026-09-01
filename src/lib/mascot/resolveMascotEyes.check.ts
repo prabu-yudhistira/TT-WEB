@@ -101,12 +101,18 @@ check('FACE_RADIUS is never overridable', resolveMascotEyes({}).FACE_RADIUS === 
     GLOW: 1.25,
     GAP: 0.51,
     SOCKET_SPAN: 1.9,
-    // Not CMS-mapped, so like FACE_RADIUS it must be the DEFAULT here: the
-    // round trip below asserts every field survives, and a non-mapped field can
-    // only survive as whatever the resolver hands back.
-    SOCKET_SPAN_Y: 0.95,
-    SOCKET_FEATHER: 0.1,
-    FACE_RADIUS: 0.5, // not mapped; must survive as the measured value
+    // Not CMS-mapped, so these must be the DEFAULT here: the round trip below
+    // asserts every field survives, and a non-mapped field can only survive as
+    // whatever the resolver hands back.
+    //
+    // ⚠️ READ from the defaults, never restated. These were literals until the
+    // fifth socket pass moved SOCKET_SPAN_Y and SOCKET_FEATHER, at which point
+    // the round trip failed for a reason that had nothing to do with the
+    // resolver — the fixture was simply describing last week's config. A copied
+    // constant here can only ever produce that false alarm.
+    SOCKET_SPAN_Y: d.SOCKET_SPAN_Y,
+    SOCKET_FEATHER: d.SOCKET_FEATHER,
+    FACE_RADIUS: d.FACE_RADIUS,
     SCANLINE_MAX: 14,
     SCANLINE_MIN_PX: 61,
     SCANLINE_RAMP: 22,

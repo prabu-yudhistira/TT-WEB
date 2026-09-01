@@ -1,11 +1,35 @@
 /**
  * How close does each eye come to the socket mask?
  *
- * The shader HARD-RETURNS when r > SOCKET_SPAN — there is no fade, so anything
- * past it is cut with a sharp edge. The approved values leave no headroom:
- * lookUpLeft already reaches 1.354 against a span of 1.34. That overshoot is
- * ~1.7px at 715px and sub-pixel at ship size, so it is the RECORDED BASELINE
- * rather than a failure. This script fails on anything WORSE than that.
+ * ⛔ STALE, AND KNOWN TO BE — do not trust the numbers below without re-deriving
+ * them. Left in place because deleting it would lose the only record of the
+ * question; fixing it needs a measurement nobody has made yet.
+ *
+ * TWO things are wrong with it as of the fifth socket pass (2026-09-01):
+ *
+ *  1. It models a CIRCULAR socket. The shader's cover became an ELLIPSE
+ *     (uSocketSpan x uSocketSpanY) when the monogram plaque and chin band
+ *     stopped being blacked out, so `reach` — a plain Euclidean radius — is not
+ *     the quantity the shader tests. It prints CLIPPED for six expressions
+ *     against SOCKET_SPAN 1.27 and still exits 0, because its pass/fail
+ *     compares `worstOverall` to a FIXED baseline and never looks at the span
+ *     at all. A gate that shouts CLIPPED and passes is worse than no gate.
+ *
+ *  2. The obvious repair — measure the rim in the ellipse's normalised space —
+ *     was written, and it disagreed with the renderer. It scored lookUpLeft at
+ *     13% of the blob clipped, while eyeshots/lookUpLeft.png at the same config
+ *     shows a whole, rounded eye with dark socket clearly above it. Rendering
+ *     the same expression at SOCKET_SPAN_Y 2.60 (a cover so wide it cannot clip
+ *     anything) produced the same eye shape. So the flat-plane model is missing
+ *     something real about how the display maps onto the DOME — vTtObjPos is a
+ *     position on a sphere, not on a plane — and the rewrite was reverted rather
+ *     than shipped on the strength of an argument the picture contradicts.
+ *
+ * To fix it properly: establish empirically what p-space range the front cap
+ * actually spans on the mesh (sweep __ttMascotSock and watch where the cover's
+ * edge lands relative to the plaque), then rebuild the test around that. Until
+ * then the load-bearing checks for the socket are the RENDER gates, which
+ * measure pixels instead of arithmetic: eyes-render.mjs and eyes-kill-switch.mjs.
  *
  * Pure geometry, no browser: reads the frozen shapes and config directly.
  * Run: node --import tsx docs/superpowers/verification/eyes-clearance.mjs

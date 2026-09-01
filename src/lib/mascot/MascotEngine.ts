@@ -397,24 +397,32 @@ export class MascotEngine {
    * Face-display uniforms. Shared across every material on the mesh, so one
    * write drives the whole display. uFaceRadius 0.50 is MEASURED — the smooth
    * front cap ends there and the bezel relief begins (see ./eyes.ts).
+   *
+   * ⚠️ DERIVED from DEFAULT_MASCOT_EYES, never restated. These are only what
+   * a material compiled BEFORE the first setEyeConfig() renders with, so a
+   * stale copy is invisible on the bench (which pushes a config on mount) and
+   * shows on the real page as a flash of the wrong socket while the model
+   * loads. Seven of these were hand-maintained duplicates of approved numbers
+   * until the fifth socket pass moved four at once and left the copy behind.
+   * Deriving them means a freeze gate cannot forget this file again.
    */
   private eyeUniforms: Record<string, { value: unknown }> = {
     /** See the roughnessmap_fragment injection. 0 = the map exactly as authored. */
     uTtRough: { value: 0 },
-    uEyesOn: { value: 1 },
-    uFaceRadius: { value: 0.5 },
+    uEyesOn: { value: DEFAULT_MASCOT_EYES.ENABLED ? 1 : 0 },
+    uFaceRadius: { value: DEFAULT_MASCOT_EYES.FACE_RADIUS },
     // Amber, not the reference video's cyan: the owner asked for the display to
     // match the mascot's own painted eyes and the gold dust trail (#FDB721), so
     // the hero keeps ONE warm accent rather than gaining a second, cold one.
-    uEyeColor: { value: new THREE.Color('#F2A81C') },
-    uEyeCore: { value: new THREE.Color('#FFF0BE') },
-    uSocketColor: { value: new THREE.Color('#000000') },
-    uEyeGlow: { value: 0.55 },
-    uEyeGap: { value: 0.38 },
+    uEyeColor: { value: new THREE.Color(DEFAULT_MASCOT_EYES.COLOR) },
+    uEyeCore: { value: new THREE.Color(DEFAULT_MASCOT_EYES.CORE) },
+    uSocketColor: { value: new THREE.Color(DEFAULT_MASCOT_EYES.SOCKET) },
+    uEyeGlow: { value: DEFAULT_MASCOT_EYES.GLOW },
+    uEyeGap: { value: DEFAULT_MASCOT_EYES.GAP },
     uScanline: { value: 0 },
-    uSocketSpan: { value: 1.34 },
-    uSocketSpanY: { value: 0.95 },
-    uSocketFeather: { value: 0.1 },
+    uSocketSpan: { value: DEFAULT_MASCOT_EYES.SOCKET_SPAN },
+    uSocketSpanY: { value: DEFAULT_MASCOT_EYES.SOCKET_SPAN_Y },
+    uSocketFeather: { value: DEFAULT_MASCOT_EYES.SOCKET_FEATHER },
     uEyeL: { value: new Float32Array(12) },
     uEyeR: { value: new Float32Array(12) },
     uObjCenter: { value: new THREE.Vector3() },
