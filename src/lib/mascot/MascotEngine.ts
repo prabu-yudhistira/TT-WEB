@@ -962,7 +962,14 @@ export class MascotEngine {
    * is not.
    */
   getBodyScreen() {
-    return { x: this.lastScreen.x, y: this.lastScreen.y, diameterPx: this.lastDiameterPx }
+    return {
+      x: this.lastScreen.x,
+      y: this.lastScreen.y,
+      // The DRAWN height, stretch included — a hint anchored below the body has
+      // to clear the body that is actually there, not the one the script asked
+      // for.
+      diameterPx: this.lastDiameterPx * this.stretchY(),
+    }
   }
 
   /** Fires when the pointer moves onto or off SAMSARA's disc. */
@@ -993,8 +1000,25 @@ export class MascotEngine {
     if (rect.width === 0 || rect.height === 0) return false
     const dx = clientX - rect.left - this.lastScreen.x
     const dy = clientY - rect.top - this.lastScreen.y
-    const r = this.lastDiameterPx / 2
-    return dx * dx + dy * dy <= r * r
+    // ⚠️ An ELLIPSE, because MASCOT_STRETCH_X/Y can make the body one. A circle
+    // of the scripted diameter would leave the stretched axis unclickable at
+    // its extremes and overshoot on the other — and the symptom would read as
+    // "the click area is offset", which this project has already chased once.
+    const rx = (this.lastDiameterPx / 2) * this.stretchX()
+    const ry = (this.lastDiameterPx / 2) * this.stretchY()
+    if (rx <= 0 || ry <= 0) return false
+    const nx = dx / rx
+    const ny = dy / ry
+    return nx * nx + ny * ny <= 1
+  }
+
+  /** 1 in the orbit — the stretch is a room-only control. */
+  private stretchX() {
+    return this.mode === 'orbit' ? 1 : this.roomCfg.MASCOT_STRETCH_X
+  }
+
+  private stretchY() {
+    return this.mode === 'orbit' ? 1 : this.roomCfg.MASCOT_STRETCH_Y
   }
 
   /** Draggable only once it has arrived — see DragConfig. */
@@ -1827,7 +1851,14 @@ export class MascotEngine {
     // recomputed yet at this point in the frame.
     const c = this.placer.position
     const centre = c.clone().project(cam)
-    const top = new THREE.Vector3(c.x, c.y + this.placer.scale.y / 2, c.z).project(cam)
+    // ⚠️ scale.Z, not scale.Y. Z is the axis MASCOT_STRETCH never touches, so
+    // this reports the SCRIPTED size — which is what the seam is about. Measured
+    // off Y instead, a 1.12 vertical stretch would show up as a 12% mismatch
+    // between the pose the script asked for and the pose that rendered, on every
+    // frame, and read as a broken projection rather than a deliberate reshape.
+    // Before the stretch existed the scale was uniform, so this changes nothing
+    // that came before it.
+    const top = new THREE.Vector3(c.x, c.y + this.placer.scale.z / 2, c.z).project(cam)
     const toPxY = (ndcY: number) => (1 - (ndcY * 0.5 + 0.5)) * this.H
     const y = toPxY(centre.y)
     this.lastRendered.x = (centre.x * 0.5 + 0.5) * this.W

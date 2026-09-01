@@ -20,10 +20,11 @@ const check = (label: string, cond: boolean) => {
 }
 
 // ── gestures ────────────────────────────────────────────────────────
-// ⚠️ TWO, not the four the spec's state machine diagram draws: one charge beat,
-// then the commit. Owner-tuned, with WHEEL_THRESHOLD raised 120 -> 205 so each
-// beat still takes a deliberate scroll rather than a nudge.
-check('one charge beat then a commit', DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT === 2)
+// ⚠️ THREE, not the four the spec's state machine diagram draws: two charge
+// beats, then the commit. Owner-tuned across four passes (4 -> 2 -> 3), with
+// WHEEL_THRESHOLD at 230 so each beat still takes a deliberate scroll rather
+// than a nudge.
+check('two charge beats then a commit', DEFAULT_SEQUENCE.GESTURES.BEATS_TO_COMMIT === 3)
 check('wheel threshold is positive', DEFAULT_SEQUENCE.GESTURES.WHEEL_THRESHOLD > 0)
 // A trackpad flick's momentum tail runs a few hundred ms. A cooldown shorter
 // than that lets one flick fire the whole sequence.
@@ -120,7 +121,9 @@ check('KEY_LIGHT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.KEY_LIGHT_COL
 // correction they asked for. The values are now a look someone chose, so they
 // are pinned exactly rather than as a range.
 check('MASCOT_TINT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_COLOR))
-check('mascot tint is the approved strength', DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0.41)
+// Pulled almost to nothing once the warm ENVIRONMENT was doing the work the
+// tint had been standing in for. It is a metal: what it reflects is its colour.
+check('mascot tint is the approved strength', DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0.05)
 check('roughness boost is the approved amount', DEFAULT_SEQUENCE.ROOM.MASCOT_ROUGHNESS_BOOST === 0.5)
 // Still room-only. If this ever stops being true the approved HERO material
 // changes too, which is a different decision from the one made here.
@@ -131,6 +134,21 @@ check(
 check(
   'tint strength is a fraction, not a percentage',
   DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH >= 0 && DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH <= 1,
+)
+
+// ── body shape ──────────────────────────────────────────────────────
+// ⚠️ NOT a correction. The renderer was measured against the source before this
+// control existed: face-on the silhouette renders 785x745 (1.0537) against the
+// mesh's own 2.00 x 1.91 (1.0471) — within 0.6%, the residual being eye glow
+// bleeding sideways. The body simply IS ~4.7% wider than tall, and STRETCH is
+// the owner overriding that on purpose rather than the engine distorting it.
+check('approved body stretch', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_X === 1)
+check('approved body stretch Y', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y === 1.12)
+// A stretch of 0 collapses the body to a plane and a negative one turns it
+// inside out; neither is a look anyone is reaching for with a slider.
+check(
+  'stretch stays positive on both axes',
+  DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_X > 0 && DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y > 0,
 )
 
 // ── parked orientation and drag ─────────────────────────────────────

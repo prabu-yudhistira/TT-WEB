@@ -281,7 +281,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   ENABLED: true,
 
   GESTURES: {
-    BEATS_TO_COMMIT: 2,
+    BEATS_TO_COMMIT: 3,
     WHEEL_THRESHOLD: 230,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
@@ -342,7 +342,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
     // reference: matte warm brass with green-blue verdigris in the recesses.
     MASCOT_TINT_COLOR: '#8A6A3A',
-    MASCOT_TINT_STRENGTH: 0.41,
+    MASCOT_TINT_STRENGTH: 0.05,
     MASCOT_ROUGHNESS_BOOST: 0.5,
 
     // Warm, so the metal reflects brass rather than steel. See ENV_COLOR.
@@ -351,7 +351,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
     // As modelled. 0.955 on X would make the silhouette a true circle.
     MASCOT_STRETCH_X: 1,
-    MASCOT_STRETCH_Y: 1,
+    MASCOT_STRETCH_Y: 1.12,
   },
 
   DRAG: {
@@ -409,7 +409,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
       lookDownLeft: 0,
       lookDownRight: 0,
     },
-    INTERVAL_MS: 2700,
+    INTERVAL_MS: 2000,
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
     HOLD_EXPRESSION: 'happy',
