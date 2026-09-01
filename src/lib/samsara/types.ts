@@ -177,6 +177,22 @@ export type RoomConfig = {
   MASCOT_TINT_STRENGTH: number
   /** Added to the material's own baked roughness, clamped to [0, 1]. */
   MASCOT_ROUGHNESS_BOOST: number
+
+  /**
+   * The environment SAMSARA REFLECTS in the room, and its strength.
+   *
+   * ⚠️ For this model this is the dominant control on how the metal reads, and
+   * it is not a light. The material is `metallic: 1` and a pure metal has no
+   * diffuse term — what you see is almost entirely what it reflects. three.js's
+   * default studio environment is neutral white, so a copper body lit by it
+   * comes back GREY and reads as polished chrome. No light intensity fixes
+   * that; the reflected COLOUR has to change.
+   *
+   * Room-only. The hero's orbit keeps the neutral environment it was approved
+   * under, where the body is 12.6-70px and its hue is not the point.
+   */
+  ENV_COLOR: string
+  ENV_INTENSITY: number
 }
 
 export type IdleEyesConfig = {
@@ -308,6 +324,10 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     MASCOT_TINT_COLOR: '#8A6A3A',
     MASCOT_TINT_STRENGTH: 0.41,
     MASCOT_ROUGHNESS_BOOST: 0.5,
+
+    // Warm, so the metal reflects brass rather than steel. See ENV_COLOR.
+    ENV_COLOR: '#FFD9A8',
+    ENV_INTENSITY: 1,
   },
 
   DRAG: {

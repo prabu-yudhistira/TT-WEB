@@ -147,6 +147,8 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'color', path: 'ROOM.MASCOT_TINT_COLOR', label: 'Tint colour' },
       { kind: 'num', path: 'ROOM.MASCOT_TINT_STRENGTH', label: 'Tint strength', min: 0, max: 1, step: 0.01 },
       { kind: 'num', path: 'ROOM.MASCOT_ROUGHNESS_BOOST', label: 'Roughness boost', min: -0.5, max: 0.5, step: 0.01 },
+      { kind: 'color', path: 'ROOM.ENV_COLOR', label: 'Reflected env colour' },
+      { kind: 'num', path: 'ROOM.ENV_INTENSITY', label: 'Reflected env strength', min: 0, max: 4, step: 0.05 },
     ],
   },
   {

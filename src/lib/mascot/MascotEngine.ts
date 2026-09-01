@@ -214,6 +214,9 @@ export class MascotEngine {
    */
   private room: Room | null = null
   private roomCfg: RoomConfig = DEFAULT_SEQUENCE.ROOM
+  /** The room's warm environment, and the config it was built from. */
+  private roomEnvRT: THREE.WebGLRenderTarget | null = null
+  private roomEnvKey = ''
 
   private onScroll = () => {
     const span = this.cfg.SCROLL_FADE_VH * window.innerHeight
@@ -261,6 +264,8 @@ export class MascotEngine {
     this.envRT = pmrem.fromScene(new RoomEnvironment(), 0.04)
     this.scene.environment = this.envRT.texture
     pmrem.dispose()
+    // The room's own, warmer environment is built lazily on first entry — see
+    // buildRoomEnvironment(). The neutral one above stays the orbit's.
 
     this.placer.add(this.tilter)
     this.tilter.add(this.spinner)
@@ -586,6 +591,7 @@ export class MascotEngine {
       this.model = norm
       this.patchEyes()
       this.applyLook()
+      this.applyTextureQuality()
       this.applyMascotTint()
     } catch (err) {
       // No mascot is an acceptable outcome; a broken hero is not.
@@ -681,6 +687,7 @@ export class MascotEngine {
       // material and the socket flashes as plain brass.
       this.patchEyes()
       this.applyLook()
+      this.applyTextureQuality()
       // The high-detail swap happens mid-fall, already in the room — reapply
       // immediately, or the tint the owner dialled in vanishes for however many
       // frames until something else happens to trigger it again.
@@ -786,7 +793,10 @@ export class MascotEngine {
     // gated on exactly that boundary, and calling it every frame's mode write
     // (this fires from the sequence's own per-frame setMode calls) would be
     // work with no observable effect the other 59 times a second.
-    if (wasOrbit !== (m === 'orbit')) this.applyMascotTint()
+    if (wasOrbit !== (m === 'orbit')) {
+      this.applyMascotTint()
+      this.applyEnvironmentFor(m)
+    }
   }
 
   getMode() {
@@ -1210,6 +1220,7 @@ export class MascotEngine {
     this.roomCfg = cfg
     this.room?.setConfig(cfg)
     this.applyMascotTint()
+    if (this.mode !== 'orbit') this.applyEnvironmentFor(this.mode)
   }
 
   /**
@@ -1290,6 +1301,87 @@ export class MascotEngine {
         : 'none'
     this.labelW = el.offsetWidth || c.LABEL_SIZE * 4
     this.labelH = el.offsetHeight || c.LABEL_SIZE * 1.35
+  }
+
+  /**
+   * The environment SAMSARA reflects while it is in the room.
+   *
+   * ⚠️ This is the single biggest lever on how the mascot reads, and it is not
+   * a light. The material is `metallic: 1`, and a pure metal has NO diffuse
+   * term — what you see is almost entirely what it reflects. three.js's
+   * RoomEnvironment is a neutral white studio, so a copper model lit by it
+   * comes back grey, and reads as polished chrome rather than warm brass. No
+   * amount of light INTENSITY fixes that; the reflected colour has to change.
+   *
+   * Built by recolouring RoomEnvironment's emissive panels rather than by
+   * authoring a new studio: the panel LAYOUT is what gives the model its
+   * highlight structure and is worth keeping — only the colour is wrong.
+   *
+   * Rebuilt when the tint or intensity changes, and only ever while in the
+   * room. The hero's orbit keeps the neutral environment it was approved
+   * under, where the body is 12.6-70px and its hue is not the point.
+   */
+  private buildRoomEnvironment() {
+    const cfg = this.roomCfg
+    const key = `${cfg.ENV_COLOR}|${cfg.ENV_INTENSITY}`
+    if (this.roomEnvKey === key && this.roomEnvRT) return
+    this.roomEnvKey = key
+
+    const scene = new RoomEnvironment()
+    const tint = new THREE.Color(cfg.ENV_COLOR)
+    scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (!m || !m.isMeshStandardMaterial) return
+      // Multiply rather than replace: the studio's relative panel brightnesses
+      // are what shape the highlights, and flattening them to one colour would
+      // trade a grey model for an evenly-lit orange one.
+      m.color.multiply(tint)
+      if (m.emissive) m.emissive.multiply(tint)
+    })
+
+    const pmrem = new THREE.PMREMGenerator(this.renderer)
+    const rt = pmrem.fromScene(scene, 0.04)
+    pmrem.dispose()
+    this.roomEnvRT?.dispose()
+    this.roomEnvRT = rt
+  }
+
+  /** Swap between the orbit's neutral environment and the room's warm one. */
+  private applyEnvironmentFor(mode: 'orbit' | 'transit' | 'room') {
+    if (mode === 'orbit') {
+      this.scene.environment = this.envRT?.texture ?? null
+      this.scene.environmentIntensity = this.cfg.ENV_INTENSITY
+      return
+    }
+    this.buildRoomEnvironment()
+    this.scene.environment = this.roomEnvRT?.texture ?? this.envRT?.texture ?? null
+    this.scene.environmentIntensity = this.roomCfg.ENV_INTENSITY
+  }
+
+  /**
+   * Anisotropic filtering on every map the model carries.
+   *
+   * ⚠️ Not a micro-optimisation — on THIS model it is the difference between
+   * worked metal and flat chrome. The material's UVs carry
+   * KHR_texture_transform at scale ~16, so the maps TILE SIXTEEN TIMES across
+   * the body. three.js defaults `anisotropy` to 1, which means that at grazing
+   * angles — and on a sphere almost every texel is at a grazing angle — the
+   * sampler falls back to a blurred mip and the normal map's hammered
+   * micro-relief disappears. A metal with no micro-relief has nothing to break
+   * up its specular, and reads as polished chrome.
+   *
+   * Costs no bytes and no draw calls: it is a sampler state, applied once per
+   * texture at load.
+   */
+  private applyTextureQuality() {
+    const max = this.renderer.capabilities.getMaxAnisotropy()
+    for (const m of this.materials) {
+      for (const map of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.aoMap]) {
+        if (!map || map.anisotropy === max) continue
+        map.anisotropy = max
+        map.needsUpdate = true
+      }
+    }
   }
 
   private applyLook() {
@@ -1968,6 +2060,8 @@ export class MascotEngine {
   dispose(releaseContext = false) {
     this.disposed = true
     this.stop()
+    this.roomEnvRT?.dispose()
+    this.roomEnvRT = null
     window.removeEventListener('scroll', this.onScroll)
     window.removeEventListener('pointerdown', this.onPointerDown)
     window.removeEventListener('pointermove', this.onPointerMove)
