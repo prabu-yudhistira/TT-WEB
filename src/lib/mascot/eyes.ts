@@ -254,6 +254,7 @@ uniform float uEyeGlow;
 uniform float uEyeGap;        // half-distance between the two eyes, display units
 uniform float uScanline;      // 0 = off; gated by on-screen size on the CPU side
 uniform float uSocketSpan;    // how far past the display radius the darkening reaches
+uniform float uSocketSpanY;   // the same, vertically — the opening is an OVAL
 uniform float uEyeL[12];
 uniform float uEyeR[12];
 varying vec3 vTtObjPos;
@@ -303,7 +304,16 @@ vec3 tt_eyes(vec3 base, out float coverage) {
   // amber ovals spill past the display radius, and leaving them showing rings
   // the new eyes with the old ones. Display coords stay normalised to
   // uFaceRadius so tuning the cover does not move the eyes.
-  if (r > uSocketSpan) return base;
+  //
+  // ⚠️ ELLIPTICAL, not circular, and that is the shape of the actual opening.
+  // A circle wide enough to cover where the eyes travel horizontally
+  // (lookUpLeft reaches ~1.35) also reaches far enough VERTICALLY to black out
+  // the monogram plaque above the face and the ornamental chin band below it —
+  // both of which are modelled relief that must stay lit. Separating the two
+  // spans lets the cover follow the bezel instead of overrunning it.
+  vec2 sockUv = vec2(vTtObjPos.x / uSocketSpan, vTtObjPos.y / uSocketSpanY) / uFaceRadius;
+  float rSock = length(sockUv);
+  if (rSock > 1.0) return base;
 
   // display space: -1..1 across the cap, y up
   vec2 p = vTtObjPos.xy / uFaceRadius;
@@ -317,8 +327,17 @@ vec3 tt_eyes(vec3 base, out float coverage) {
   float fill = 1.0 - smoothstep(-aa, aa, d);
   float glow = exp(-max(d, 0.0) * 26.0) * uEyeGlow;
 
-  // socket: darken the whole cap so the PAINTED amber ovals are covered
-  float cap = 1.0 - smoothstep(uSocketSpan - 0.22, uSocketSpan, r);
+  // socket: darken the cap so the PAINTED amber ovals are covered. Feathered
+  // in the ellipse's own normalised space, so the fade is even all the way
+  // round rather than abrupt at the top and bottom where it is tightest.
+  //
+  // ⚠️ The feather is NARROW on purpose. The old 0.22 band, measured against a
+  // span of 1.34, started fading the cover at 84% of the way out — and the
+  // model's painted amber eyes carry fine horizontal scanlines that then show
+  // THROUGH the half-faded cover as striping around the display's upper edge.
+  // Holding full darkness to 90% and fading over the last tenth keeps the edge
+  // soft without letting the old eyes read through the new ones.
+  float cap = 1.0 - smoothstep(0.90, 1.0, rSock);
   vec3 col = mix(base, uSocketColor, cap * uEyesOn);
 
   // hot core inside the blob, saturated body toward its edge.

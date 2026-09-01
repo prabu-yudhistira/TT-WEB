@@ -79,6 +79,11 @@ export function resolveMascotEyes(
     GLOW: num(l.glow, d.GLOW),
     GAP: num(l.gap, d.GAP),
     SOCKET_SPAN: num(l.socketSpan, d.SOCKET_SPAN),
+    // Never CMS-mapped, for the same reason FACE_RADIUS is not: both are
+    // properties of the MESH, not taste. This one is set by where the monogram
+    // plaque and the chin band actually sit, and a field inviting someone to
+    // move it could only ever put the black back over them.
+    SOCKET_SPAN_Y: d.SOCKET_SPAN_Y,
     // Never CMS-mapped. Measured: the smooth front cap ends at 0.50.
     FACE_RADIUS: d.FACE_RADIUS,
 

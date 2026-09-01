@@ -29,6 +29,21 @@ check('approved SOCKET (pure black, not the old #06080B)', d.SOCKET === '#000000
 check('approved GLOW', d.GLOW === 0.55)
 check('approved GAP', d.GAP === 0.38)
 check('approved SOCKET_SPAN', d.SOCKET_SPAN === 1.34)
+// ⚠️ MEASURED 2026-09-01, not chosen. The socket is an ELLIPSE because the face
+// opening is: a circle wide enough to cover where the eyes travel horizontally
+// (lookUpLeft reaches ~1.35) also reaches far enough vertically to black out the
+// monogram plaque above the face and the ornamental chin band below it. Both are
+// modelled relief, and both were being swallowed — invisible at the hero's
+// 12.6-70px, obvious the moment the room shows the body at 400px+.
+//
+// 0.95 was found by sweeping the span live and checking two things at once: the
+// plaque and chin clear, AND no painted amber leaks at the most extreme gaze
+// (lookUpLeft). Re-measure with __ttMascotSock if the source mesh changes.
+check('measured SOCKET_SPAN_Y', d.SOCKET_SPAN_Y === 0.95)
+check(
+  'the socket is shorter than it is wide, or it is not clearing the plaque',
+  d.SOCKET_SPAN_Y < d.SOCKET_SPAN,
+)
 check('approved SCANLINE_MAX', d.SCANLINE_MAX === 9)
 check('approved SCANLINE_MIN_PX', d.SCANLINE_MIN_PX === 44)
 check('approved SCANLINE_RAMP', d.SCANLINE_RAMP === 12)
@@ -53,6 +68,7 @@ check('GLANCE_PEAK within 0..1', d.GLANCE_PEAK > 0 && d.GLANCE_PEAK < 1)
 check('CHARGE_CROSSOVER within 0..1', d.CHARGE_CROSSOVER > 0 && d.CHARGE_CROSSOVER < 1)
 check('GLANCE_SECONDS positive', d.GLANCE_SECONDS > 0)
 check('SOCKET_SPAN positive', d.SOCKET_SPAN > 0)
+check('SOCKET_SPAN_Y positive', d.SOCKET_SPAN_Y > 0)
 
 // Every expression must carry a weight. A missing key reads as 0 in
 // pickWeighted, which would silently drop that expression from the beat.

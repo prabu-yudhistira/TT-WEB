@@ -49,6 +49,20 @@ export type MascotEyesConfig = {
    * release valve if any gaze or dy is ever pushed further. Spec §6.
    */
   SOCKET_SPAN: number
+  /**
+   * The socket's VERTICAL span. The opening is an oval, not a circle.
+   *
+   * ⚠️ Added 2026-09-01 because the circular cover was blacking out modelled
+   * relief. A circle wide enough to cover where the eyes travel horizontally
+   * also reaches far enough up and down to swallow the monogram plaque above
+   * the face and the ornamental chin band below it — invisible at the hero's
+   * 12.6-70px, obvious the moment the room shows the body at 400px+.
+   *
+   * Kept SEPARATE from SOCKET_SPAN rather than derived from it: how much room
+   * the plaque and chin need is a property of the model, not a ratio anyone
+   * should infer.
+   */
+  SOCKET_SPAN_Y: number
   /** ⚠️ MEASURED, not taste. Not a CMS field. See the file header. */
   FACE_RADIUS: number
 
@@ -100,6 +114,7 @@ export const DEFAULT_MASCOT_EYES: MascotEyesConfig = Object.freeze({
   GLOW: 0.55,
   GAP: 0.38,
   SOCKET_SPAN: 1.34,
+  SOCKET_SPAN_Y: 0.95,
   FACE_RADIUS: 0.5,
 
   SCANLINE_MAX: 9,

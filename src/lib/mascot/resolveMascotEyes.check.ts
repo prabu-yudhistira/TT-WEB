@@ -101,6 +101,10 @@ check('FACE_RADIUS is never overridable', resolveMascotEyes({}).FACE_RADIUS === 
     GLOW: 1.25,
     GAP: 0.51,
     SOCKET_SPAN: 1.9,
+    // Not CMS-mapped, so like FACE_RADIUS it must be the DEFAULT here: the
+    // round trip below asserts every field survives, and a non-mapped field can
+    // only survive as whatever the resolver hands back.
+    SOCKET_SPAN_Y: 0.95,
     FACE_RADIUS: 0.5, // not mapped; must survive as the measured value
     SCANLINE_MAX: 14,
     SCANLINE_MIN_PX: 61,

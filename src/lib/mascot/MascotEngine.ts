@@ -352,6 +352,19 @@ export class MascotEngine {
       return { ok, detail: this.detailLoaded }
     }
 
+    /**
+     * Dev handle: sweep the socket's vertical span live.
+     *
+     * Kept rather than deleted after the 2026-09-01 fix, because the value is a
+     * property of the MESH — where the monogram plaque and the chin band sit —
+     * and the source GLB has already been replaced once. If it is replaced
+     * again this is how the number gets re-measured instead of re-guessed.
+     */
+    ;(window as unknown as Record<string, unknown>).__ttMascotSock = (v: number) => {
+      this.eyeUniforms.uSocketSpanY.value = v
+      return v
+    }
+
     // Dev handle for the bench and for verification scripts: hold one
     // expression instead of waiting for the glance beat to pick it.
     ;(window as unknown as Record<string, unknown>).__ttMascotExpr = (name: string | null) => {
@@ -400,6 +413,7 @@ export class MascotEngine {
     uEyeGap: { value: 0.38 },
     uScanline: { value: 0 },
     uSocketSpan: { value: 1.34 },
+    uSocketSpanY: { value: 0.95 },
     uEyeL: { value: new Float32Array(12) },
     uEyeR: { value: new Float32Array(12) },
     uObjCenter: { value: new THREE.Vector3() },
@@ -743,6 +757,7 @@ export class MascotEngine {
     u.uEyeGlow.value = c.GLOW
     u.uEyeGap.value = c.GAP
     u.uSocketSpan.value = c.SOCKET_SPAN
+    u.uSocketSpanY.value = c.SOCKET_SPAN_Y
     u.uFaceRadius.value = c.FACE_RADIUS
 
     // Toggling the switch has to rebuild the material: when off, the display's
