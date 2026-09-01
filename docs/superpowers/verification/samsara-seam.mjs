@@ -40,7 +40,8 @@ const TOL_PX = 1
 
 /**
  * ⚠️ Must track `LANDING.SIZE_FRAC` / `MOBILE_SIZE_FRAC` in
- * src/lib/samsara/types.ts — owner-approved 0.435 and 0.35 on 2026-08-31.
+ * src/lib/samsara/types.ts — owner-approved 0.455 and 0.35 (2026-09-01, third
+ * tuning pass; the desktop fraction moved again after the HiDPI canvas fix).
  *
  * ⚠️ TWO values, not one. They were both 0.4 when this file was written, so a
  * single constant happened to work; the owner set them independently at the
@@ -52,7 +53,7 @@ const TOL_PX = 1
  * the config is TypeScript. `types.check.ts` pins the values themselves; what
  * this asserts is that the LIVE PAGE actually arrives there.
  */
-const LANDED_SIZE_FRAC = 0.435
+const LANDED_SIZE_FRAC = 0.455
 const LANDED_SIZE_FRAC_MOBILE = 0.35
 /** Matches the engine's own split — see MascotEngine.sizePx(). */
 const MOBILE_MAX_W = 640

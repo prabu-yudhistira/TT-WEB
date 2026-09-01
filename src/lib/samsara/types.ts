@@ -246,7 +246,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   GESTURES: {
     BEATS_TO_COMMIT: 2,
-    WHEEL_THRESHOLD: 410,
+    WHEEL_THRESHOLD: 230,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
     TOUCH_THRESHOLD: 60,
@@ -266,16 +266,16 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // value for the bench like every other number here.
     FALL_MS: 950,
     BOUNCE_COUNT: 3,
-    RESTITUTION: 0.8,
+    RESTITUTION: 0.71,
     BOUNCE_MS: [520, 430, 360],
     SETTLE_MS: 300,
   },
 
   LANDING: {
-    SIZE_FRAC: 0.435,
+    SIZE_FRAC: 0.455,
     MOBILE_SIZE_FRAC: 0.35,
-    X_FRAC: 0.59,
-    Y_FRAC: 0.52,
+    X_FRAC: 0.75,
+    Y_FRAC: 0.635,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.3,
     HOVER_BOB_PX: 8,
@@ -283,8 +283,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
     // Frontal and level. The owner parks it for real at the bench.
     ROT_X_DEG: -5,
-    ROT_Y_DEG: -21,
-    ROT_Z_DEG: -5,
+    ROT_Y_DEG: -34,
+    ROT_Z_DEG: -7,
   },
 
   ROOM: {
@@ -306,7 +306,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
     // reference: matte warm brass with green-blue verdigris in the recesses.
     MASCOT_TINT_COLOR: '#8A6A3A',
-    MASCOT_TINT_STRENGTH: 0.32,
+    MASCOT_TINT_STRENGTH: 0.41,
     MASCOT_ROUGHNESS_BOOST: 0.5,
   },
 
@@ -340,8 +340,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      * each key against EXPRESSION_ORDER for exactly that reason.
      */
     WEIGHTS: {
-      neutral: 18,
-      blink: 6,
+      neutral: 15,
+      blink: 7,
       squint: 2,
       // ⚠️ ZERO is a decision, not an omission. Every expression keeps its key
       // so the bench always has a slider for it and pickWeighted can never miss
@@ -366,8 +366,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
       lookDownRight: 0,
     },
     INTERVAL_MS: 2700,
-    SMILE_SHAKE_PX: 16,
-    SMILE_SHAKE_MS: 900,
+    SMILE_SHAKE_PX: 9,
+    SMILE_SHAKE_MS: 160,
     HOLD_EXPRESSION: 'happy',
   },
 

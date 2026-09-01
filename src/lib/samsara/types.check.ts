@@ -87,7 +87,7 @@ check(
 )
 
 // ── landing ─────────────────────────────────────────────────────────
-check('landed size is the approved 43.5% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.435)
+check('landed size is the approved 45.5% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.455)
 check('mobile lands smaller than desktop', DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 0.35)
 check(
   'mobile landed size is set independently',
@@ -120,7 +120,7 @@ check('KEY_LIGHT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.KEY_LIGHT_COL
 // correction they asked for. The values are now a look someone chose, so they
 // are pinned exactly rather than as a range.
 check('MASCOT_TINT is uppercase hex', HEX.test(DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_COLOR))
-check('mascot tint is the approved strength', DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0.32)
+check('mascot tint is the approved strength', DEFAULT_SEQUENCE.ROOM.MASCOT_TINT_STRENGTH === 0.41)
 check('roughness boost is the approved amount', DEFAULT_SEQUENCE.ROOM.MASCOT_ROUGHNESS_BOOST === 0.5)
 // Still room-only. If this ever stops being true the approved HERO material
 // changes too, which is a different decision from the one made here.
