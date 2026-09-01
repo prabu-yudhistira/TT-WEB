@@ -266,6 +266,33 @@ export function MascotLayer({
         style={{
           position: 'absolute',
           inset: 0,
+          /**
+           * ⚠️ EXPLICIT 100%, and `inset: 0` is NOT enough on its own.
+           *
+           * A <canvas> is a REPLACED element. For absolutely-positioned replaced
+           * elements CSS resolves `width: auto` to the INTRINSIC width and then
+           * ignores one of left/right — so `inset: 0` does not stretch it the
+           * way it stretches a div. The canvas falls back to its `width`/
+           * `height` ATTRIBUTES, which three.js sets to host x devicePixelRatio
+           * because setSize() is called with updateStyle = false.
+           *
+           * At dpr 1 that is coincidentally the host size and everything looks
+           * right, which is why every headless run passed. At dpr 1.25 the
+           * canvas lays out 25% too large: MEASURED on the owner's machine,
+           * host 1188.8x729.6 against canvasCSS 1486x912. The engine's own
+           * numbers stay self-consistent — it is the PRESENTATION that is
+           * scaled — so the body renders inflated and pushed away from the
+           * origin while the pointer hit test, which reads the real element box,
+           * stays correct. That is what "the click area is off to the left"
+           * actually was.
+           *
+           * LogoCanvas has always sized itself this way; SatelliteEngine writes
+           * style.width/height from JS. This layer was the only one that did
+           * neither.
+           */
+          width: '100%',
+          height: '100%',
+          display: 'block',
           zIndex: behind ? 0 : 2,
           /**
            * ⚠️ 'auto' ONLY while the pointer is actually over SAMSARA's disc.

@@ -432,3 +432,44 @@ the DOM, still sized, no longer drawing. Hence the assertions: no such warning,
 context obtainable and not lost, canvas count unchanged, **and the sequence still
 reaches `landed` and renders at size** — the last one being what separates a live
 context from a working one.
+
+## 2026-09-01 — a canvas that lays out 25% too large, invisible at dpr 1
+
+### `canvas-presentation-scale.mjs` — the bug every headless run was blind to
+
+A `<canvas>` is a **replaced element**. For an absolutely-positioned replaced
+element, CSS resolves `width: auto` to the element's **intrinsic** width and then
+ignores one of left/right — so `position: absolute; inset: 0` does **not**
+stretch a canvas the way it stretches a div. It falls back to its `width`/
+`height` ATTRIBUTES, which renderers set to `cssSize × devicePixelRatio`.
+
+At dpr 1 the attributes happen to equal the container and everything is correct.
+**At dpr 1.25 the canvas lays out 25% too large, anchored at its top-left.**
+
+⚠️ **The symptom points at the wrong thing.** The engine's own coordinates stay
+self-consistent — it is the PRESENTATION that is scaled — so the scene renders
+inflated and pushed away from the origin while a pointer hit test that reads the
+real element box stays exactly where it should be. It reads as "the click area is
+offset from the artwork", which sends you to inspect the hit test, which is fine.
+
+Measured on the owner's machine at 125% Windows scaling, before the fix:
+host `1188.8×729.6` against a canvas laying out at `1486×912`. Ratio 1.25000.
+
+**Three rounds of measurement missed it**, including a deliberate devicePixelRatio
+sweep, because every assertion compared the engine's intended pose against the
+engine's rendered pose — two numbers that agree with each other no matter how the
+result is presented. The sweep's own output even printed
+`host=1536x830 canvasCSS=1920x1037` and it was read past. **When a user reports a
+spatial offset the harness cannot reproduce, compare against the DOM, not against
+another engine number.**
+
+The fix is an explicit CSS size on the canvas — `width: 100%; height: 100%` — or
+writing `style.width/height` from JS. `LogoCanvas` always did the former and
+`SatelliteEngine` the latter; `MascotLayer` did neither, and was the only layer
+that broke.
+
+The script runs at dpr 1, 1.25, 1.5 and 2 because **one ratio passing proves
+nothing** — 1 is precisely the ratio that cannot see this. It also asserts the
+buffer still scales with dpr, so the fix cannot be "make it blurry". Negative-
+tested: reverting the CSS size fails it at 1.25/1.5/2 with the ratio in the
+message, and passes at 1.
