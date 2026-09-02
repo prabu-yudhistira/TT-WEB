@@ -1845,7 +1845,27 @@ export class MascotEngine {
     const entrance = this.active
       ? clamp01((now - this.activeSince) / Math.max(1, c.ENTRANCE_MS))
       : 0
-    const alpha = entrance * this.scrollAlpha * (c.ENABLED ? 1 : 0)
+    /**
+     * ⚠️ The scroll fade belongs to the HERO ORBIT ONLY.
+     *
+     * `scrollAlpha` is `1 - scrollY / (SCROLL_FADE_VH * innerHeight)` — at 0.6vh
+     * it reaches zero after about half a screen — and it is right for a mascot
+     * circling a mark the visitor is scrolling away from.
+     *
+     * It is wrong the moment SAMSARA is in the ROOM. There the canvas is
+     * `position: fixed` and covers the viewport, the pin is released on landing,
+     * and the body is the subject rather than something being left behind. With
+     * the fade still applied, scrolling down inside Section 2 dimmed the eye
+     * display and the smoke and then erased SAMSARA entirely, leaving an empty
+     * lit room — measured gone by scrollY 800 at an 800px viewport, while the
+     * room itself stayed because it is not gated by this alpha.
+     *
+     * In `transit` the page is pinned so scrollY cannot move, but the same rule
+     * is applied there: once the sequence owns the body, page scroll does not
+     * get a say in whether it is visible.
+     */
+    const scrollFade = this.mode === 'orbit' ? this.scrollAlpha : 1
+    const alpha = entrance * scrollFade * (c.ENABLED ? 1 : 0)
 
     const charge = clamp01(this.chargeSource())
     if (charge > 0) this.shakePhase += c.HOLD_SHAKE_SPEED * dt
