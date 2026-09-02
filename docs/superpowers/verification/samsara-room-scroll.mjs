@@ -116,6 +116,59 @@ for (const c of counts.slice(1)) {
   )
 }
 
+/**
+ * ── Downward scrolling is inert while landed ─────────────────────────
+ *
+ * Owner requirement 2026-09-02. Spec §6.7 leaves nothing below the room, so
+ * scrolling down was 1,171px of travel behind a fixed, full-screen canvas: the
+ * view never changed and the only effect was dragging the page off the room.
+ *
+ * ⚠️ Real wheel events, and dispatched at whatever is actually under the pointer
+ * in the middle of the room. The cause here was subtle: `onWheel` already
+ * called preventDefault on every event — 8 of 8, measured — so the DOCUMENT
+ * never scrolled itself. What moved the page was LENIS, restarted by a
+ * `releasePin()` on landing and doing its own smooth scrolling from those same
+ * events. A test that only checked `defaultPrevented` would have reported this
+ * as working.
+ *
+ * The upward half is not optional. With the pin held, a wheel gesture up is the
+ * only way out of the room, so "down does nothing" and "up still leaves" have to
+ * be asserted together — otherwise the fix for one is a trap.
+ */
+{
+  const wheelAt = (dy, n) =>
+    page.evaluate(
+      async ([d, count]) => {
+        const before = Math.round(window.scrollY)
+        for (let i = 0; i < count; i++) {
+          const el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)
+          ;(el ?? document.body).dispatchEvent(
+            new WheelEvent('wheel', { deltaY: d, bubbles: true, cancelable: true }),
+          )
+          await new Promise((r) => setTimeout(r, 90))
+        }
+        await new Promise((r) => setTimeout(r, 800))
+        return { before, after: Math.round(window.scrollY), mode: window.__ttSamsara().mode }
+      },
+      [dy, n],
+    )
+
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await new Promise((r) => setTimeout(r, 500))
+
+  const down = await wheelAt(200, 10)
+  check('scrolling DOWN in the room moves nothing',
+    down.after <= down.before + 4, `scrollY ${down.before} -> ${down.after}`)
+  check('and leaves the sequence landed', down.mode === 'landed', down.mode)
+
+  const again = await wheelAt(200, 10)
+  check('and stays inert however long it is scrolled',
+    again.after <= again.before + 4, `scrollY ${again.before} -> ${again.after}`)
+
+  const up = await wheelAt(-200, 8)
+  check('while scrolling UP still leaves the room', up.mode !== 'landed', `mode ${up.mode}`)
+}
+
 check('no page errors', errors.length === 0, errors.slice(0, 2).join(' | '))
 
 await browser.close()

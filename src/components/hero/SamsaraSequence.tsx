@@ -411,7 +411,25 @@ export function SamsaraSequence({
       if (mode !== lastMode) {
         lastMode = mode
         modeCbRef.current?.(mode)
-        if (mode === 'landed') releasePin()
+        /**
+         * ⚠️ The pin is HELD through `landed`. It used to be released here.
+         *
+         * Owner requirement 2026-09-02: downward scrolling must do nothing once
+         * SAMSARA has landed. Spec §6.7 — nothing sits below the room until
+         * Section 3 exists — so scrolling down was 1,171px of travel behind a
+         * fixed, full-screen canvas: the view never changed, and the only thing
+         * it achieved was dragging the page off the room.
+         *
+         * ⚠️ Releasing here did NOT hand scrolling to the browser, which is why
+         * the cause was not obvious. `onWheel` still calls preventDefault on
+         * every event — measured, 8 of 8 — so the document never scrolled
+         * itself. What moved the page was LENIS, restarted by this line and
+         * doing its own smooth scrolling from the same wheel events.
+         *
+         * `SequenceController.beat()` already ignores `down` while landed, so
+         * with the pin held a downward gesture is simply inert. `up` still
+         * reaches it and still exits: verified end to end, landed -> idle.
+         */
         if (mode === 'idle') lenisRef.current?.stop()
       }
 
