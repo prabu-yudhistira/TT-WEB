@@ -2,6 +2,8 @@
    Run: npm run seed  — idempotent: exits if users already exist. */
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { DEFAULT_SEQUENCE } from '../lib/samsara/types'
+import { toSamsaraPayload } from '../lib/samsara/resolveSamsara'
 
 const lorem = [
   'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
@@ -376,6 +378,22 @@ const run = async () => {
     })
   }
 
+  // --- the SAMSARA transition (not localized) ---
+  //
+  // Seeded straight from the frozen config, so a fresh install matches what
+  // ships without anyone opening /admin. Spec §7.1: unlike `hero-effects`, this
+  // global has no owner tuning that diverges from code, so writing it here is
+  // safe rather than destructive.
+  //
+  // ⚠️ It is written through toSamsaraPayload() rather than by hand. A literal
+  // object here would be a THIRD copy of ~75 approved numbers, and the two that
+  // already existed both went stale within a day (MascotEngine's uniform
+  // defaults, and resolveMascotEyes.check's fixture).
+  await payload.updateGlobal({
+    slug: 'samsara-sequence',
+    data: toSamsaraPayload(DEFAULT_SEQUENCE) as never,
+  })
+
   // --- homepage (one shared layout; localized fields inside blocks) ---
   const home = await payload.create({
     collection: 'pages',
@@ -398,11 +416,19 @@ const run = async () => {
             'story', 'precision', 'digital', 'atelier', 'jakarta', 'brand',
           ].map((word) => ({ word })),
         },
-        { blockType: 'manifestoStrip' },
-        { blockType: 'featuredWorks', heading: 'Selected works' },
-        { blockType: 'servicesRows', heading: 'Services' },
-        { blockType: 'archiveTeaser', countTemplate: '{{count}} projects in the archive' },
-        { blockType: 'contactMailto', heading: 'Lorem ipsum dolor?' },
+        // Section 2. Spec §7.7: the homepage is exactly these TWO blocks now.
+        //
+        // ⚠️ The five blocks that used to follow — manifestoStrip, featuredWorks,
+        // servicesRows, archiveTeaser, contactMailto — are RETIRED from this page,
+        // not deleted. Their definitions stay in `pageBlocks` (see
+        // src/blocks/index.ts) precisely so their tables survive the next schema
+        // push, and the content they rendered still lives in its own collections
+        // (manifesto statements, works, services). Section 3 will use them again.
+        {
+          blockType: 'samsaraRoom',
+          chatHeading: 'Ask SAMSARA',
+          chatPlaceholder: 'Coming soon…',
+        },
       ],
     },
   })
@@ -419,6 +445,10 @@ const run = async () => {
         'cerita', 'presisi', 'digital', 'atelier', 'jakarta', 'merek',
       ].map((word) => ({ word })),
     },
+    samsaraRoom: { chatHeading: 'Tanya SAMSARA', chatPlaceholder: 'Segera hadir…' },
+    // Kept for the retired blocks: they are not on the homepage any more, but
+    // this map is keyed by blockType and costs nothing to leave complete, so
+    // Section 3 does not have to rediscover the Indonesian headings.
     featuredWorks: { heading: 'Karya pilihan' },
     servicesRows: { heading: 'Layanan' },
     archiveTeaser: { countTemplate: '{{count}} proyek dalam arsip' },
@@ -439,7 +469,9 @@ const run = async () => {
     },
   })
 
-  payload.logger.info('Seed complete: admin user, settings, 6 statements, 4 services, 12 works, homepage (en+id).')
+  payload.logger.info(
+    'Seed complete: admin user, settings, hero effects, SAMSARA sequence, 6 statements, 4 services, 12 works, homepage (hero + samsaraRoom, en+id).',
+  )
   process.exit(0)
 }
 
