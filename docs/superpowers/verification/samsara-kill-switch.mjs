@@ -110,9 +110,21 @@ const inspect = async () => {
   await page.goto(BASE, { waitUntil: 'networkidle0', timeout: 120000 })
   // The hero's intro gates arming either way, so "not yet" and "never" need the
   // same wait before they can be told apart.
-  await new Promise((r) => setTimeout(r, 12000))
 
-  const armed = await page.evaluate(() => typeof window.__ttSamsara === 'function')
+  /**
+   * ⚠️ WAIT FOR THE CONDITION, not for a duration.
+   *
+   * The hero now arms only after its ENTIRE entrance — video, ignition, the
+   * headline typed, held, dissolved, and the constellation reflowed — which
+   * measures ~11.3s here. A fixed settle was 12s, so this had 0.7s of margin on
+   * a software-rasterised browser and would have started reporting "never arms"
+   * as a flake the moment the machine was busy. Waiting on the handle with a
+   * generous timeout distinguishes "not yet" from "never" honestly.
+   */
+  const armed = await page
+    .waitForFunction(() => typeof window.__ttSamsara === 'function', { timeout: 30000 })
+    .then(() => true)
+    .catch(() => false)
 
   // Real wheel gestures, and the document only moves when nothing swallowed
   // them — which is what makes a pin observable. `window.scrollBy` alone walks

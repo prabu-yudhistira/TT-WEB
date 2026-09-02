@@ -176,6 +176,22 @@ export function HeroBlock({
 
   const [headlineStarted, setHeadlineStarted] = useState(false)
   const [headlineDismissed, setHeadlineDismissed] = useState(false)
+  /**
+   * The hero has finished its ENTIRE entrance — owner requirement 2026-09-02:
+   * "make the scroll function wait until hero plays all the sequential".
+   *
+   * `stageLive` alone is not that. It fires when the logo's ignition hands over
+   * and the canvas is ready, which is still mid-entrance: the headline is being
+   * typed, holds for 5.6s, dissolves, and only then does the constellation
+   * reclaim the space it was occupying. Arming on `stageLive` let a scroll rip
+   * SAMSARA out of an orbit that was still rearranging itself underneath it.
+   *
+   * ⚠️ Never true under reduced motion — the headline deliberately stays put
+   * there — which is correct: the sequence does not run in that mode either. And
+   * if the intro video stalls, VIDEO_START_FALLBACK_MS still starts the headline,
+   * so this cannot wedge shut. Until it flips, scrolling is ordinary scrolling.
+   */
+  const [heroSettled, setHeroSettled] = useState(false)
   const onStageLive = useCallback(() => setStageLive(true), [])
   const onIntroPlayStart = useCallback(() => setVideoStarted(true), [])
 
@@ -268,7 +284,12 @@ export function HeroBlock({
     if (!headlineDismissed) return
     // headline is dissolving (CSS transition below) — once it's clear of the
     // layout, let the constellation reclaim the freed space
-    const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 650)
+    const t = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'))
+      // The LAST beat of the hero's entrance. Set here rather than on its own
+      // timer so it cannot drift out of step with the reflow above.
+      setHeroSettled(true)
+    }, 650)
     return () => clearTimeout(t)
   }, [headlineDismissed])
 
@@ -341,7 +362,7 @@ export function HeroBlock({
         engine={mascotEngine}
         rootElRef={mascotRootRef}
         heroRef={heroRef}
-        armed={stageLive && mascot.ENABLED}
+        armed={stageLive && heroSettled && mascot.ENABLED}
         onShake={setShakePx}
         chargeOutRef={seqChargeRef}
         logoChargeOutRef={seqLogoChargeRef}
