@@ -36,11 +36,17 @@ check('and fires every 4 seconds, as asked', cfg.INTERVAL_MS === 4000)
 
 // ── it has to read as SMOKE, not as dust ─────────────────────────────
 //
-// The owner revised this from gold dust to golden smoke, and the difference
-// is entirely in these four numbers rather than in the colour. Pinning them as
-// a SHAPE (few, large, faint, expanding) rather than as exact values leaves the
-// owner free to tune while still failing if a change quietly turns it back into
-// a cloud of grains.
+// ⚠️ These are the CONFIG half of that, and they are the smaller half. What
+// actually decides it is the sprite's SHAPE, in the fragment shader: a sprite
+// whose alpha falls off smoothly with radius is the definition of bokeh, and
+// no combination of the numbers below rescues it. The owner reported exactly
+// that — "emitting dust not smoke" — against a pass that had already tuned
+// count, size and opacity three times. The shader now erodes each puff with
+// fbm noise; these values only have to keep the cloud faint and expanding.
+//
+// A COUNT ceiling used to live here on the theory that smoke means FEWER
+// particles. That was wrong and is deliberately gone: with eroded sprites,
+// more of them is what makes the mass connected rather than a scatter of orbs.
 check('smoke expands as it fades', cfg.GROWTH > 1, `growth ${cfg.GROWTH}`)
 check('and curls rather than expanding as a clean ball', cfg.SWIRL > 0, `swirl ${cfg.SWIRL}`)
 check('the puffs are large', cfg.SIZE >= 24, `${cfg.SIZE}px at the body`)
@@ -49,7 +55,10 @@ check(
   cfg.OPACITY <= 0.5,
   `opacity ${cfg.OPACITY}`,
 )
-check('there are fewer of them than the dust pass had', cfg.COUNT <= 80, `${cfg.COUNT}`)
+check('the glow is low enough not to leave a bright centre', cfg.GLOW <= 0.25,
+  `glow ${cfg.GLOW}`)
+check('and there are enough puffs to form a connected mass', cfg.COUNT >= 60,
+  `${cfg.COUNT}`)
 
 // ── the fade ─────────────────────────────────────────────────────────
 check('fade is 0 at birth', burstFade(0) === 0)
@@ -104,6 +113,14 @@ check('fade never goes negative', burstFade(1.4) === 0)
   b.fire(cfg, 0)
   const motes = b.sample(cfg, 0.001, 1).filter((m) => m.alpha > 0 || m.size > 0)
   check('a burst emits COUNT motes', motes.length === cfg.COUNT, `${motes.length}`)
+
+  // The shader rotates and offsets each puff's noise by this. All-equal seeds
+  // would draw the same wisp 110 times, and repetition reads as a texture bug.
+  const seeds = new Set(motes.map((m) => m.size > 0 && m.seed))
+  check('every puff carries its own noise seed', seeds.size > cfg.COUNT * 0.9,
+    `${seeds.size} distinct of ${motes.length}`)
+  check('and the seeds are in 0..1 as the shader assumes',
+    motes.every((m) => m.seed >= 0 && m.seed <= 1))
 
   // ⚠️ Every mote starts behind the body's centre plane. If any spawned in
   // front, the effect reads as dust sprayed at the visitor's face rather than

@@ -46,6 +46,12 @@ export type BurstSample = {
   z: number
   alpha: number
   size: number
+  /**
+   * 0..1, fixed for a puff's whole life. Drives the shader's noise offset and
+   * its rotation, so no two puffs show the same shape and none of them looks
+   * like the tidy circle it is actually drawn on.
+   */
+  seed: number
 }
 
 export function makeBurstPool(size: number): BurstMote[] {
@@ -171,7 +177,7 @@ export class BurstState {
       const m = this.pool[i]
       const age = m.life > 0 ? (elapsed - m.born) / m.life : 2
       if (age >= 1 || age < 0) {
-        out.push({ i, x: m.x, y: m.y, z: m.z, alpha: 0, size: 0 })
+        out.push({ i, x: m.x, y: m.y, z: m.z, alpha: 0, size: 0, seed: m.seed })
         continue
       }
       m.x += m.vx * dtSec
@@ -202,6 +208,7 @@ export class BurstState {
         // EXPANDING, not shrinking. A puff that shrinks as it fades reads as a
         // grain falling away; one that grows reads as smoke thinning out.
         size: m.size * (1 + (cfg.GROWTH - 1) * age),
+        seed: m.seed,
       })
     }
     return out

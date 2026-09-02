@@ -475,30 +475,35 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     ENABLED: true,
     // The owner asked for every 4 seconds.
     INTERVAL_MS: 4000,
-    // FEWER and LARGER than the dust pass's 90 grains, but not so few that the
-    // cloud is see-through: smoke needs enough overlapping puffs to build
-    // density, and 34 left visible gaps between individual blobs.
-    COUNT: 78,
+    // ⚠️ Count is NOT what separates smoke from dust — an earlier pass here
+    // assumed it was and went down to 34, which just gave fewer, more obviously
+    // separate orbs. The SHAPE does that (see the fragment shader). Given
+    // eroded, noisy sprites, the count's only job is to make the mass
+    // CONNECTED, and that wants more of them, not fewer.
+    COUNT: 95,
     SECONDS: 2.6,
     // ⚠️ Fast enough to ESCAPE, then slowed. The first smoke pass used SPEED
     // 0.45 against DRAG 1.6, which stops a puff after roughly v/drag = 0.19
     // radii — so almost the entire burst stayed hidden behind the silhouette
     // it was born behind, and only three or four puffs ever reached the screen.
     // These give about 2 radii of travel: out past the body, then hanging.
-    SPEED: 0.95,
+    SPEED: 0.62,
     DRAG: 0.7,
     RISE: 0.35,
-    GROWTH: 2.2,
+    GROWTH: 2.5,
     SWIRL: 0.35,
-    SPREAD: 0.22,
+    SPREAD: 0.3,
     BACK_OFFSET: 0.4,
-    // Large on purpose — these are puffs, not grains.
-    SIZE: 78,
+    // Large, and larger than it looks: the noise erodes most of each sprite
+    // away, so the drawn wisp is much smaller than the point it is cut from.
+    SIZE: 96,
     // LOW, and that is what makes it volumetric: single puffs are barely
     // there and the density comes from several overlapping. A high value here
     // gives distinct discs with visible edges.
-    OPACITY: 0.26,
-    GLOW: 0.35,
+    OPACITY: 0.17,
+    // Very low. Anything higher puts a bright centre back in each puff, and a
+    // bright centre in a round sprite is exactly the ember look being escaped.
+    GLOW: 0.14,
     // The hero's own dust, so the room reads as the same material rather
     // than as a second gold. Matches MascotConfig.TRAIL_COLOR / _CORE_COLOR.
     COLOR: '#FDB721',

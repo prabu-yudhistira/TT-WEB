@@ -140,6 +140,7 @@ export class MascotEngine {
   private burstPos!: Float32Array
   private burstAlpha!: Float32Array
   private burstSize!: Float32Array
+  private burstSeed!: Float32Array
   private burstPoints!: THREE.Points
   private burstCfg: BurstConfig = DEFAULT_SEQUENCE.BURST
 
@@ -623,11 +624,13 @@ export class MascotEngine {
     this.burstPos = new Float32Array(MAX_BURST * 3)
     this.burstAlpha = new Float32Array(MAX_BURST)
     this.burstSize = new Float32Array(MAX_BURST)
+    this.burstSeed = new Float32Array(MAX_BURST)
     this.burst = new BurstState(makeBurstPool(MAX_BURST))
     this.burstGeo = new THREE.BufferGeometry()
     this.burstGeo.setAttribute('position', new THREE.BufferAttribute(this.burstPos, 3))
     this.burstGeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.burstAlpha, 1))
     this.burstGeo.setAttribute('aSize', new THREE.BufferAttribute(this.burstSize, 1))
+    this.burstGeo.setAttribute('aSeed', new THREE.BufferAttribute(this.burstSeed, 1))
 
     this.burstMat = new THREE.ShaderMaterial({
       uniforms: {
@@ -641,10 +644,13 @@ export class MascotEngine {
       vertexShader: `
         attribute float aAlpha;
         attribute float aSize;
+        attribute float aSeed;
         uniform float uPxPerWorld;
         varying float vAlpha;
+        varying float vSeed;
         void main() {
           vAlpha = aAlpha;
+          vSeed = aSeed;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
           // ⚠️ This IS the perspective idiom the trail's shader warns against,
@@ -662,26 +668,107 @@ export class MascotEngine {
         uniform vec3 uCore;
         uniform float uGlow;
         varying float vAlpha;
+        varying float vSeed;
+
+        // ⚠️ EXPLICIT precision. The noise below hashes with fract() of products,
+        // which is meaningless at mediump: the mantissa runs out and every pixel
+        // gets an independent value instead of a smooth field. three.js prefixes
+        // highp by default, but this shader's correctness depends on it.
+        precision highp float;
+
+        float hash21(vec2 p) {
+          p = fract(p * vec2(123.34, 345.45));
+          p += dot(p, p + 34.345);
+          return fract(p.x * p.y);
+        }
+        float vnoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = hash21(i);
+          float b = hash21(i + vec2(1.0, 0.0));
+          float c = hash21(i + vec2(0.0, 1.0));
+          float d = hash21(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0;
+          float amp = 0.5;
+          for (int i = 0; i < 3; i++) {
+            v += amp * vnoise(p);
+            p *= 2.03;
+            amp *= 0.5;
+          }
+          return v;
+        }
+
         void main() {
           vec2 d = gl_PointCoord - 0.5;
+
+          // ⛔ THE THING THAT DECIDES SMOKE VERSUS DUST, and it is the SHAPE,
+          // not the colour and not the count.
+          //
+          // A sprite whose alpha is a smooth function of radius is, precisely,
+          // what an out-of-focus point light looks like. That is the definition
+          // of bokeh. Every earlier pass here drew exactly that and then tried
+          // to rescue it with opacity, count and size — which cannot work,
+          // because a hundred faint circles is still a hundred circles.
+          //
+          // Smoke has no clean silhouette: it is eroded, wispy and different
+          // every time. So the radial body below is only a MASK, and what is
+          // actually drawn is fbm noise cut out of it.
+
+          // Rotate per puff, or 78 sprites all show the same noise field and
+          // the repetition reads as a texture bug.
+          float ang = vSeed * 6.2831853;
+          float cs = cos(ang);
+          float sn = sin(ang);
+          vec2 rd = vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs);
+
           float r = length(d) * 2.0;
           if (r > 1.0) discard;
-          // ⚠️ SMOKE, not dust, and the falloff is what decides which it is.
+
+          // Soft containing mask. Meets zero tangentially so the puff has no rim.
+          float body = max(0.0, 1.0 - r * r);
+
+          // Offset by the seed so no two puffs sample the same region.
           //
-          // The trail's grain uses pow(1-r, 2): that reaches zero with a
-          // non-zero slope, leaving a faint but definite RIM. At 7px nobody
-          // sees it; at the 46px these puffs run to it is a visible disc edge,
-          // and a cloud of discs never reads as smoke however soft the colour.
+          // ⚠️ The offset is SMALL, and that is not cosmetic. This read
+          // vSeed * 37.0, which put the hash's inputs in the thousands after
+          // its internal multiply, where floating point has no bits left for
+          // fract() to mean anything — so vnoise degenerated into per-pixel
+          // randomness. Rendered, that is not a texture: it is a scatter of
+          // isolated bright pixels, i.e. precisely the dust the noise was added
+          // to get rid of. Variety comes from the ROTATION above; the offset
+          // only has to break the tie.
           //
-          // (1 - r^2) is flat-topped and meets zero tangentially, so the puff
-          // has no edge at all — which is also why OPACITY is low: density is
-          // meant to come from several of these overlapping.
-          float f = max(0.0, 1.0 - r * r);
-          float a = pow(f, 2.2);
-          // Broad and gentle. A tight hot centre would put a bright dot back
-          // in the middle of every puff, which is the grain look returning.
-          float core = pow(f, 4.0) * uGlow;
-          vec3 c = mix(uColor, uCore, clamp(core, 0.0, 1.0));
+          // LOW frequency too: at 3.4 the lobes were finer than the puff itself.
+          float n = fbm(rd * 2.3 + vec2(vSeed * 5.0, vSeed * 3.0));
+
+          // ⚠️ MODULATE, do not threshold.
+          //
+          // The first attempt at this cut everything below a density threshold
+          // away — smoothstep(0.06, 0.55, body * noise) — which kept only each
+          // sprite's dense core and collapsed a 90px puff into a speck. It turned
+          // the bokeh into literal dust, which was further from smoke, not closer.
+          //
+          // Multiplying instead keeps the puff its full size and gives it uneven
+          // internal density and a wobbling outline, which is what a wisp is. The
+          // multiplier straddles 1.0 so the mean brightness is unchanged and only
+          // its DISTRIBUTION becomes irregular.
+          float wisp = 0.45 + 1.15 * n;
+          float a = pow(body, 1.25) * wisp;
+          // Soften only the outermost rim, so the sprite's own circular boundary
+          // never shows even where the noise happens to be bright there.
+          a *= smoothstep(0.0, 0.22, body);
+          a = clamp(a, 0.0, 1.0);
+          if (a <= 0.002) discard;
+
+          // Warmth in the denser parts rather than a hot centre: a bright middle
+          // is the ember look returning, and it is centred, which is the one
+          // place smoke never has structure.
+          float core = clamp(a * uGlow, 0.0, 1.0);
+          vec3 c = mix(uColor, uCore, core);
           gl_FragColor = vec4(c, a * vAlpha);
         }`,
       transparent: true,
@@ -744,6 +831,7 @@ export class MascotEngine {
       this.burstPos[m.i * 3 + 2] = cz + m.z * radius
       this.burstAlpha[m.i] = m.alpha
       this.burstSize[m.i] = m.size * this.dpr * worldPerPx
+      this.burstSeed[m.i] = m.seed
       if (m.alpha > 0) anyLit = true
     }
 
@@ -756,6 +844,7 @@ export class MascotEngine {
     this.burstGeo.attributes.position.needsUpdate = true
     this.burstGeo.attributes.aAlpha.needsUpdate = true
     this.burstGeo.attributes.aSize.needsUpdate = true
+    this.burstGeo.attributes.aSeed.needsUpdate = true
   }
 
   /** Recomputed on resize and whenever the room's FOV changes. */
