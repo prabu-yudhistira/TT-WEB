@@ -145,44 +145,6 @@ await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 })
 
 check('no page errors', errors.length === 0, errors.slice(0, 2).join(' | '))
 
-/**
- * ── Once per session ─────────────────────────────────────────────────
- *
- * Owner requirement: the entrance plays once per session. The same TAB is
- * reused deliberately — `sessionStorage` is per-tab, so opening a fresh page in
- * a new context would test nothing.
- *
- * ⚠️ Both halves matter. "It skips" alone is satisfiable by an entrance that
- * never plays; the run above already proved the first visit holds the page, so
- * this is the other side of the same claim.
- */
-{
-  const seen = await page.evaluate(() => {
-    try {
-      return window.sessionStorage.getItem('tt-hero-intro-seen')
-    } catch {
-      return null
-    }
-  })
-  check('the finished entrance is remembered for the session', seen === '1', `flag: ${seen}`)
-
-  const t1 = Date.now()
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 })
-  const s = await wheel(page, 10)
-  check('a repeat visit is NOT held — the page scrolls at once',
-    s.after > s.before + 100, `scrollY ${s.before} -> ${s.after}`)
-
-  await page.waitForFunction(() => typeof window.__ttSamsara === 'function', {
-    timeout: 45000,
-    polling: 100,
-  })
-  const armedAt = Date.now() - t1
-  // First visit armed at ~11-15s. Skipping the 7.7s video and the 7s headline
-  // has to show up as a large, unmistakable drop, not a marginal one.
-  check('and it arms far sooner, having skipped the entrance',
-    armedAt < 8000, `armed at ${armedAt}ms on the repeat visit`)
-}
-
 await browser.close()
 console.log(
   failures ? `\n${failures} check(s) failed.` : '\nThe transition waits for the hero to finish.',

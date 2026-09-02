@@ -37,7 +37,6 @@ export function LogoStage({
   onChargeSource,
   externalChargeRef,
   holdEnabled = true,
-  skipIntro = false,
 }: {
   onLive?: () => void
   onIntroPlayStart?: () => void
@@ -59,24 +58,8 @@ export function LogoStage({
    * which reforms a charge already in flight instead of freezing it open.
    */
   holdEnabled?: boolean
-  /**
-   * Skip the 7.7s sketch video and hand straight to the 3D logo.
-   *
-   * Set on every visit after the first IN THIS SESSION — see HeroBlock. The
-   * ignition still runs: it is short, and it is what fires `onIgnitionCue`,
-   * which is the only source of `onLive`. Skipping that too would leave the
-   * hero with no signal that it had gone live.
-   */
-  skipIntro?: boolean
 }) {
   const [introDone, setIntroDone] = useState(false)
-  // Not an initial state: `skipIntro` is resolved from sessionStorage in an
-  // effect, so it is false on the first render even for a repeat visit, and a
-  // useState initialiser would also have to run during SSR where there is no
-  // sessionStorage to read.
-  useEffect(() => {
-    if (skipIntro) setIntroDone(true)
-  }, [skipIntro])
   const [canvasReady, setCanvasReady] = useState(false)
   const [ignited, setIgnited] = useState(false)
   const [overlay, setOverlay] = useState(false)
@@ -140,14 +123,12 @@ export function LogoStage({
           externalChargeRef={externalChargeRef}
         />
       </div>
-      {skipIntro ? null : (
       <SketchIntro
         onDone={() => setIntroDone(true)}
         onPlayStart={onIntroPlayStart}
         onNearEnd={onNearEnd}
         nearEndLeadMs={overlayWanted ? ignition.OVERLAY_LEAD_MS : 0}
       />
-      )}
       {/* Gated on `ignited`, not just hover: until the ignition's `done` fires
           the logo is not armed, so a hold does nothing and the hint would be
           telling the visitor to try something that cannot work yet. */}

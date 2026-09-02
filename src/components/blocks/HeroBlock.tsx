@@ -72,21 +72,6 @@ const VIDEO_START_FALLBACK_MS = 8000 // video stalls with no error/end → run t
  */
 const INTRO_LOCK_MAX_MS = 18000
 
-/**
- * "Plays once per session" — owner requirement 2026-09-02.
- *
- * ⚠️ sessionStorage, NOT localStorage. The entrance IS the arrival moment (spec
- * base §1.2/§3.2); it should greet someone who opens the site, not be retired
- * for ever after one viewing. A session is exactly that boundary: gone when the
- * tab closes.
- *
- * This overturns a previously deliberate decision — the hero used to replay on
- * every remount, and the comment below the constants said so explicitly. What
- * changed is that the entrance now HOLDS THE PAGE for up to ~16s, which is
- * hospitable once and an obstacle every time after.
- */
-const INTRO_SEEN_KEY = 'tt-hero-intro-seen'
-
 // Splits a line into per-character spans with a staggered animation-delay so
 // each line types itself out over TYPE_DUR_S seconds (CSS keyframes only —
 // no GSAP/SplitText involved, deliberately: a prior version used SplitText
@@ -115,14 +100,9 @@ function TypedLine({ text }: { text: string }) {
 // over) the headline types itself out letter-by-letter (1.4s type, 5.6s hold
 // — see TYPE_DUR_S/HOLD_DUR_S) → headline dissolves 7s after it started →
 // video ends and crossfades to the rotating 3D logo → constellation floating
-// words activate.
-//
-// ⚠️ It plays ONCE PER SESSION (INTRO_SEEN_KEY). This used to replay on every
-// remount — navigating back from Manifesto or Archive ran the whole thing again
-// — and that was deliberate while the entrance was merely something to watch.
-// It stopped being tenable when the entrance began HOLDING THE PAGE for up to
-// ~16s: hospitable the first time, an obstacle every time after. A repeat visit
-// skips the sketch video and the headline entirely and lands on the live logo.
+// words activate. Nothing is gated behind a "seen this session" flag, so the
+// whole sequence replays every time the hero remounts (e.g. navigating back
+// from Manifesto/Archive).
 export function HeroBlock({
   line1,
   line2,
@@ -225,8 +205,6 @@ export function HeroBlock({
    * so this cannot wedge shut. Until it flips, scrolling is ordinary scrolling.
    */
   const [heroSettled, setHeroSettled] = useState(false)
-  /** null = not yet resolved from sessionStorage. See the effect below. */
-  const [introSeen, setIntroSeen] = useState<boolean | null>(null)
   const onStageLive = useCallback(() => setStageLive(true), [])
   const onIntroPlayStart = useCallback(() => setVideoStarted(true), [])
 
@@ -352,11 +330,6 @@ export function HeroBlock({
   handingOverRef.current = stageLive && !!mascotEngine && mascot.ENABLED
   useEffect(() => {
     if (!samsara.ENABLED) return
-    // ⚠️ `!== false`, not `!introSeen`. `null` means "not resolved yet", and on
-    // the very first render it always is — so locking on a falsy check would pin
-    // the page for a frame and, worse, run the scrollTo(0, 0) below on a
-    // returning visitor whose position the browser had just restored.
-    if (introSeen !== false) return
     if (heroSettled) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
@@ -386,50 +359,7 @@ export function HeroBlock({
        */
       if (!handingOverRef.current) lenisRef.current?.start()
     }
-  }, [samsara.ENABLED, heroSettled, mascot.ENABLED, introSeen])
-
-  /**
-   * Resolve "have they already seen it this session?" — and if so, fast-forward
-   * the whole entrance rather than replaying it.
-   *
-   * ⚠️ Read in an EFFECT, not in a useState initialiser. This component is
-   * server-rendered, so an initialiser runs where `sessionStorage` does not
-   * exist, and a value that differed between server and client would be a
-   * hydration mismatch. `null` until resolved keeps the lock above from acting
-   * on a guess.
-   */
-  useEffect(() => {
-    let seen = false
-    try {
-      seen = window.sessionStorage.getItem(INTRO_SEEN_KEY) === '1'
-    } catch {
-      // Private mode, or storage disabled. Falling back to "not seen" replays
-      // the entrance, which is the same behaviour the site had before this
-      // existed — never a broken page.
-      seen = false
-    }
-    setIntroSeen(seen)
-    if (!seen) return
-    // Every stage marked done at once. The headline renders dismissed rather
-    // than typing, and `heroSettled` means the sequence can arm as soon as the
-    // engine is up.
-    setVideoStarted(true)
-    setHeadlineStarted(true)
-    setHeadlineDismissed(true)
-    setHeroSettled(true)
-  }, [])
-
-  // Remember it only once the entrance has actually FINISHED. Marking it on
-  // mount would burn the flag on a visitor who left after two seconds, and they
-  // would never see the entrance at all.
-  useEffect(() => {
-    if (!heroSettled) return
-    try {
-      window.sessionStorage.setItem(INTRO_SEEN_KEY, '1')
-    } catch {
-      /* storage unavailable — the entrance simply replays */
-    }
-  }, [heroSettled])
+  }, [samsara.ENABLED, heroSettled, mascot.ENABLED])
 
   useEffect(() => {
     const onScroll = () => {
@@ -484,7 +414,6 @@ export function HeroBlock({
       <LogoStage
         onLive={onStageLive}
         onIntroPlayStart={onIntroPlayStart}
-        skipIntro={introSeen === true}
         separation={separation}
         ignition={ignition}
         onChargeSource={onChargeSource}
