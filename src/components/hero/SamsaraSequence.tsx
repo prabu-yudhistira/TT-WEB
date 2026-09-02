@@ -167,6 +167,23 @@ export function SamsaraSequence({
     // hypothetical here: the owner's own machine has had it silently enabled.
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (!armed) return
+    /**
+     * Spec §5.10, fail-open. No engine, no sequence.
+     *
+     * ⚠️ This is not defensive tidiness — without it the site becomes a DEAD END
+     * on any machine that cannot give us a GL context. `MascotLayer` catches the
+     * failure and never calls `onEngine`, so `engine` stays null; but the
+     * sequence armed anyway, installed its wheel listener, counted beats and
+     * pinned the page with `lenis.stop()` — and then had nothing to animate, so
+     * it never reached `landed` and never released. Measured: the document sat
+     * at scrollY 0 through fourteen wheel gestures and Section 2 was
+     * unreachable.
+     *
+     * `engine` is in this effect's deps, so arming simply waits for it rather
+     * than being lost: the model loads asynchronously and normally arrives after
+     * the hero goes live.
+     */
+    if (!engine) return
 
     const ctrl = new SequenceController(cfgRef.current)
     ctrlRef.current = ctrl
@@ -725,7 +742,7 @@ export function SamsaraSequence({
       delete w.__ttSamsaraReset
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [armed, config.ENABLED])
+  }, [armed, config.ENABLED, engine])
 
   // Config edits (the bench, and the CMS once Task 15 lands) reach the running
   // machine without tearing the sequence down mid-cinematic.
