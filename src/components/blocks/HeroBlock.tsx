@@ -6,6 +6,7 @@ import { LogoStage } from '../hero/LogoStage'
 import { SatelliteField } from '../hero/SatelliteField'
 import { MascotLayer } from '../hero/MascotLayer'
 import { SamsaraSequence, type SequenceControls } from '../hero/SamsaraSequence'
+import { lenisRef } from '../providers/SmoothScroll'
 import { DEFAULT_SEQUENCE } from '../../lib/samsara/types'
 import type { MascotEngine } from '../../lib/mascot/MascotEngine'
 import type { SequenceConfig } from '../../lib/samsara/types'
@@ -58,6 +59,18 @@ const HOLD_DUR_S = 5.6 // complete text stays put this long — dissolve begins 
 const DISMISS_AT_MS = (TYPE_DUR_S + HOLD_DUR_S) * 1000
 const HEADLINE_AFTER_VIDEO_MS = 300 // owner 2026-07-18: typing starts 0.3s after the video truly plays
 const VIDEO_START_FALLBACK_MS = 8000 // video stalls with no error/end → run the headline anyway
+
+/**
+ * Hard ceiling on the intro scroll lock.
+ *
+ * ⚠️ A lock with no timeout is a trapped visitor. The longest legitimate
+ * entrance is the video stall fallback (8s) + the headline's 0.3s lead + its 7s
+ * type-and-hold + the 650ms reflow ≈ 16s, so this sits just past it. If anything
+ * in that chain never fires — a browser that blocks the video AND drops a timer,
+ * an exception in an effect — the page releases anyway and behaves like an
+ * ordinary document. Fail-open is the rule the whole feature is built on.
+ */
+const INTRO_LOCK_MAX_MS = 18000
 
 // Splits a line into per-character spans with a staggered animation-delay so
 // each line types itself out over TYPE_DUR_S seconds (CSS keyframes only —
@@ -292,6 +305,61 @@ export function HeroBlock({
     }, 650)
     return () => clearTimeout(t)
   }, [headlineDismissed])
+
+  /**
+   * Hold the page still while the hero plays its entrance.
+   *
+   * Owner requirement 2026-09-02, after seeing the page scrolled away to Section
+   * 2 while the sketch video was still drawing: the hero has to be allowed to
+   * finish. Gating the SEQUENCE on `heroSettled` was not enough — that only
+   * decides when SAMSARA can be launched, and left ordinary scrolling free to
+   * carry the visitor past the whole intro.
+   *
+   * ⚠️ The pin has to start at MOUNT, not at `stageLive`. The reported scroll
+   * happened during the video, which is before the logo stage goes live and
+   * therefore before the sequence exists to pin anything.
+   *
+   * ⚠️ Three ways out, all of which must stay:
+   *   - `prefers-reduced-motion`: never locks at all. A scroll-jack must never be
+   *     the only route to content, and this is the path most likely to need one.
+   *   - `sequenceEnabled: false`: the kill switch turns this off too, or it would
+   *     leave a scroll-jack with nothing behind it.
+   *   - INTRO_LOCK_MAX_MS: releases regardless if the entrance never completes.
+   */
+  const handingOverRef = useRef(false)
+  handingOverRef.current = stageLive && !!mascotEngine && mascot.ENABLED
+  useEffect(() => {
+    if (!samsara.ENABLED) return
+    if (heroSettled) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    // Start from the top: a reload can restore a scrolled position, and an
+    // entrance that plays while the visitor is looking at Section 2 is no
+    // entrance at all.
+    window.scrollTo(0, 0)
+    lenisRef.current?.stop()
+    const block = (e: Event) => e.preventDefault()
+    window.addEventListener('wheel', block, { passive: false })
+    window.addEventListener('touchmove', block, { passive: false })
+
+    const failsafe = setTimeout(() => setHeroSettled(true), INTRO_LOCK_MAX_MS)
+
+    return () => {
+      clearTimeout(failsafe)
+      window.removeEventListener('wheel', block)
+      window.removeEventListener('touchmove', block)
+      /**
+       * ⚠️ Only hand the scroll back if the SEQUENCE is not about to take it.
+       *
+       * Both this and SamsaraSequence drive the same `lenis` instance, and on the
+       * frame `heroSettled` flips they both run — this one's cleanup and the
+       * sequence's setup. React does not promise which lands last, so calling
+       * `start()` unconditionally can undo the pin the sequence just took and
+       * the page lurches on the first beat, intermittently.
+       */
+      if (!handingOverRef.current) lenisRef.current?.start()
+    }
+  }, [samsara.ENABLED, heroSettled, mascot.ENABLED])
 
   useEffect(() => {
     const onScroll = () => {

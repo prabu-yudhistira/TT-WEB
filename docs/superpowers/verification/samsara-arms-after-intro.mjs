@@ -80,9 +80,24 @@ await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 })
   const armedNow = await page.evaluate(() => typeof window.__ttSamsara === 'function')
   check('the sequence has NOT armed while the hero is still playing', armedNow === false)
 
+  /**
+   * ⚠️ The page must NOT move, and this assertion was inverted at first.
+   *
+   * The initial reading of "make the scroll function wait until hero plays all
+   * the sequential" was that only the SEQUENCE should wait, with ordinary
+   * scrolling left free. It was wrong: the owner sent a screenshot of the page
+   * scrolled down to Section 2 with the sketch video still drawing. Gating the
+   * sequence alone does nothing about that, because the visitor simply scrolls
+   * past the entrance instead of triggering it.
+   *
+   * So the hero holds the page from mount until its entrance completes — a
+   * separate pin from the sequence's, because the reported scroll happened
+   * during the video, before the logo stage is live and before the sequence
+   * exists to pin anything.
+   */
   const s = await wheel(page, 10)
-  check('and the page scrolls normally in the meantime',
-    s.after > s.before + 100, `scrollY ${s.before} -> ${s.after}`)
+  check('and the page is HELD — the entrance cannot be scrolled past',
+    s.after <= s.before + 8, `scrollY ${s.before} -> ${s.after}`)
 }
 
 // ── AFTER it ─────────────────────────────────────────────────────────
