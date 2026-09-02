@@ -25,5 +25,7 @@ eyeshots/
 # eyes-legibility.mjs readdir()s that directory and asserts it holds exactly the
 # 14 expression crops, so anything else written there fails an unrelated gate.
 samsarashots/
+# eyes-zoom.mjs writes this into the repo root.
+zoom-neutral.png
 killswitch-*.png
 occlusion-sheet.png
