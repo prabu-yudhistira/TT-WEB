@@ -19,6 +19,7 @@
  * Run: node --import tsx docs/superpowers/verification/samsara-cms-preview.mjs
  */
 import puppeteer from './_puppeteer.mjs'
+import { mkdirSync } from 'node:fs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const BASE = process.env.TT_URL ?? 'http://localhost:3000/en'
@@ -32,6 +33,10 @@ const check = (label, cond, note = '') => {
     console.log(`ok    ${label}   ${note}`)
   }
 }
+
+// The gates write here rather than into eyeshots/, which eyes-legibility
+// readdir()s and asserts holds exactly the 14 expression crops.
+mkdirSync('samsarashots', { recursive: true })
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -63,7 +68,7 @@ const run = async (source, waitMs) => {
     await new Promise((r) => setTimeout(r, 200))
   }
   const camera = await page.evaluate(() => window.__ttMascot().rendered.camera)
-  await page.screenshot({ path: `eyeshots/preview-${source}.png` })
+  await page.screenshot({ path: `samsarashots/preview-${source}.png` })
   await page.close()
   return { mode, camera, errors, tookMs: Date.now() - t0 }
 }

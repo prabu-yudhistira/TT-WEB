@@ -21,5 +21,9 @@ next-env.d.ts
 # Verification harness outputs — screenshots and contact sheets
 shots/
 eyeshots/
+# Screenshots from the samsara-* gates. Kept OUT of eyeshots/ on purpose:
+# eyes-legibility.mjs readdir()s that directory and asserts it holds exactly the
+# 14 expression crops, so anything else written there fails an unrelated gate.
+samsarashots/
 killswitch-*.png
 occlusion-sheet.png

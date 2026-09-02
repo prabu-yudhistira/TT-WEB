@@ -20,6 +20,7 @@
  * Run: node --import tsx docs/superpowers/verification/samsara-room-chatbox.mjs
  */
 import puppeteer from './_puppeteer.mjs'
+import { mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 const sharp = createRequire('file:///D:/TAMPA%20TARUNO/WEBSITE/_WEB_PRODUCT/package.json')('sharp')
 
@@ -48,6 +49,10 @@ const check = (label, cond, note = '') => {
     console.log(`ok    ${label}   ${note}`)
   }
 }
+
+// The gates write here rather than into eyeshots/, which eyes-legibility
+// readdir()s and asserts holds exactly the 14 expression crops.
+mkdirSync('samsarashots', { recursive: true })
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -255,7 +260,7 @@ for (const vp of VIEWPORTS) {
 
   check(`[${vp.label}] no page errors`, pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '))
 
-  await page.screenshot({ path: `eyeshots/room-${vp.w}x${vp.h}.png` })
+  await page.screenshot({ path: `samsarashots/room-${vp.w}x${vp.h}.png` })
   await page.close()
 }
 

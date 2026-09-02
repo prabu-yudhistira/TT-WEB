@@ -22,6 +22,7 @@
  * Run: node --import tsx docs/superpowers/verification/samsara-burst.mjs
  */
 import puppeteer from './_puppeteer.mjs'
+import { mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 const sharp = createRequire('file:///D:/TAMPA%20TARUNO/WEBSITE/_WEB_PRODUCT/package.json')('sharp')
 
@@ -59,6 +60,10 @@ const goldPixels = async (buf, accept) => {
   }
   return n
 }
+
+// The gates write here rather than into eyeshots/, which eyes-legibility
+// readdir()s and asserts holds exactly the 14 expression crops.
+mkdirSync('samsarashots', { recursive: true })
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -150,7 +155,7 @@ const onFace = (x, y) => Math.hypot(x - body.x, y - body.y) < R * 0.55
 const quietShot = await page.screenshot()
 const quietRing = await goldPixels(quietShot, inRing)
 const quietFace = await goldPixels(quietShot, onFace)
-await sharp(quietShot).toFile('eyeshots/burst-quiet.png')
+await sharp(quietShot).toFile('samsarashots/burst-quiet.png')
 
 // ── fire one on demand and look ──────────────────────────────────────
 await page.evaluate(() => window.__ttBurst().fire())
@@ -160,7 +165,7 @@ await new Promise((r) => setTimeout(r, 420))
 const burstShot = await page.screenshot()
 const duringRing = await goldPixels(burstShot, inRing)
 const duringFace = await goldPixels(burstShot, onFace)
-await sharp(burstShot).toFile('eyeshots/burst-during.png')
+await sharp(burstShot).toFile('samsarashots/burst-during.png')
 
 check(
   'golden smoke is actually PAINTED outside the body during a burst',

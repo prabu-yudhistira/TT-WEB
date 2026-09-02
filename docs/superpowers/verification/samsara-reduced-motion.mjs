@@ -23,6 +23,7 @@
  * Run: node --import tsx docs/superpowers/verification/samsara-reduced-motion.mjs
  */
 import puppeteer from './_puppeteer.mjs'
+import { mkdirSync } from 'node:fs'
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const BASE = process.env.TT_URL ?? 'http://localhost:3000/en'
@@ -36,6 +37,10 @@ const check = (label, cond, note = '') => {
     console.log(`ok    ${label}   ${note}`)
   }
 }
+
+// The gates write here rather than into eyeshots/, which eyes-legibility
+// readdir()s and asserts holds exactly the 14 expression crops.
+mkdirSync('samsarashots', { recursive: true })
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -122,7 +127,7 @@ const run = async (label, setup) => {
     }
   })
 
-  await page.screenshot({ path: `eyeshots/degraded-${label}.png`, fullPage: false })
+  await page.screenshot({ path: `samsarashots/degraded-${label}.png`, fullPage: false })
   await page.close()
   return { armed, scroll, room, errors }
 }
