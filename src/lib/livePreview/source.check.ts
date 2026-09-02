@@ -19,7 +19,12 @@ const check = (label: string, cond: boolean) => {
 }
 
 check('recognises hero-effects', parseSource('hero-effects') === 'hero-effects')
+check('recognises samsara-sequence', parseSource('samsara-sequence') === 'samsara-sequence')
 check('recognises page', parseSource('page') === 'page')
+// The two globals are both flat objects of numbers and hex strings, so a
+// mis-parsed marker would feed one config into the other's resolver and the
+// preview would render plausible nonsense rather than failing.
+check('does not confuse the two globals', parseSource('samsara') === null)
 check('rejects an unknown source', parseSource('something-else') === null)
 check('rejects null', parseSource(null) === null)
 check('rejects undefined', parseSource(undefined) === null)

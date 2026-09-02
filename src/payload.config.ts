@@ -29,12 +29,19 @@ export default buildConfig({
     // which document is live, because the posted payload does not say — see
     // src/lib/livePreview/source.ts.
     livePreview: {
-      globals: ['hero-effects'],
+      globals: ['hero-effects', 'samsara-sequence'],
       collections: ['pages'],
       url: ({ locale, globalConfig }) => {
         const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
         const code = locale?.code || 'en'
-        const source = globalConfig ? 'hero-effects' : 'page'
+        // ⚠️ Read the SLUG rather than testing `globalConfig` for truthiness.
+        // That test was fine with one global; with two it silently labels the
+        // SAMSARA transition's data as hero-effects, and the preview would then
+        // feed a sequence config into the effects resolvers — every field
+        // missing, so it renders the saved hero and looks merely 'not live'.
+        const source = globalConfig ? globalConfig.slug : 'page'
+        // The SAMSARA fields are about the ROOM, so that preview lands there
+        // rather than sitting on the hero the whole time.
         return `${base}/${code}/admin-preview/hero?source=${source}`
       },
     },

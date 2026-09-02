@@ -5,7 +5,7 @@ import { gsap } from 'gsap'
 import { LogoStage } from '../hero/LogoStage'
 import { SatelliteField } from '../hero/SatelliteField'
 import { MascotLayer } from '../hero/MascotLayer'
-import { SamsaraSequence } from '../hero/SamsaraSequence'
+import { SamsaraSequence, type SequenceControls } from '../hero/SamsaraSequence'
 import { DEFAULT_SEQUENCE } from '../../lib/samsara/types'
 import type { MascotEngine } from '../../lib/mascot/MascotEngine'
 import type { SequenceConfig } from '../../lib/samsara/types'
@@ -42,6 +42,15 @@ type Props = {
   samsara?: SequenceConfig
   /** Only for the drag-to-turn cursor pill. Defaults to English. */
   locale?: string
+  /**
+   * Lets a caller drive the transition (beat / reset) instead of scrolling.
+   *
+   * Only the admin live preview uses it: the SAMSARA fields are almost all
+   * about the ROOM, and an editor dragging the key-light slider cannot be
+   * asked to scroll an iframe past a 7.7s intro to see what it did. Undefined
+   * everywhere else, so the homepage keeps exactly one way in — scrolling.
+   */
+  samsaraControlsRef?: React.MutableRefObject<SequenceControls | null>
 }
 
 const TYPE_DUR_S = 1.4 // characters finish typing by this mark (owner 2026-07-17: 1.4s reveal / 7s full)
@@ -94,6 +103,7 @@ export function HeroBlock({
   eyes,
   floatingWords = [],
   samsara = DEFAULT_SEQUENCE,
+  samsaraControlsRef,
   locale = 'en',
 }: Props) {
   const metaRef = useRef<HTMLDivElement>(null)
@@ -336,6 +346,7 @@ export function HeroBlock({
         chargeOutRef={seqChargeRef}
         logoChargeOutRef={seqLogoChargeRef}
         onPointerHold={setHoldEnabled}
+        controlsRef={samsaraControlsRef}
       />
 
       <div

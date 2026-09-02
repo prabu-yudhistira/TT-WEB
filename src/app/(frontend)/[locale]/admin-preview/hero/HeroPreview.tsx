@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLivePreview } from '@payloadcms/live-preview-react'
 import { HeroBlock } from '@/components/blocks/HeroBlock'
 import { parseSource, SOURCE_PARAM } from '@/lib/livePreview/source'
@@ -13,6 +13,9 @@ import {
 } from '@/lib/satellites/resolveSatellites'
 import { resolveMascot, type HeroEffectsMascotInput } from '@/lib/mascot/resolveMascot'
 import { resolveMascotEyes, type HeroEffectsEyesInput } from '@/lib/mascot/resolveMascotEyes'
+import { resolveSamsara, type SamsaraSequenceInput } from '@/lib/samsara/resolveSamsara'
+import type { SequenceConfig } from '@/lib/samsara/types'
+import type { SequenceControls } from '@/components/hero/SamsaraSequence'
 import type { IgnitionConfig } from '@/lib/three/ignition/types'
 import type { SatelliteConfig } from '@/lib/satellites/types'
 import type { MascotConfig } from '@/lib/mascot/types'
@@ -42,6 +45,8 @@ type Props = {
   savedScrollCue?: string | null
   savedConstellationEnabled: boolean
   savedWords: string[]
+  savedSamsara: SequenceConfig
+  locale: string
 }
 
 /**
@@ -65,6 +70,45 @@ export default function HeroPreview(props: Props) {
   // edits alone update state quietly rather than restarting on every keystroke.
   const [nonce, setNonce] = useState(0)
   const replay = useCallback(() => setNonce((n) => n + 1), [])
+
+  /**
+   * Drive the transition into the ROOM when the SAMSARA global is what is being
+   * edited.
+   *
+   * Nearly every field on that global describes the room, the landing or the
+   * golden smoke, and none of it is visible from the hero. Left alone, an editor
+   * dragging the key-light slider would watch a 7.7s sketch intro and then a
+   * hero that never changes, and would reasonably conclude the preview is
+   * broken.
+   *
+   * ⚠️ The sequence only ARMS once the hero stage goes live, and the controls ref
+   * is null until then — so this polls for it rather than firing on mount. It
+   * runs once per mount; `replay` remounts, which is what replays the cinematic.
+   */
+  const controls = useRef<SequenceControls | null>(null)
+  const wantsRoom = source === 'samsara-sequence'
+  useEffect(() => {
+    if (!wantsRoom) return
+    let cancelled = false
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const poll = setInterval(() => {
+      const c = controls.current
+      if (!c || cancelled) return
+      clearInterval(poll)
+      // Beats are spaced past GESTURES.COOLDOWN_MS, or the later ones are
+      // swallowed and the sequence stalls part-charged.
+      const beats = Math.max(1, samsaraBeatsRef.current)
+      for (let i = 0; i < beats; i++) {
+        timers.push(setTimeout(() => controls.current?.beat('down'), 420 * (i + 1)))
+      }
+    }, 200)
+    return () => {
+      cancelled = true
+      clearInterval(poll)
+      timers.forEach(clearTimeout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsRoom, nonce])
 
   // One subscription. Payload posts whichever document the parent edit screen
   // is editing; `source` says which that is.
@@ -93,6 +137,10 @@ export default function HeroPreview(props: Props) {
   let scrollCue = props.savedScrollCue
   let constellationEnabled = props.savedConstellationEnabled
   let words = props.savedWords
+  let samsara = props.savedSamsara
+  // Read at fire time rather than captured in the effect's closure — the
+  // editor may be dragging BEATS_TO_COMMIT itself while the preview runs.
+  const samsaraBeatsRef = useRef(props.savedSamsara.GESTURES.BEATS_TO_COMMIT)
 
   // `initialData` seeds `id` so mergeData() has a real endpoint to hit (see
   // the useLivePreview call above) — which means `data` always has at LEAST
@@ -101,6 +149,11 @@ export default function HeroPreview(props: Props) {
   // the very first render. Checking for a key that only a REAL payload of
   // that shape would carry avoids that false positive.
   const hasLiveEffects = source === 'hero-effects' && ('timing' in data || 'separationEnabled' in data)
+  // Same false-positive guard as above: a key only a real sequence payload
+  // carries. `sequenceEnabled` is a checkbox, so it is present even when every
+  // group is still untouched.
+  const hasLiveSamsara =
+    source === 'samsara-sequence' && ('sequenceEnabled' in data || 'landing' in data)
   const hasLivePage = source === 'page' && 'layout' in data
 
   if (hasLiveEffects) {
@@ -109,6 +162,14 @@ export default function HeroPreview(props: Props) {
     satellites = resolveSatellites(data as HeroEffectsSatellitesInput)
     mascot = resolveMascot(data as HeroEffectsMascotInput)
     eyes = resolveMascotEyes(data as HeroEffectsEyesInput)
+  }
+
+  if (hasLiveSamsara) {
+    // Straight through the resolver, exactly like the effects above: it already
+    // merges a partial, null-riddled shape over the frozen defaults and clamps
+    // the values the engine divides by. Half-typed form state is precisely what
+    // it was built to survive.
+    samsara = resolveSamsara(data as SamsaraSequenceInput)
   }
 
   if (hasLivePage) {
@@ -128,6 +189,8 @@ export default function HeroPreview(props: Props) {
     }
   }
 
+  samsaraBeatsRef.current = samsara.GESTURES.BEATS_TO_COMMIT
+
   return (
     <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <HeroBlock
@@ -143,6 +206,9 @@ export default function HeroPreview(props: Props) {
         mascot={mascot}
         eyes={eyes}
         floatingWords={words}
+        samsara={samsara}
+        locale={props.locale}
+        samsaraControlsRef={controls}
       />
 
       <button

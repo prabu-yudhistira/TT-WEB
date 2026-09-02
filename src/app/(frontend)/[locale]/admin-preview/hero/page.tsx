@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
-import { getHeroEffects, getPage } from '@/lib/cms'
+import { getHeroEffects, getSamsaraSequence, getPage } from '@/lib/cms'
 import { isLocale } from '@/lib/i18n'
 import { resolveIgnition } from '@/lib/three/ignition/resolveIgnition'
 import { resolveSatellites } from '@/lib/satellites/resolveSatellites'
 import { resolveMascot } from '@/lib/mascot/resolveMascot'
 import { resolveMascotEyes } from '@/lib/mascot/resolveMascotEyes'
 import { resolveSeparation } from '@/lib/three/shatter/resolveSeparation'
+import { resolveSamsara } from '@/lib/samsara/resolveSamsara'
 import HeroPreview from './HeroPreview'
 
 // A second page rendering the same hero must never compete with the homepage
@@ -31,7 +32,11 @@ export default async function HeroPreviewPage({
   const { locale } = await params
   if (!isLocale(locale)) notFound()
 
-  const [effects, page] = await Promise.all([getHeroEffects(), getPage('home', locale)])
+  const [effects, samsaraCms, page] = await Promise.all([
+    getHeroEffects(),
+    getSamsaraSequence(),
+    getPage('home', locale),
+  ])
   if (!page) notFound()
 
   const hero = (page.layout || []).find((b) => b.blockType === 'hero')
@@ -51,6 +56,8 @@ export default async function HeroPreviewPage({
         savedSatellites={resolveSatellites(effects)}
         savedMascot={resolveMascot(effects)}
         savedEyes={resolveMascotEyes(effects)}
+        savedSamsara={resolveSamsara(samsaraCms)}
+        locale={locale}
         savedLine1={hero.line1}
         savedLine2={hero.line2}
         savedLocationLine={hero.locationLine}
