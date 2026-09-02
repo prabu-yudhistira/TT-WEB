@@ -257,6 +257,61 @@ export type IdleEyesConfig = {
   HOLD_EXPRESSION: string
 }
 
+/**
+ * Golden SMOKE, puffed from behind the parked mascot on a timer.
+ *
+ * Owner requirement 2026-09-02: bursts from behind SAMSARA every 4 seconds,
+ * revised the same day from dust to smoke.
+ *
+ * ⚠️ Smoke and dust are not a colour change, they are different physics, and
+ * the defaults below encode that. Dust is many small hard grains that fly out
+ * and SHRINK; smoke is a few large soft puffs that drift slowly, EXPAND as they
+ * dissipate, curl on the way, and read as volume only because they are faint
+ * enough to layer over one another. Turning SIZE up on a dust preset gives big
+ * hard discs, not smoke — GROWTH, SWIRL and a low OPACITY are what carry it.
+ *
+ * ⚠️ Distances are in BODY RADII, not pixels and not world units. The room
+ * scales SAMSARA by LANDING.SIZE_FRAC of the viewport, so a burst measured in
+ * pixels would be a halo on a laptop and a speck on a large display. See
+ * ./roomBurst.ts.
+ */
+export type BurstConfig = {
+  ENABLED: boolean
+  /** Between bursts. The owner asked for 4 seconds. */
+  INTERVAL_MS: number
+  /** Motes per burst. */
+  COUNT: number
+  /** How long one mote lives, before the per-mote 0.7-1.3 spread. */
+  SECONDS: number
+  /** Outward speed, in body radii per second. */
+  SPEED: number
+  /**
+   * Final size as a multiple of birth size. >1 expands as it fades, which is
+   * the single strongest smoke cue; 1 holds a constant disc, <1 shrinks to a
+   * grain and reads as dust again.
+   */
+  GROWTH: number
+  /**
+   * Lateral curl, in body radii per second. Each puff drifts on its own slow
+   * sine, so the cloud folds instead of expanding as a clean sphere.
+   */
+  SWIRL: number
+  /** How much a mote slows per second. 0 lets them fly on forever. */
+  DRAG: number
+  /** Upward drift, in body radii per second — dust rises as it is shed. */
+  RISE: number
+  /** Extra spawn radius past the surface, in body radii. */
+  SPREAD: number
+  /** How far behind the centre the disc sits. Larger hides the birth better. */
+  BACK_OFFSET: number
+  /** Base mote size. Scaled by distance, so this is its size AT the body. */
+  SIZE: number
+  OPACITY: number
+  GLOW: number
+  COLOR: string
+  CORE_COLOR: string
+}
+
 export type ChatboxConfig = {
   /** From the start of the commit. Overlaps the settle. */
   DELAY_MS: number
@@ -272,6 +327,7 @@ export type SequenceConfig = {
   ROOM: RoomConfig
   DRAG: DragConfig
   IDLE_EYES: IdleEyesConfig
+  BURST: BurstConfig
   CHATBOX: ChatboxConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
   EXIT_MS: number
@@ -413,6 +469,40 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
     HOLD_EXPRESSION: 'happy',
+  },
+
+  BURST: {
+    ENABLED: true,
+    // The owner asked for every 4 seconds.
+    INTERVAL_MS: 4000,
+    // FEWER and LARGER than the dust pass's 90 grains, but not so few that the
+    // cloud is see-through: smoke needs enough overlapping puffs to build
+    // density, and 34 left visible gaps between individual blobs.
+    COUNT: 78,
+    SECONDS: 2.6,
+    // ⚠️ Fast enough to ESCAPE, then slowed. The first smoke pass used SPEED
+    // 0.45 against DRAG 1.6, which stops a puff after roughly v/drag = 0.19
+    // radii — so almost the entire burst stayed hidden behind the silhouette
+    // it was born behind, and only three or four puffs ever reached the screen.
+    // These give about 2 radii of travel: out past the body, then hanging.
+    SPEED: 0.95,
+    DRAG: 0.7,
+    RISE: 0.35,
+    GROWTH: 2.2,
+    SWIRL: 0.35,
+    SPREAD: 0.22,
+    BACK_OFFSET: 0.4,
+    // Large on purpose — these are puffs, not grains.
+    SIZE: 78,
+    // LOW, and that is what makes it volumetric: single puffs are barely
+    // there and the density comes from several overlapping. A high value here
+    // gives distinct discs with visible edges.
+    OPACITY: 0.26,
+    GLOW: 0.35,
+    // The hero's own dust, so the room reads as the same material rather
+    // than as a second gold. Matches MascotConfig.TRAIL_COLOR / _CORE_COLOR.
+    COLOR: '#FDB721',
+    CORE_COLOR: '#FFFCD6',
   },
 
   CHATBOX: {

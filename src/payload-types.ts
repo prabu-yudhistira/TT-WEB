@@ -1610,6 +1610,69 @@ export interface SamsaraSequence {
     };
   };
   /**
+   * Puffs of golden smoke shed from BEHIND SAMSARA once it has parked, on a timer. Distances are in body radii, not pixels, so it holds its scale relative to SAMSARA on every screen. Smoke reads as smoke because the puffs are FEW, LARGE, FAINT and EXPANDING — raising the count or the opacity turns it back into dust.
+   */
+  burst?: {
+    enabled?: boolean | null;
+    /**
+     * Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.
+     */
+    intervalMs?: number | null;
+    /**
+     * Motes per burst. 0 is another way to turn it off.
+     */
+    count?: number | null;
+    /**
+     * How long a mote lasts, before a per-mote spread of 0.7-1.3x.
+     */
+    seconds?: number | null;
+    /**
+     * Outward speed, in body radii per second.
+     */
+    speed?: number | null;
+    /**
+     * How much each puff expands over its life. Above 1 it billows out as it fades, which is the strongest smoke cue; 1 holds a flat disc and below 1 it shrinks to a grain and reads as dust.
+     */
+    growth?: number | null;
+    /**
+     * Lateral curl. Each puff drifts on its own slow wander, so the cloud folds instead of expanding as a clean ball. 0 makes it a tidy sphere.
+     */
+    swirl?: number | null;
+    /**
+     * How quickly motes slow down. 0 lets them fly on at full speed and leave the frame.
+     */
+    drag?: number | null;
+    /**
+     * Upward drift. Negative makes the dust fall instead.
+     */
+    rise?: number | null;
+    /**
+     * How far past the surface motes are born.
+     */
+    spread?: number | null;
+    /**
+     * How far BEHIND the body the burst starts. Larger hides the moment of birth better; 0 lets motes appear level with the silhouette.
+     */
+    backOffset?: number | null;
+    /**
+     * Puff size in px at birth, measured at SAMSARA’s own depth. Large is correct here — these overlap to make the volume.
+     */
+    size?: number | null;
+    opacity?: number | null;
+    /**
+     * How much of each puff is hot centre rather than body colour. Keep it low: a bright middle puts a visible grain back inside every puff.
+     */
+    glow?: number | null;
+    /**
+     * The hero’s own gold, so the room reads as the same material.
+     */
+    color?: string | null;
+    /**
+     * The warmer centre of each puff.
+     */
+    coreColor?: string | null;
+  };
+  /**
    * Its wording lives on the SAMSARA room block, in Pages. These are only its timings.
    */
   chatbox?: {
@@ -2085,6 +2148,26 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               lookDownLeft?: T;
               lookDownRight?: T;
             };
+      };
+  burst?:
+    | T
+    | {
+        enabled?: T;
+        intervalMs?: T;
+        count?: T;
+        seconds?: T;
+        speed?: T;
+        growth?: T;
+        swirl?: T;
+        drag?: T;
+        rise?: T;
+        spread?: T;
+        backOffset?: T;
+        size?: T;
+        opacity?: T;
+        glow?: T;
+        color?: T;
+        coreColor?: T;
       };
   chatbox?:
     | T

@@ -178,6 +178,27 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: 'golden smoke burst',
+    note: 'shed from BEHIND the parked body, on a timer. distances are in body radii, so it holds its scale at every viewport. few + large + faint + growing reads as smoke; many + small + bright reads as dust.',
+    rows: [
+      { kind: 'num', path: 'BURST.INTERVAL_MS', label: 'Every ms', min: 400, max: 20000, step: 100 },
+      { kind: 'num', path: 'BURST.COUNT', label: 'Motes per burst', min: 0, max: 400, step: 5 },
+      { kind: 'num', path: 'BURST.SECONDS', label: 'Mote life s', min: 0.2, max: 5, step: 0.05 },
+      { kind: 'num', path: 'BURST.SPEED', label: 'Outward speed', min: 0, max: 4, step: 0.05 },
+      { kind: 'num', path: 'BURST.GROWTH', label: 'Billow (x size)', min: 0.2, max: 6, step: 0.05 },
+      { kind: 'num', path: 'BURST.SWIRL', label: 'Curl', min: 0, max: 3, step: 0.02 },
+      { kind: 'num', path: 'BURST.DRAG', label: 'Slow-down /s', min: 0, max: 6, step: 0.05 },
+      { kind: 'num', path: 'BURST.RISE', label: 'Rise', min: -2, max: 2, step: 0.02 },
+      { kind: 'num', path: 'BURST.SPREAD', label: 'Spawn spread', min: 0, max: 2, step: 0.05 },
+      { kind: 'num', path: 'BURST.BACK_OFFSET', label: 'How far behind', min: 0, max: 3, step: 0.05 },
+      { kind: 'num', path: 'BURST.SIZE', label: 'Puff px at body', min: 1, max: 180, step: 1 },
+      { kind: 'num', path: 'BURST.OPACITY', label: 'Opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'BURST.GLOW', label: 'Hot core', min: 0, max: 2, step: 0.05 },
+      { kind: 'color', path: 'BURST.COLOR', label: 'Dust colour' },
+      { kind: 'color', path: 'BURST.CORE_COLOR', label: 'Core colour' },
+    ],
+  },
+  {
     title: 'chatbox + exit',
     rows: [
       { kind: 'num', path: 'CHATBOX.DELAY_MS', label: 'Chatbox delay ms', min: 0, max: 8000, step: 50 },
@@ -631,6 +652,16 @@ export default function SamsaraLab({
           />
           <span title="Click-hold-drag SAMSARA to turn it. Landed only.">
             drag to turn
+          </span>
+        </label>
+        <label style={{ display: 'flex', gap: 6, marginBottom: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={cfg.BURST.ENABLED}
+            onChange={(e) => set('BURST.ENABLED', e.target.checked)}
+          />
+          <span title="Golden smoke shed from behind SAMSARA once it has parked. Landed only.">
+            golden smoke burst
           </span>
         </label>
         <label style={{ display: 'flex', gap: 6, marginBottom: 12, cursor: 'pointer' }}>

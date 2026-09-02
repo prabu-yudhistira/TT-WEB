@@ -85,6 +85,24 @@ export type SamsaraSequenceInput = {
     holdExpression?: string | null
     weights?: Record<string, number | null | undefined> | null
   } | null
+  burst?: {
+    enabled?: boolean | null
+    intervalMs?: number | null
+    count?: number | null
+    seconds?: number | null
+    speed?: number | null
+    growth?: number | null
+    swirl?: number | null
+    drag?: number | null
+    rise?: number | null
+    spread?: number | null
+    backOffset?: number | null
+    size?: number | null
+    opacity?: number | null
+    glow?: number | null
+    color?: string | null
+    coreColor?: string | null
+  } | null
   chatbox?: { delayMs?: number | null; enterMs?: number | null } | null
   exitMs?: number | null
 }
@@ -127,6 +145,7 @@ export function resolveSamsara(
   const r = cms?.room ?? {}
   const dr = cms?.drag ?? {}
   const ie = cms?.idleEyes ?? {}
+  const bu = cms?.burst ?? {}
   const c = cms?.chatbox ?? {}
   const w = ie?.weights ?? {}
 
@@ -221,6 +240,27 @@ export function resolveSamsara(
           : d.IDLE_EYES.HOLD_EXPRESSION,
     },
 
+    BURST: {
+      ENABLED: bool(bu.enabled, d.BURST.ENABLED),
+      // Floored well above 0: the interval is a divisor for the schedule, and
+      // a 0 here would fire a burst every frame and flood the pool.
+      INTERVAL_MS: Math.max(50, num(bu.intervalMs, d.BURST.INTERVAL_MS)),
+      COUNT: Math.max(0, Math.round(num(bu.count, d.BURST.COUNT))),
+      SECONDS: Math.max(0.05, num(bu.seconds, d.BURST.SECONDS)),
+      SPEED: num(bu.speed, d.BURST.SPEED),
+      DRAG: num(bu.drag, d.BURST.DRAG),
+      RISE: num(bu.rise, d.BURST.RISE),
+      GROWTH: num(bu.growth, d.BURST.GROWTH),
+      SWIRL: num(bu.swirl, d.BURST.SWIRL),
+      SPREAD: num(bu.spread, d.BURST.SPREAD),
+      BACK_OFFSET: num(bu.backOffset, d.BURST.BACK_OFFSET),
+      SIZE: num(bu.size, d.BURST.SIZE),
+      OPACITY: num(bu.opacity, d.BURST.OPACITY),
+      GLOW: num(bu.glow, d.BURST.GLOW),
+      COLOR: hex(bu.color, d.BURST.COLOR),
+      CORE_COLOR: hex(bu.coreColor, d.BURST.CORE_COLOR),
+    },
+
     CHATBOX: {
       DELAY_MS: num(c.delayMs, d.CHATBOX.DELAY_MS),
       ENTER_MS: num(c.enterMs, d.CHATBOX.ENTER_MS),
@@ -298,6 +338,24 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       smileShakeMs: c.IDLE_EYES.SMILE_SHAKE_MS,
       holdExpression: c.IDLE_EYES.HOLD_EXPRESSION,
       weights: { ...c.IDLE_EYES.WEIGHTS },
+    },
+    burst: {
+      enabled: c.BURST.ENABLED,
+      intervalMs: c.BURST.INTERVAL_MS,
+      count: c.BURST.COUNT,
+      seconds: c.BURST.SECONDS,
+      speed: c.BURST.SPEED,
+      growth: c.BURST.GROWTH,
+      swirl: c.BURST.SWIRL,
+      drag: c.BURST.DRAG,
+      rise: c.BURST.RISE,
+      spread: c.BURST.SPREAD,
+      backOffset: c.BURST.BACK_OFFSET,
+      size: c.BURST.SIZE,
+      opacity: c.BURST.OPACITY,
+      glow: c.BURST.GLOW,
+      color: c.BURST.COLOR,
+      coreColor: c.BURST.CORE_COLOR,
     },
     chatbox: { delayMs: c.CHATBOX.DELAY_MS, enterMs: c.CHATBOX.ENTER_MS },
     exitMs: c.EXIT_MS,

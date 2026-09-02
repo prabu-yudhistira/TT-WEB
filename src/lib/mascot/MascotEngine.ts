@@ -9,6 +9,7 @@ import { screenToWorld, worldSizeFor } from '../samsara/cameraHandoff'
 import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
 import { makeMotePool, TrailState } from './mascotTrail'
+import { BurstState, makeBurstPool } from '../samsara/roomBurst'
 import {
   EXPRESSIONS,
   EYES_FRAGMENT_CHUNK,
@@ -22,7 +23,13 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
-import { DEFAULT_SEQUENCE, type DragConfig, type IdleEyesConfig, type RoomConfig } from '../samsara/types'
+import {
+  DEFAULT_SEQUENCE,
+  type BurstConfig,
+  type DragConfig,
+  type IdleEyesConfig,
+  type RoomConfig,
+} from '../samsara/types'
 
 /**
  * Hero orbiting mascot — simulation and rendering.
@@ -59,6 +66,15 @@ import { DEFAULT_SEQUENCE, type DragConfig, type IdleEyesConfig, type RoomConfig
  * for more live motes than the pool holds.
  */
 const MAX_MOTES = 2600
+
+/**
+ * Burst pool. Sized so the CMS ceiling (COUNT 400) can be in flight for the
+ * longest life (SECONDS 5 x the 1.3 per-mote spread) across two overlapping
+ * bursts, since a short INTERVAL_MS can fire again before the previous drains.
+ * `fire()` clamps to the pool anyway, so the worst case is a shortened burst
+ * rather than an overrun.
+ */
+const MAX_BURST = 1024
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
@@ -111,6 +127,21 @@ export class MascotEngine {
   private dustSize!: Float32Array
   /** Pure particle bookkeeping — emission carry, stall clamp, fade, ring buffer. */
   private trail!: TrailState
+
+  // ── the parked mascot's golden-smoke bursts (owner 2026-09-02) ──
+  //
+  // A SECOND particle system, deliberately. The trail above lives in screen
+  // pixels under the ORTHOGRAPHIC camera; the room is PERSPECTIVE, where those
+  // coordinates land hundreds of units off-frustum and that point sizing means
+  // nothing. See ../samsara/roomBurst.ts.
+  private burst!: BurstState
+  private burstGeo!: THREE.BufferGeometry
+  private burstMat!: THREE.ShaderMaterial
+  private burstPos!: Float32Array
+  private burstAlpha!: Float32Array
+  private burstSize!: Float32Array
+  private burstPoints!: THREE.Points
+  private burstCfg: BurstConfig = DEFAULT_SEQUENCE.BURST
 
   private cfg: MascotConfig = { ...DEFAULT_MASCOT }
   private belt: SatelliteConfig | null = null
@@ -273,6 +304,7 @@ export class MascotEngine {
     this.placer.visible = false
 
     this.buildTrail()
+    this.buildBurst()
 
     ;(window as unknown as Record<string, unknown>).__ttMascot = () => ({
       cx: this.cx,
@@ -364,6 +396,22 @@ export class MascotEngine {
       this.eyeUniforms.uSocketSpanY.value = v
       return v
     }
+
+    /**
+     * Dev handle for the burst: its live count, its config, and a way to fire
+     * one now. Verification needs the live count specifically — screenshotting
+     * against a wall-clock timer races the schedule and compares two frames
+     * that both happen to have dust in them.
+     */
+    ;(window as unknown as Record<string, unknown>).__ttBurst = () => ({
+      alive: this.burst.aliveCount(this.elapsed),
+      // The engine's OWN clock, which is what the burst schedule runs on.
+      // Wall-clock drifts from it whenever frames are slow, so verification
+      // must time the interval here or it measures the frame rate instead.
+      elapsed: this.elapsed,
+      cfg: this.burstCfg,
+      fire: () => this.fireBurst(),
+    })
 
     // Dev handle for the bench and for verification scripts: hold one
     // expression instead of waiting for the glance beat to pick it.
@@ -567,6 +615,164 @@ export class MascotEngine {
     this.dustGeo.attributes.position.needsUpdate = true
     this.dustGeo.attributes.aAlpha.needsUpdate = true
     this.dustGeo.attributes.aSize.needsUpdate = true
+  }
+
+  // ── the parked mascot's golden-smoke burst ──────────────────────────
+
+  private buildBurst() {
+    this.burstPos = new Float32Array(MAX_BURST * 3)
+    this.burstAlpha = new Float32Array(MAX_BURST)
+    this.burstSize = new Float32Array(MAX_BURST)
+    this.burst = new BurstState(makeBurstPool(MAX_BURST))
+    this.burstGeo = new THREE.BufferGeometry()
+    this.burstGeo.setAttribute('position', new THREE.BufferAttribute(this.burstPos, 3))
+    this.burstGeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.burstAlpha, 1))
+    this.burstGeo.setAttribute('aSize', new THREE.BufferAttribute(this.burstSize, 1))
+
+    this.burstMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(DEFAULT_SEQUENCE.BURST.COLOR) },
+        uCore: { value: new THREE.Color(DEFAULT_SEQUENCE.BURST.CORE_COLOR) },
+        uGlow: { value: DEFAULT_SEQUENCE.BURST.GLOW },
+        // Device pixels per world unit at one unit of depth. The engine
+        // recomputes it on resize and on any FOV change.
+        uPxPerWorld: { value: 1 },
+      },
+      vertexShader: `
+        attribute float aAlpha;
+        attribute float aSize;
+        uniform float uPxPerWorld;
+        varying float vAlpha;
+        void main() {
+          vAlpha = aAlpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          // ⚠️ This IS the perspective idiom the trail's shader warns against,
+          // and here it is correct: aSize is in WORLD units and the camera is
+          // a real perspective camera in room-scale units. The trail's warning
+          // is about the ORTHOGRAPHIC camera, whose units are already pixels.
+          gl_PointSize = aSize * uPxPerWorld / max(0.001, -mv.z);
+          if (aAlpha <= 0.0) {
+            gl_PointSize = 0.0;
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+          }
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform vec3 uCore;
+        uniform float uGlow;
+        varying float vAlpha;
+        void main() {
+          vec2 d = gl_PointCoord - 0.5;
+          float r = length(d) * 2.0;
+          if (r > 1.0) discard;
+          // ⚠️ SMOKE, not dust, and the falloff is what decides which it is.
+          //
+          // The trail's grain uses pow(1-r, 2): that reaches zero with a
+          // non-zero slope, leaving a faint but definite RIM. At 7px nobody
+          // sees it; at the 46px these puffs run to it is a visible disc edge,
+          // and a cloud of discs never reads as smoke however soft the colour.
+          //
+          // (1 - r^2) is flat-topped and meets zero tangentially, so the puff
+          // has no edge at all — which is also why OPACITY is low: density is
+          // meant to come from several of these overlapping.
+          float f = max(0.0, 1.0 - r * r);
+          float a = pow(f, 2.2);
+          // Broad and gentle. A tight hot centre would put a bright dot back
+          // in the middle of every puff, which is the grain look returning.
+          float core = pow(f, 4.0) * uGlow;
+          vec3 c = mix(uColor, uCore, clamp(core, 0.0, 1.0));
+          gl_FragColor = vec4(c, a * vAlpha);
+        }`,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      // ⚠️ depthTest ON, depthWrite OFF, and both matter.
+      //
+      // TEST on is what makes this read as coming from BEHIND: the body writes
+      // depth, so motes still behind it are hidden and only those that have
+      // travelled past the silhouette appear. Turning it off would draw the
+      // whole burst over SAMSARA's face, which is the opposite of the effect.
+      //
+      // WRITE off so motes do not occlude each other — additive grains that
+      // z-fight against their own siblings sparkle in a way that reads as a bug.
+      depthTest: true,
+      depthWrite: false,
+    })
+    this.burstPoints = new THREE.Points(this.burstGeo, this.burstMat)
+    this.burstPoints.frustumCulled = false
+    this.burstPoints.visible = false
+    this.scene.add(this.burstPoints)
+  }
+
+  /**
+   * The burst only exists in the room, and only once SAMSARA has parked.
+   *
+   * `active` is the caller's judgement (landed and still), not something this
+   * method infers: the sequence owns what 'parked' means and the bench needs to
+   * be able to force it.
+   */
+  private updateBurst(dtSec: number, alpha: number, active: boolean) {
+    const c = this.burstCfg
+    const live = active && c.ENABLED && this.cameraMode === 'perspective'
+
+    this.burst.update(c, this.elapsed, live)
+
+    // Motes outlive the moment they were fired, so the object stays visible
+    // while the last burst drains rather than being cut off mid-air.
+    const samples = this.burst.sample(c, this.elapsed, alpha, dtSec)
+    let anyLit = false
+
+    // Body centre and radius in WORLD units. Radius comes off scale.Z because
+    // Z is the one axis MASCOT_STRETCH never touches — the same reason
+    // recordProjection() measures there. Reading X or Y would make the dust
+    // cloud inherit the body's 1.12 vertical stretch and read as an ellipse.
+    const cx = this.placer.position.x
+    const cy = this.placer.position.y
+    const cz = this.placer.position.z
+    const radius = this.placer.scale.z / 2
+
+    const pxPerWorld = this.burstMat.uniforms.uPxPerWorld.value as number
+    const bodyDist = Math.max(0.001, this.persp.position.z - cz)
+    // A mote's configured SIZE is pixels AT THE BODY'S depth; convert once so
+    // the shader's divide by -mv.z does the rest. Without this the burst is a
+    // fixed world size and grows into a wall of gold as the camera nears.
+    const worldPerPx = pxPerWorld > 0 ? bodyDist / pxPerWorld : 0
+
+    for (const m of samples) {
+      this.burstPos[m.i * 3] = cx + m.x * radius
+      this.burstPos[m.i * 3 + 1] = cy + m.y * radius
+      this.burstPos[m.i * 3 + 2] = cz + m.z * radius
+      this.burstAlpha[m.i] = m.alpha
+      this.burstSize[m.i] = m.size * this.dpr * worldPerPx
+      if (m.alpha > 0) anyLit = true
+    }
+
+    this.burstPoints.visible = anyLit
+    if (!anyLit) return
+
+    ;(this.burstMat.uniforms.uColor.value as THREE.Color).set(c.COLOR)
+    ;(this.burstMat.uniforms.uCore.value as THREE.Color).set(c.CORE_COLOR)
+    this.burstMat.uniforms.uGlow.value = c.GLOW
+    this.burstGeo.attributes.position.needsUpdate = true
+    this.burstGeo.attributes.aAlpha.needsUpdate = true
+    this.burstGeo.attributes.aSize.needsUpdate = true
+  }
+
+  /** Recomputed on resize and whenever the room's FOV changes. */
+  private syncBurstProjection() {
+    if (!this.burstMat) return
+    const hDevice = this.H * this.dpr
+    const fovRad = (this.persp.fov * Math.PI) / 180
+    this.burstMat.uniforms.uPxPerWorld.value = hDevice / (2 * Math.tan(fovRad / 2))
+  }
+
+  setBurstConfig(cfg: BurstConfig) {
+    this.burstCfg = cfg
+  }
+
+  /** Bench / verification: fire one now, without waiting out the interval. */
+  fireBurst() {
+    this.burst.fire(this.burstCfg, this.elapsed)
   }
 
   // ── loading ─────────────────────────────────────────────────────────
@@ -861,6 +1067,8 @@ export class MascotEngine {
       this.persp.updateProjectionMatrix()
       this.persp.lookAt(0, 0, 0)
     }
+    // The burst sizes its points off the FOV, so it has to follow it.
+    this.syncBurstProjection()
   }
 
   getCameraMode() {
@@ -1493,6 +1701,7 @@ export class MascotEngine {
     // Keep the room camera's aspect in step, or a resize mid-transit stretches it.
     this.persp.aspect = H > 0 ? W / H : 1
     this.persp.updateProjectionMatrix()
+    this.syncBurstProjection()
     this.layout()
     if (this.reduced) this.drawStatic()
   }
@@ -1775,6 +1984,9 @@ export class MascotEngine {
     // orbit rather than an idealised one — the hold-shake jitter above is
     // included on purpose.
     this.updateTrail(dtSec, alpha, X, Y)
+    // Parked is the same condition the pose easing uses just above, so the dust
+    // starts exactly when the body stops turning rather than on a second rule.
+    this.updateBurst(dtSec, alpha, parked)
     this.updateEyes(dtSec, charge, diameterPx, alpha)
     this.placeLabel(q, radiusPx, alpha)
 

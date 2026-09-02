@@ -559,6 +559,145 @@ export const SamsaraSequence: GlobalConfig = {
     },
 
     {
+      name: 'burst',
+      type: 'group',
+      label: 'Golden smoke — the bursts from behind the parked mascot',
+      admin: {
+        description:
+          'Puffs of golden smoke shed from BEHIND SAMSARA once it has parked, on a timer. Distances are in body radii, not pixels, so it holds its scale relative to SAMSARA on every screen. Smoke reads as smoke because the puffs are FEW, LARGE, FAINT and EXPANDING — raising the count or the opacity turns it back into dust.',
+      },
+      fields: [
+        { name: 'enabled', type: 'checkbox', defaultValue: d.BURST.ENABLED },
+        {
+          name: 'intervalMs',
+          type: 'number',
+          defaultValue: d.BURST.INTERVAL_MS,
+          min: 400,
+          max: 20000,
+          admin: {
+            description:
+              'Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.',
+          },
+        },
+        {
+          name: 'count',
+          type: 'number',
+          defaultValue: d.BURST.COUNT,
+          min: 0,
+          max: 400,
+          admin: { description: 'Motes per burst. 0 is another way to turn it off.' },
+        },
+        {
+          name: 'seconds',
+          type: 'number',
+          defaultValue: d.BURST.SECONDS,
+          min: 0.2,
+          max: 5,
+          admin: { description: 'How long a mote lasts, before a per-mote spread of 0.7-1.3x.' },
+        },
+        {
+          name: 'speed',
+          type: 'number',
+          defaultValue: d.BURST.SPEED,
+          min: 0,
+          max: 4,
+          admin: { description: 'Outward speed, in body radii per second.' },
+        },
+        {
+          name: 'growth',
+          type: 'number',
+          defaultValue: d.BURST.GROWTH,
+          min: 0.2,
+          max: 6,
+          admin: {
+            description:
+              'How much each puff expands over its life. Above 1 it billows out as it fades, which is the strongest smoke cue; 1 holds a flat disc and below 1 it shrinks to a grain and reads as dust.',
+          },
+        },
+        {
+          name: 'swirl',
+          type: 'number',
+          defaultValue: d.BURST.SWIRL,
+          min: 0,
+          max: 3,
+          admin: {
+            description:
+              'Lateral curl. Each puff drifts on its own slow wander, so the cloud folds instead of expanding as a clean ball. 0 makes it a tidy sphere.',
+          },
+        },
+        {
+          name: 'drag',
+          type: 'number',
+          defaultValue: d.BURST.DRAG,
+          min: 0,
+          max: 6,
+          admin: {
+            description:
+              'How quickly motes slow down. 0 lets them fly on at full speed and leave the frame.',
+          },
+        },
+        {
+          name: 'rise',
+          type: 'number',
+          defaultValue: d.BURST.RISE,
+          min: -2,
+          max: 2,
+          admin: { description: 'Upward drift. Negative makes the dust fall instead.' },
+        },
+        {
+          name: 'spread',
+          type: 'number',
+          defaultValue: d.BURST.SPREAD,
+          min: 0,
+          max: 2,
+          admin: { description: 'How far past the surface motes are born.' },
+        },
+        {
+          name: 'backOffset',
+          type: 'number',
+          defaultValue: d.BURST.BACK_OFFSET,
+          min: 0,
+          max: 3,
+          admin: {
+            description:
+              'How far BEHIND the body the burst starts. Larger hides the moment of birth better; 0 lets motes appear level with the silhouette.',
+          },
+        },
+        {
+          name: 'size',
+          type: 'number',
+          defaultValue: d.BURST.SIZE,
+          min: 1,
+          max: 180,
+          admin: {
+            description:
+              'Puff size in px at birth, measured at SAMSARA’s own depth. Large is correct here — these overlap to make the volume.',
+          },
+        },
+        {
+          name: 'opacity',
+          type: 'number',
+          defaultValue: d.BURST.OPACITY,
+          min: 0,
+          max: 1,
+        },
+        {
+          name: 'glow',
+          type: 'number',
+          defaultValue: d.BURST.GLOW,
+          min: 0,
+          max: 2,
+          admin: {
+            description:
+              'How much of each puff is hot centre rather than body colour. Keep it low: a bright middle puts a visible grain back inside every puff.',
+          },
+        },
+        colour('color', d.BURST.COLOR, 'The hero’s own gold, so the room reads as the same material.'),
+        colour('coreColor', d.BURST.CORE_COLOR, 'The warmer centre of each puff.'),
+      ],
+    },
+
+    {
       name: 'chatbox',
       type: 'group',
       label: 'Chatbox — the stub in Section 2',
