@@ -103,7 +103,6 @@ export type SamsaraSequenceInput = {
     color?: string | null
     coreColor?: string | null
   } | null
-  chatbox?: { delayMs?: number | null; enterMs?: number | null } | null
   exitMs?: number | null
 }
 
@@ -146,7 +145,6 @@ export function resolveSamsara(
   const dr = cms?.drag ?? {}
   const ie = cms?.idleEyes ?? {}
   const bu = cms?.burst ?? {}
-  const c = cms?.chatbox ?? {}
   const w = ie?.weights ?? {}
 
   // A missing weight falls back to its default rather than to 0 — 0 would
@@ -261,11 +259,6 @@ export function resolveSamsara(
       CORE_COLOR: hex(bu.coreColor, d.BURST.CORE_COLOR),
     },
 
-    CHATBOX: {
-      DELAY_MS: num(c.delayMs, d.CHATBOX.DELAY_MS),
-      ENTER_MS: num(c.enterMs, d.CHATBOX.ENTER_MS),
-    },
-
     EXIT_MS: num(cms?.exitMs, d.EXIT_MS),
   }
 }
@@ -357,7 +350,6 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       color: c.BURST.COLOR,
       coreColor: c.BURST.CORE_COLOR,
     },
-    chatbox: { delayMs: c.CHATBOX.DELAY_MS, enterMs: c.CHATBOX.ENTER_MS },
     exitMs: c.EXIT_MS,
   }
 }

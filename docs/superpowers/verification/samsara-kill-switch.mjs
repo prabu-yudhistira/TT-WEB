@@ -149,10 +149,10 @@ const inspect = async () => {
    * ⚠️ Try to drive it into the room BEFORE measuring promotion.
    *
    * With the switch off there is no handle and this does nothing, which is the
-   * result being tested. With it on, this is what makes `hostPosition` and the
-   * chatbox layer actually differ between the polarities — both only change
-   * after the commit. Measured without it, those three checks read identically
-   * in both states and were silently testing nothing.
+   * result being tested. With it on, this is what makes `hostPosition` actually
+   * differ between the polarities — it only changes after the commit. Measured
+   * without it, that check read identically in both states and was silently
+   * testing nothing.
    */
   await page.evaluate(async () => {
     if (typeof window.__ttSamsaraBeat !== 'function') return
@@ -173,13 +173,12 @@ const inspect = async () => {
     if (!el) return { present: false }
     el.scrollIntoView({ block: 'start' })
     await new Promise((r) => setTimeout(r, 700))
-    const h = el.querySelector('h2')
-    const hb = h?.getBoundingClientRect()
-    const chat = el.querySelector('.tt-room-chat')
+    const n = el.querySelector('.tt-room-note')
+    const nb = n?.getBoundingClientRect()
     return {
       present: true,
-      headingInViewport: !!hb && hb.top >= 0 && hb.bottom <= window.innerHeight && hb.height > 0,
-      chatPosition: chat ? getComputedStyle(chat).position : null,
+      noteInViewport: !!nb && nb.top >= 0 && nb.bottom <= window.innerHeight && nb.height > 0,
+      notePosition: n ? getComputedStyle(n).position : null,
     }
   })
 
@@ -199,12 +198,8 @@ const inspect = async () => {
     return hosts.includes('fixed') ? 'fixed' : hosts.join('/')
   })
 
-  const chatAttr = await page.evaluate(() =>
-    document.documentElement.hasAttribute('data-tt-chatbox'),
-  )
-
   await page.close()
-  return { armed, scroll, room, hostPosition, chatAttr, errors }
+  return { armed, scroll, room, hostPosition, errors }
 }
 
 let restored = false
@@ -227,14 +222,28 @@ try {
       `scrollY ${r.scroll.before} -> ${r.scroll.after}`, true)
     check('[off] the canvas never promotes to fixed', r.hostPosition !== 'fixed',
       `position: ${r.hostPosition}`, true)
-    check('[off] the chatbox layer is never claimed', r.chatAttr === false, '', true)
-    check('[off] the chatbox stays ordinary in-flow content',
-      r.room.chatPosition === 'relative', `position: ${r.room.chatPosition}`, true)
 
-    // ── invariants: true in BOTH polarities. Fail-open is the whole promise,
-    // so these must NOT go red under TT_BREAK_KILL. ──
+    /**
+     * ── invariants: true in BOTH polarities. Fail-open is the whole promise,
+     * so these must NOT go red under TT_BREAK_KILL. ──
+     *
+     * ⚠️ Section 2's readable content used to be a DISCRIMINATING check: the
+     * chatbox was lifted to `fixed` and `data-tt-chatbox` was written only when
+     * the sequence ran, so both differed between the polarities. The chatbox is
+     * gone (2026-09-03) and the note that replaced it is plain in-flow DOM that
+     * nothing promotes, so it reads identically in both states — which makes it
+     * an invariant and NOT evidence that the switch works. Demanding it go red
+     * would be demanding the site be broken.
+     *
+     * That leaves three discriminating checks above. If a future change gives
+     * Section 2 sequence-driven DOM again (the holographic screen will), add it
+     * back to the discriminating set rather than leaving it here.
+     */
     check('[off] Section 2 is still reachable and readable',
-      r.room.present === true && r.room.headingInViewport === true)
+      r.room.present === true && r.room.noteInViewport === true)
+    check('[off] and its content is ordinary in-flow DOM',
+      r.room.notePosition === 'relative' || r.room.notePosition === 'static',
+      `note position: ${r.room.notePosition}`)
     check('[off] no page errors', r.errors.length === 0, r.errors.slice(0, 2).join(' | '))
   }
 
@@ -265,7 +274,12 @@ try {
 }
 
 if (BREAK) {
-  const WANT = 5
+  // Was 5 until 2026-09-03. The chatbox's two discriminating assertions (the
+  // `data-tt-chatbox` layer being claimed, and the box lifting to `fixed`) went
+  // with the chatbox itself; the note that replaced it is in-flow in both
+  // polarities and is an invariant, not evidence. Three remain: arming, the
+  // scroll pin, and the canvas promotion.
+  const WANT = 3
   const ok = discriminatingFailures === WANT
   console.log(
     ok

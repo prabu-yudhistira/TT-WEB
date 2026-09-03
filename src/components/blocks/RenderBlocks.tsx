@@ -68,20 +68,15 @@ export async function RenderBlocks({
               )
             }
 
-            // Section 2. Text only — everything about how the room looks and
-            // behaves comes from the `samsara-sequence` global, not from here.
+            // Section 2. The block carries no fields of its own — everything
+            // about how the room looks and behaves comes from the
+            // `samsara-sequence` global, not from here.
             case 'samsaraRoom': {
               // Only the room's own black is needed here — everything else about
               // Section 2's behaviour reaches the engine through the hero.
               const room = resolveSamsara(await getSamsaraSequence())
               return (
-                <SamsaraRoomBlock
-                  key={block.id}
-                  chatHeading={block.chatHeading}
-                  chatPlaceholder={block.chatPlaceholder}
-                  locale={locale}
-                  bgColor={room.ROOM.BG_COLOR}
-                />
+                <SamsaraRoomBlock key={block.id} locale={locale} bgColor={room.ROOM.BG_COLOR} />
               )
             }
 

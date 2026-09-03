@@ -424,11 +424,8 @@ const run = async () => {
         // src/blocks/index.ts) precisely so their tables survive the next schema
         // push, and the content they rendered still lives in its own collections
         // (manifesto statements, works, services). Section 3 will use them again.
-        {
-          blockType: 'samsaraRoom',
-          chatHeading: 'Ask SAMSARA',
-          chatPlaceholder: 'Coming soon…',
-        },
+        // No fields: the chatbox stub that owned them was removed 2026-09-03.
+        { blockType: 'samsaraRoom' },
       ],
     },
   })
@@ -445,7 +442,6 @@ const run = async () => {
         'cerita', 'presisi', 'digital', 'atelier', 'jakarta', 'merek',
       ].map((word) => ({ word })),
     },
-    samsaraRoom: { chatHeading: 'Tanya SAMSARA', chatPlaceholder: 'Segera hadir…' },
     // Kept for the retired blocks: they are not on the homepage any more, but
     // this map is keyed by blockType and costs nothing to leave complete, so
     // Section 3 does not have to rediscover the Indonesian headings.

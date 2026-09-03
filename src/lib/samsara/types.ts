@@ -74,7 +74,7 @@ export type LandingConfig = {
   /** Landed centre, as fractions of viewport width/height. */
   X_FRAC: number
   Y_FRAC: number
-  /** Portrait: SAMSARA above, chatbox below it. */
+  /** Portrait: SAMSARA sits high; Section 2 content goes below it. */
   MOBILE_X_FRAC: number
   MOBILE_Y_FRAC: number
   /** Idle float once landed. */
@@ -312,12 +312,6 @@ export type BurstConfig = {
   CORE_COLOR: string
 }
 
-export type ChatboxConfig = {
-  /** From the start of the commit. Overlaps the settle. */
-  DELAY_MS: number
-  ENTER_MS: number
-}
-
 export type SequenceConfig = {
   ENABLED: boolean
   GESTURES: GesturesConfig
@@ -328,7 +322,6 @@ export type SequenceConfig = {
   DRAG: DragConfig
   IDLE_EYES: IdleEyesConfig
   BURST: BurstConfig
-  CHATBOX: ChatboxConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
   EXIT_MS: number
 }
@@ -508,11 +501,6 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // than as a second gold. Matches MascotConfig.TRAIL_COLOR / _CORE_COLOR.
     COLOR: '#FDB721',
     CORE_COLOR: '#FFFCD6',
-  },
-
-  CHATBOX: {
-    DELAY_MS: 2100,
-    ENTER_MS: 400,
   },
 
   EXIT_MS: 800,

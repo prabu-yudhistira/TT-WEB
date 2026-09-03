@@ -473,3 +473,61 @@ nothing** — 1 is precisely the ratio that cannot see this. It also asserts the
 buffer still scales with dpr, so the fix cannot be "make it blurry". Negative-
 tested: reverting the CSS size fails it at 1.25/1.5/2 with the ratio in the
 message, and passes at 1.
+
+## 2026-09-03 — measuring DOM laid over the fixed room
+
+Recorded when `samsara-room-chatbox.mjs` was deleted along with the chatbox it
+guarded. **Anything that later floats DOM over the promoted canvas — the
+holographic screen, a message list, a caption — needs every one of these, and
+each was paid for by a green tick on a visibly broken build.**
+
+### On-screen is a precondition, not a detail
+
+The room is a FIXED canvas over a PINNED page, so Section 2's section element is
+still a whole viewport below the fold the entire time SAMSARA stands in it. The
+first cut of the chatbox left the box in normal flow and it measured at **y=1283
+in an 844px viewport**. Every clearance and composition assertion passed anyway,
+because *a box nobody can see clears everything by any distance*. Assert the box
+is within the viewport **before** any assertion about where it sits.
+
+### `elementFromPoint` lies here, and it lies in the direction of passing
+
+The section briefly carried `z-index: 1`. That made it a **stacking context**, so
+a child's `z-index: 41` resolved *inside* it and the whole thing painted UNDER the
+promoted canvas at z-index 40. The element still reported `position: fixed`,
+`opacity: 1` and correct coordinates — and was invisible.
+
+⚠️ Hit-testing does **not** catch this. The mascot canvas is `pointer-events:
+none` on purpose, so `elementFromPoint` skips straight past it and cheerfully
+returns the buried element. That version of the assertion was written,
+negative-tested against the real bug, and **passed**. Only reading pixels
+separates the two states.
+
+### Peak luma over the element's own box is the honest test
+
+Screenshot-clip to the element's rect, take peak luminance across the crop.
+Near-white text (#F6F1E7 → 246) against room walls at 8–90 separates with
+enormous margin; the threshold was 180. Measured **239 painted vs 37 buried** on
+the two real builds. This is the same lesson as the eyes (`darkness, not
+brightness`) and `samsara-detail` (`difference between two states, not an
+absolute count`): **pick a metric whose two outcomes cannot be produced by the
+same broken build.**
+
+### Clear the body as a rectangle-to-ellipse test, not centre-to-centre
+
+SAMSARA's silhouette is an ELLIPSE — `MASCOT_STRETCH_Y` is 1.12 — and
+`getBodyScreen()`/`rendered.diameterPx` report the DRAWN extent for that reason.
+Take the closest point on the DOM rect to the body centre and compare against the
+silhouette radius; centre-to-centre says nothing useful about a wide box's near
+edge. And assert **direction as well as distance** — "clears it" is equally
+satisfied by a box that has drifted off the opposite edge, which is not the
+owner's composition.
+
+### Also worth keeping
+
+Three viewports minimum (1440×900, 1280×720, 390×844): the desktop/portrait
+split lives in a media query in the component and a landing fraction in the
+config, tuned at different times in different files, and nothing but a gate
+notices when they stop agreeing. And the samsara gates write screenshots to
+**`samsarashots/`**, never `eyeshots/` — `eyes-legibility.mjs` `readdir()`s the
+latter and asserts it holds exactly the 14 expression crops.

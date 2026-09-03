@@ -189,7 +189,6 @@ check(
       COLOR: '#778899',
       CORE_COLOR: '#99AABB',
     },
-    CHATBOX: { DELAY_MS: 1500, ENTER_MS: 620 },
     EXIT_MS: 1250,
   }
 

@@ -427,7 +427,7 @@ export class MascotEngine {
     // ⚠️ On WINDOW, not on the canvas, and that is not laziness.
     //
     // The mascot layer is `pointer-events: none` so the room stays clickable
-    // through it — the chatbox lands on top of this canvas. A `pointerdown`
+    // through it — Section 2's DOM lands on top of this canvas. A `pointerdown`
     // bound to the canvas would therefore never fire at all. Listening on the
     // window and hit-testing the circle ourselves keeps the layer transparent
     // to every pointer that is not actually on SAMSARA, which is the behaviour

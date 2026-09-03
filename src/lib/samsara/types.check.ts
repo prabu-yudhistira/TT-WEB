@@ -99,9 +99,7 @@ check('desktop lands right of centre', DEFAULT_SEQUENCE.LANDING.X_FRAC > 0.5)
 check('mobile lands in the upper area', DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC < 0.5)
 check('hover bob is a gentle float', DEFAULT_SEQUENCE.LANDING.HOVER_BOB_PX > 0 && DEFAULT_SEQUENCE.LANDING.HOVER_BOB_PX < 40)
 
-// ── chatbox and exit ────────────────────────────────────────────────
-check('chatbox enters after the bounces begin', DEFAULT_SEQUENCE.CHATBOX.DELAY_MS > DEFAULT_SEQUENCE.TRANSIT.FALL_MS)
-check('chatbox entrance is positive', DEFAULT_SEQUENCE.CHATBOX.ENTER_MS > 0)
+// ── exit ────────────────────────────────────────────────────────────
 check('exit is quicker than the fall', DEFAULT_SEQUENCE.EXIT_MS < DEFAULT_SEQUENCE.TRANSIT.FALL_MS)
 
 // ── room ────────────────────────────────────────────────────────────

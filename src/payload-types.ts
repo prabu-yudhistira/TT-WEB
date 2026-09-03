@@ -313,14 +313,6 @@ export interface Page {
             blockType: 'hero';
           }
         | {
-            /**
-             * Heading above the chat box in the dark room. The box is a STUB — it is styled and positioned but does not send anything yet.
-             */
-            chatHeading?: string | null;
-            /**
-             * Placeholder inside the disabled input. Say what SAMSARA will eventually answer, so the stub reads as a promise rather than a broken field.
-             */
-            chatPlaceholder?: string | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'samsaraRoom';
@@ -630,8 +622,6 @@ export interface PagesSelect<T extends boolean = true> {
         samsaraRoom?:
           | T
           | {
-              chatHeading?: T;
-              chatPlaceholder?: T;
               id?: T;
               blockName?: T;
             };
@@ -1435,7 +1425,7 @@ export interface SamsaraSequence {
     settleMs?: number | null;
   };
   /**
-   * Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because the chatbox moves from beside SAMSARA to below it.
+   * Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because SAMSARA sits beside Section 2’s content on wide screens and above it in portrait.
    */
   landing?: {
     /**
@@ -1455,11 +1445,11 @@ export interface SamsaraSequence {
      */
     yFrac?: number | null;
     /**
-     * Portrait: centred, with the chatbox below.
+     * Portrait: centred, sitting high in the frame.
      */
     mobileXFrac?: number | null;
     /**
-     * Portrait height. Lowering this pushes SAMSARA down into the chatbox — the check at docs/superpowers/verification/samsara-room-chatbox.mjs measures the real gap.
+     * Portrait height. Lowering this pushes SAMSARA down into whatever Section 2 renders below it.
      */
     mobileYFrac?: number | null;
     /**
@@ -1615,7 +1605,7 @@ export interface SamsaraSequence {
   burst?: {
     enabled?: boolean | null;
     /**
-     * Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.
+     * Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the settle.
      */
     intervalMs?: number | null;
     /**
@@ -1671,19 +1661,6 @@ export interface SamsaraSequence {
      * The warmer centre of each puff.
      */
     coreColor?: string | null;
-  };
-  /**
-   * Its wording lives on the SAMSARA room block, in Pages. These are only its timings.
-   */
-  chatbox?: {
-    /**
-     * From the moment SAMSARA leaves the hero. It should overlap the settle, so the box arrives as the body stops moving rather than after it.
-     */
-    delayMs?: number | null;
-    /**
-     * The fade and rise.
-     */
-    enterMs?: number | null;
   };
   /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
@@ -2168,12 +2145,6 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         glow?: T;
         color?: T;
         coreColor?: T;
-      };
-  chatbox?:
-    | T
-    | {
-        delayMs?: T;
-        enterMs?: T;
       };
   exitMs?: T;
   updatedAt?: T;

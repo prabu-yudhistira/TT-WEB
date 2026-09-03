@@ -251,7 +251,7 @@ export const SamsaraSequence: GlobalConfig = {
       label: 'Landing — where SAMSARA ends up',
       admin: {
         description:
-          'Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because the chatbox moves from beside SAMSARA to below it.',
+          'Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because SAMSARA sits beside Section 2’s content on wide screens and above it in portrait.',
       },
       fields: [
         {
@@ -292,7 +292,7 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.LANDING.MOBILE_X_FRAC,
           min: 0,
           max: 1,
-          admin: { description: 'Portrait: centred, with the chatbox below.' },
+          admin: { description: 'Portrait: centred, sitting high in the frame.' },
         },
         {
           name: 'mobileYFrac',
@@ -302,7 +302,7 @@ export const SamsaraSequence: GlobalConfig = {
           max: 1,
           admin: {
             description:
-              'Portrait height. Lowering this pushes SAMSARA down into the chatbox — the check at docs/superpowers/verification/samsara-room-chatbox.mjs measures the real gap.',
+              'Portrait height. Lowering this pushes SAMSARA down into whatever Section 2 renders below it.',
           },
         },
         {
@@ -576,7 +576,7 @@ export const SamsaraSequence: GlobalConfig = {
           max: 20000,
           admin: {
             description:
-              'Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.',
+              'Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the settle.',
           },
         },
         {
@@ -694,37 +694,6 @@ export const SamsaraSequence: GlobalConfig = {
         },
         colour('color', d.BURST.COLOR, 'The hero’s own gold, so the room reads as the same material.'),
         colour('coreColor', d.BURST.CORE_COLOR, 'The warmer centre of each puff.'),
-      ],
-    },
-
-    {
-      name: 'chatbox',
-      type: 'group',
-      label: 'Chatbox — the stub in Section 2',
-      admin: {
-        description:
-          'Its wording lives on the SAMSARA room block, in Pages. These are only its timings.',
-      },
-      fields: [
-        {
-          name: 'delayMs',
-          type: 'number',
-          defaultValue: d.CHATBOX.DELAY_MS,
-          min: 0,
-          max: 9000,
-          admin: {
-            description:
-              'From the moment SAMSARA leaves the hero. It should overlap the settle, so the box arrives as the body stops moving rather than after it.',
-          },
-        },
-        {
-          name: 'enterMs',
-          type: 'number',
-          defaultValue: d.CHATBOX.ENTER_MS,
-          min: 60,
-          max: 3000,
-          admin: { description: 'The fade and rise.' },
-        },
       ],
     },
 

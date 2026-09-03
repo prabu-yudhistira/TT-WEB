@@ -199,10 +199,8 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
-    title: 'chatbox + exit',
+    title: 'exit',
     rows: [
-      { kind: 'num', path: 'CHATBOX.DELAY_MS', label: 'Chatbox delay ms', min: 0, max: 8000, step: 50 },
-      { kind: 'num', path: 'CHATBOX.ENTER_MS', label: 'Chatbox enter ms', min: 60, max: 2500, step: 20 },
       { kind: 'num', path: 'EXIT_MS', label: 'Exit ms', min: 100, max: 4000, step: 25 },
     ],
   },

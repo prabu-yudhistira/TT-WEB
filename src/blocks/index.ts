@@ -102,26 +102,20 @@ export const MediaFullBlock: Block = {
 export const SamsaraRoomBlock: Block = {
   slug: 'samsaraRoom',
   labels: { singular: 'SAMSARA room', plural: 'SAMSARA rooms' },
-  fields: [
-    {
-      name: 'chatHeading',
-      type: 'text',
-      localized: true,
-      admin: {
-        description:
-          'Heading above the chat box in the dark room. The box is a STUB — it is styled and positioned but does not send anything yet.',
-      },
-    },
-    {
-      name: 'chatPlaceholder',
-      type: 'text',
-      localized: true,
-      admin: {
-        description:
-          'Placeholder inside the disabled input. Say what SAMSARA will eventually answer, so the stub reads as a promise rather than a broken field.',
-      },
-    },
-  ],
+  /**
+   * ⚠️ No fields, and that is deliberate rather than unfinished.
+   *
+   * The block carried `chatHeading` and `chatPlaceholder` for the chatbox stub,
+   * which was removed on 2026-09-03. Everything else about Section 2 — colour,
+   * light, camera, timings — lives in the `samsara-sequence` global, so the
+   * block is now purely a marker saying "the room goes here", which is what lets
+   * the owner position and reorder it in /admin.
+   *
+   * A block with no fields is valid; Payload keeps its `pages_blocks_samsara_room`
+   * row for id and order. The holographic screen adds its own copy fields back
+   * here if it needs any.
+   */
+  fields: [],
 }
 
 export const pageBlocks = [

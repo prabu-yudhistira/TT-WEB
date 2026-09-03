@@ -100,7 +100,7 @@ export class BurstState {
    *
    * ⚠️ The FIRST burst is delayed by a full interval rather than firing the
    * instant SAMSARA parks. It lands during the settle otherwise, on top of the
-   * bounce and the chatbox arriving, where nobody can read it as its own event.
+   * bounce and the settle, where nobody can read it as its own event.
    */
   update(cfg: BurstConfig, elapsed: number, active: boolean): boolean {
     if (!active || !cfg.ENABLED) {

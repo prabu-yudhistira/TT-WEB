@@ -304,7 +304,7 @@ export function MascotLayer({
            * TARGET, and a `pointer-events: none` element is never the target.
            *
            * Left permanently 'auto' this canvas would swallow every click in
-           * the room, including the chatbox that lands on top of it.
+           * the room, including any DOM Section 2 lands on top of it.
            *
            * ⚠️ The site's `data-cursor` pill is deliberately NOT used here — see
            * the holdHint prop. What this buys now is the grab cursor, which is

@@ -76,7 +76,7 @@ check('fade never goes negative', burstFade(1.4) === 0)
 {
   const b = new BurstState(makeBurstPool(256), seeded())
   // ⚠️ The first burst waits a full interval. Firing on arrival buries it under
-  // the bounce and the chatbox entrance.
+  // the bounce and the settle.
   check('nothing fires on the frame it parks', b.update(cfg, 0, true) === false)
   check('nor part-way through the first interval', b.update(cfg, 3.9, true) === false)
   check('one fires at the interval', b.update(cfg, 4.0, true) === true)
