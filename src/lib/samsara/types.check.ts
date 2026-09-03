@@ -6,7 +6,7 @@
  * later edit has to be deliberate and has to come back through the owner.
  * Run: npm run verify:config
  */
-import { DEFAULT_SEQUENCE } from './types'
+import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
 import { EXPRESSION_ORDER } from '../mascot/eyes'
 
 let failures = 0
@@ -238,6 +238,46 @@ check(
 )
 
 check('kill switch defaults on', DEFAULT_SEQUENCE.ENABLED === true)
+
+// ── emitters ────────────────────────────────────────────────────────
+//
+// ⚠️ RELATIONSHIPS ONLY, never magnitudes — unlike everything above, which
+// pins owner-approved decisions. EMITTERS and HOLOGRAM are STARTING VALUES
+// (spec §9): the owner tunes them at /dev/samsara and freezes them there.
+// Pinning a number here would misrepresent a guess as a decision.
+check('orb size is a sane fraction of the viewport',
+  DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC > 0 && DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC < 0.5)
+check('mobile orb is not larger than desktop',
+  DEFAULT_SEQUENCE.EMITTERS.MOBILE_SIZE_FRAC <= DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC)
+check('the near orb is nearer the camera than the far orb',
+  DEFAULT_SEQUENCE.EMITTERS.NEAR.DEPTH_FRAC < DEFAULT_SEQUENCE.EMITTERS.FAR.DEPTH_FRAC)
+check('entry has a positive duration', DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS > 0)
+check('the stagger is shorter than the entry it offsets',
+  DEFAULT_SEQUENCE.EMITTERS.ENTRY_STAGGER_MS < DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS)
+// A puff outliving its interval means the cadence never reads as separate
+// bursts — it becomes a continuous plume, which is the thrust, not the cadence.
+// ⚠️ Lifetimes are randomised up to 1.25x, so the headroom is real, not spare.
+check('a cadenced puff dies before the next burst',
+  DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS * 1.25 < DEFAULT_SEQUENCE.EMITTERS.CADENCE_MS)
+check('thrust emits at a positive rate', DEFAULT_SEQUENCE.EMITTERS.THRUST_RATE > 0)
+check('there are four ports', PORT_OFFSETS.length === 4)
+
+// ── hologram ────────────────────────────────────────────────────────
+check('the screen has positive extent',
+  DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC > 0 && DEFAULT_SEQUENCE.HOLOGRAM.H_FRAC > 0)
+check('forming has a positive duration', DEFAULT_SEQUENCE.HOLOGRAM.FORM_MS > 0)
+check('the flicker is briefer than its own interval',
+  DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DUR_MS < DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_MS)
+check('the flicker dips rather than extinguishing',
+  DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DEPTH > 0 && DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DEPTH < 1)
+// Landscape: the screen sits LEFT of SAMSARA, which parks at X_FRAC 0.75.
+check('the screen clears SAMSARA horizontally in landscape',
+  DEFAULT_SEQUENCE.HOLOGRAM.X_FRAC + DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC / 2
+    < DEFAULT_SEQUENCE.LANDING.X_FRAC)
+// Portrait: the screen sits BELOW SAMSARA, which parks at MOBILE_Y_FRAC 0.3.
+check('the screen clears SAMSARA vertically in portrait',
+  DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_Y_FRAC - DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_H_FRAC / 2
+    > DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC)
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll sequence config checks passed.')
 process.exit(failures ? 1 : 0)

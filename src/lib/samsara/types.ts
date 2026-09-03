@@ -312,6 +312,119 @@ export type BurstConfig = {
   CORE_COLOR: string
 }
 
+/** One orb's parked position. Fractions of the viewport and of room depth. */
+export type OrbSlotConfig = {
+  X_FRAC: number
+  Y_FRAC: number
+  /** 0 = at the camera plane, 1 = at the back wall. Drives apparent size. */
+  DEPTH_FRAC: number
+}
+
+export type EmittersConfig = {
+  /**
+   * ⚠️ ONE size for BOTH orbs, and that is not an omission.
+   *
+   * The two orbs in the owner's mockup are the SAME object at different
+   * depths — a ~2.6x depth ratio under the room's perspective camera, not two
+   * different sizes. Two size values would drift apart the first time either
+   * was tuned, and the mockup's own proportions would stop being reproducible.
+   * Apparent size comes from DEPTH_FRAC.
+   */
+  SIZE_FRAC: number
+  MOBILE_SIZE_FRAC: number
+
+  NEAR: OrbSlotConfig
+  FAR: OrbSlotConfig
+  MOBILE_NEAR: OrbSlotConfig
+  MOBILE_FAR: OrbSlotConfig
+
+  /** Entry flight, per orb. */
+  ENTRY_MS: number
+  /** The far orb lags the near one by this, so they do not read as one body. */
+  ENTRY_STAGGER_MS: number
+
+  /** Idle float once parked, in ORB RADII. */
+  BOB_AMP: number
+  BOB_MS: number
+
+  /**
+   * ⚠️ TWO smoke behaviours from the same four ports, and one interval control
+   * cannot express both.
+   *
+   * THRUST_* is the continuous afterburner plume while the orbs fly in — it is
+   * what makes the entry read as propulsion rather than as two objects sliding
+   * into place, and it ends when the orb parks.
+   *
+   * CADENCE_* is the permanent every-3s burst from `parked` onward, which runs
+   * for as long as the room is up.
+   */
+  THRUST_RATE: number
+  THRUST_SPREAD: number
+  CADENCE_MS: number
+  CADENCE_PUFFS: number
+
+  /** Shared by both behaviours. Sizes are in ORB RADII. */
+  PUFF_SIZE: number
+  PUFF_LIFE_MS: number
+  PUFF_COLOR: string
+  PUFF_OPACITY: number
+}
+
+export type HologramConfig = {
+  /** Screen extent and centre, as fractions of the viewport. */
+  W_FRAC: number
+  H_FRAC: number
+  X_FRAC: number
+  Y_FRAC: number
+  MOBILE_W_FRAC: number
+  MOBILE_H_FRAC: number
+  MOBILE_X_FRAC: number
+  MOBILE_Y_FRAC: number
+
+  /** Flicker-then-resolve. Not a clean fade — the owner asked for instability. */
+  FORM_MS: number
+
+  /**
+   * ⚠️ The flicker belongs to the GLASS ONLY. The published rect and the `live`
+   * state must stay steady through it, because this screen will later carry
+   * SUBTITLES — text that flickers on a 5s cycle defeats the accessibility
+   * feature it exists to provide.
+   */
+  FLICKER_MS: number
+  FLICKER_DUR_MS: number
+  FLICKER_DEPTH: number
+
+  GLASS_COLOR: string
+  GLASS_OPACITY: number
+  SHAFT_COLOR: string
+  SHAFT_OPACITY: number
+  SHAFT_SPREAD: number
+}
+
+/**
+ * The four steam ports and the hologram lens, in ORB RADII, orb local space.
+ *
+ * ⚠️ HAND-MEASURED, because `emitter_orb.glb` has NO NAMED NODES — it is one
+ * welded mesh, one primitive, one unnamed material (`scripts/_inspect-orb.mjs`).
+ * The features the owner labelled are not transforms and nothing can be
+ * parented to them.
+ *
+ * ⚠️ RE-EXPORTING THE MODEL SILENTLY INVALIDATES THESE. Nothing throws; the
+ * smoke simply starts coming out of the wrong places. `samsara-emitters.mjs`
+ * asserts puffs originate within the orb silhouette, which catches gross drift
+ * but not a subtle one. The durable fix is a re-export carrying named empties
+ * at these five points — worth requesting from the model's author.
+ */
+export const PORT_OFFSETS: readonly (readonly [number, number, number])[] = [
+  [0.42, -0.78, 0.3],
+  [-0.42, -0.78, 0.3],
+  [0.42, -0.78, -0.3],
+  [-0.42, -0.78, -0.3],
+]
+
+/** The domed lens on top, where the shafts originate. Orb radii. */
+export const LENS_OFFSET: readonly [number, number, number] = [0, 0.86, 0.1]
+
 export type SequenceConfig = {
   ENABLED: boolean
   GESTURES: GesturesConfig
@@ -322,6 +435,8 @@ export type SequenceConfig = {
   DRAG: DragConfig
   IDLE_EYES: IdleEyesConfig
   BURST: BurstConfig
+  EMITTERS: EmittersConfig
+  HOLOGRAM: HologramConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
   EXIT_MS: number
 }
@@ -501,6 +616,56 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // than as a second gold. Matches MascotConfig.TRAIL_COLOR / _CORE_COLOR.
     COLOR: '#FDB721',
     CORE_COLOR: '#FFFCD6',
+  },
+
+  /**
+   * ⚠️ STARTING POINTS, NOT FROZEN VALUES — unlike everything above them.
+   *
+   * Every other group in this object names a decision the owner made at the
+   * bench with the thing on screen, and `types.check.ts` pins each one by
+   * value. These two are guesses that look plausible, so `types.check.ts`
+   * asserts only the RELATIONSHIPS between them. They are frozen when the
+   * owner tunes them at /dev/samsara and presses `copy json`.
+   */
+  EMITTERS: {
+    SIZE_FRAC: 0.175,
+    MOBILE_SIZE_FRAC: 0.13,
+    NEAR: { X_FRAC: 0.12, Y_FRAC: 0.82, DEPTH_FRAC: 0.28 },
+    FAR: { X_FRAC: 0.46, Y_FRAC: 0.7, DEPTH_FRAC: 0.74 },
+    MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
+    MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
+    ENTRY_MS: 1600,
+    ENTRY_STAGGER_MS: 320,
+    BOB_AMP: 0.08,
+    BOB_MS: 3400,
+    THRUST_RATE: 42,
+    THRUST_SPREAD: 0.5,
+    CADENCE_MS: 3000,
+    CADENCE_PUFFS: 3,
+    PUFF_SIZE: 0.34,
+    PUFF_LIFE_MS: 1500,
+    PUFF_COLOR: '#C9B896',
+    PUFF_OPACITY: 0.34,
+  },
+
+  HOLOGRAM: {
+    W_FRAC: 0.52,
+    H_FRAC: 0.46,
+    X_FRAC: 0.3,
+    Y_FRAC: 0.42,
+    MOBILE_W_FRAC: 0.78,
+    MOBILE_H_FRAC: 0.3,
+    MOBILE_X_FRAC: 0.5,
+    MOBILE_Y_FRAC: 0.66,
+    FORM_MS: 1400,
+    FLICKER_MS: 5000,
+    FLICKER_DUR_MS: 260,
+    FLICKER_DEPTH: 0.45,
+    GLASS_COLOR: '#F5C542',
+    GLASS_OPACITY: 0.3,
+    SHAFT_COLOR: '#F5C542',
+    SHAFT_OPACITY: 0.16,
+    SHAFT_SPREAD: 0.55,
   },
 
   EXIT_MS: 800,

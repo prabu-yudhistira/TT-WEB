@@ -1,4 +1,4 @@
-import { DEFAULT_SEQUENCE, type SequenceConfig } from './types'
+import { DEFAULT_SEQUENCE, type OrbSlotConfig, type SequenceConfig } from './types'
 
 /**
  * The `samsara-sequence` global's shape, written by hand rather than imported
@@ -103,8 +103,53 @@ export type SamsaraSequenceInput = {
     color?: string | null
     coreColor?: string | null
   } | null
+  emitters?: {
+    sizeFrac?: number | null
+    mobileSizeFrac?: number | null
+    near?: OrbSlotCms
+    far?: OrbSlotCms
+    mobileNear?: OrbSlotCms
+    mobileFar?: OrbSlotCms
+    entryMs?: number | null
+    entryStaggerMs?: number | null
+    bobAmp?: number | null
+    bobMs?: number | null
+    thrustRate?: number | null
+    thrustSpread?: number | null
+    cadenceMs?: number | null
+    cadencePuffs?: number | null
+    puffSize?: number | null
+    puffLifeMs?: number | null
+    puffColor?: string | null
+    puffOpacity?: number | null
+  } | null
+  hologram?: {
+    wFrac?: number | null
+    hFrac?: number | null
+    xFrac?: number | null
+    yFrac?: number | null
+    mobileWFrac?: number | null
+    mobileHFrac?: number | null
+    mobileXFrac?: number | null
+    mobileYFrac?: number | null
+    formMs?: number | null
+    flickerMs?: number | null
+    flickerDurMs?: number | null
+    flickerDepth?: number | null
+    glassColor?: string | null
+    glassOpacity?: number | null
+    shaftColor?: string | null
+    shaftOpacity?: number | null
+    shaftSpread?: number | null
+  } | null
   exitMs?: number | null
 }
+
+type OrbSlotCms = {
+  xFrac?: number | null
+  yFrac?: number | null
+  depthFrac?: number | null
+} | null
 
 /** Payload stores a list of numbers as rows, not as a bare array. */
 type Row = { value?: number | null } | null
@@ -145,7 +190,16 @@ export function resolveSamsara(
   const dr = cms?.drag ?? {}
   const ie = cms?.idleEyes ?? {}
   const bu = cms?.burst ?? {}
+  const em = cms?.emitters ?? {}
+  const ho = cms?.hologram ?? {}
   const w = ie?.weights ?? {}
+
+  /** One orb slot, falling back field-by-field like every other group here. */
+  const slot = (v: OrbSlotCms | undefined, d0: OrbSlotConfig): OrbSlotConfig => ({
+    X_FRAC: num(v?.xFrac, d0.X_FRAC),
+    Y_FRAC: num(v?.yFrac, d0.Y_FRAC),
+    DEPTH_FRAC: num(v?.depthFrac, d0.DEPTH_FRAC),
+  })
 
   // A missing weight falls back to its default rather than to 0 — 0 would
   // silently drop that expression out of the room's idle loop, which reads as
@@ -259,6 +313,47 @@ export function resolveSamsara(
       CORE_COLOR: hex(bu.coreColor, d.BURST.CORE_COLOR),
     },
 
+    EMITTERS: {
+      SIZE_FRAC: num(em.sizeFrac, d.EMITTERS.SIZE_FRAC),
+      MOBILE_SIZE_FRAC: num(em.mobileSizeFrac, d.EMITTERS.MOBILE_SIZE_FRAC),
+      NEAR: slot(em.near, d.EMITTERS.NEAR),
+      FAR: slot(em.far, d.EMITTERS.FAR),
+      MOBILE_NEAR: slot(em.mobileNear, d.EMITTERS.MOBILE_NEAR),
+      MOBILE_FAR: slot(em.mobileFar, d.EMITTERS.MOBILE_FAR),
+      ENTRY_MS: num(em.entryMs, d.EMITTERS.ENTRY_MS),
+      ENTRY_STAGGER_MS: num(em.entryStaggerMs, d.EMITTERS.ENTRY_STAGGER_MS),
+      BOB_AMP: num(em.bobAmp, d.EMITTERS.BOB_AMP),
+      BOB_MS: num(em.bobMs, d.EMITTERS.BOB_MS),
+      THRUST_RATE: num(em.thrustRate, d.EMITTERS.THRUST_RATE),
+      THRUST_SPREAD: num(em.thrustSpread, d.EMITTERS.THRUST_SPREAD),
+      CADENCE_MS: num(em.cadenceMs, d.EMITTERS.CADENCE_MS),
+      CADENCE_PUFFS: num(em.cadencePuffs, d.EMITTERS.CADENCE_PUFFS),
+      PUFF_SIZE: num(em.puffSize, d.EMITTERS.PUFF_SIZE),
+      PUFF_LIFE_MS: num(em.puffLifeMs, d.EMITTERS.PUFF_LIFE_MS),
+      PUFF_COLOR: hex(em.puffColor, d.EMITTERS.PUFF_COLOR),
+      PUFF_OPACITY: num(em.puffOpacity, d.EMITTERS.PUFF_OPACITY),
+    },
+
+    HOLOGRAM: {
+      W_FRAC: num(ho.wFrac, d.HOLOGRAM.W_FRAC),
+      H_FRAC: num(ho.hFrac, d.HOLOGRAM.H_FRAC),
+      X_FRAC: num(ho.xFrac, d.HOLOGRAM.X_FRAC),
+      Y_FRAC: num(ho.yFrac, d.HOLOGRAM.Y_FRAC),
+      MOBILE_W_FRAC: num(ho.mobileWFrac, d.HOLOGRAM.MOBILE_W_FRAC),
+      MOBILE_H_FRAC: num(ho.mobileHFrac, d.HOLOGRAM.MOBILE_H_FRAC),
+      MOBILE_X_FRAC: num(ho.mobileXFrac, d.HOLOGRAM.MOBILE_X_FRAC),
+      MOBILE_Y_FRAC: num(ho.mobileYFrac, d.HOLOGRAM.MOBILE_Y_FRAC),
+      FORM_MS: num(ho.formMs, d.HOLOGRAM.FORM_MS),
+      FLICKER_MS: num(ho.flickerMs, d.HOLOGRAM.FLICKER_MS),
+      FLICKER_DUR_MS: num(ho.flickerDurMs, d.HOLOGRAM.FLICKER_DUR_MS),
+      FLICKER_DEPTH: num(ho.flickerDepth, d.HOLOGRAM.FLICKER_DEPTH),
+      GLASS_COLOR: hex(ho.glassColor, d.HOLOGRAM.GLASS_COLOR),
+      GLASS_OPACITY: num(ho.glassOpacity, d.HOLOGRAM.GLASS_OPACITY),
+      SHAFT_COLOR: hex(ho.shaftColor, d.HOLOGRAM.SHAFT_COLOR),
+      SHAFT_OPACITY: num(ho.shaftOpacity, d.HOLOGRAM.SHAFT_OPACITY),
+      SHAFT_SPREAD: num(ho.shaftSpread, d.HOLOGRAM.SHAFT_SPREAD),
+    },
+
     EXIT_MS: num(cms?.exitMs, d.EXIT_MS),
   }
 }
@@ -349,6 +444,45 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       glow: c.BURST.GLOW,
       color: c.BURST.COLOR,
       coreColor: c.BURST.CORE_COLOR,
+    },
+    emitters: {
+      sizeFrac: c.EMITTERS.SIZE_FRAC,
+      mobileSizeFrac: c.EMITTERS.MOBILE_SIZE_FRAC,
+      near: { xFrac: c.EMITTERS.NEAR.X_FRAC, yFrac: c.EMITTERS.NEAR.Y_FRAC, depthFrac: c.EMITTERS.NEAR.DEPTH_FRAC },
+      far: { xFrac: c.EMITTERS.FAR.X_FRAC, yFrac: c.EMITTERS.FAR.Y_FRAC, depthFrac: c.EMITTERS.FAR.DEPTH_FRAC },
+      mobileNear: { xFrac: c.EMITTERS.MOBILE_NEAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_NEAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_NEAR.DEPTH_FRAC },
+      mobileFar: { xFrac: c.EMITTERS.MOBILE_FAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_FAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_FAR.DEPTH_FRAC },
+      entryMs: c.EMITTERS.ENTRY_MS,
+      entryStaggerMs: c.EMITTERS.ENTRY_STAGGER_MS,
+      bobAmp: c.EMITTERS.BOB_AMP,
+      bobMs: c.EMITTERS.BOB_MS,
+      thrustRate: c.EMITTERS.THRUST_RATE,
+      thrustSpread: c.EMITTERS.THRUST_SPREAD,
+      cadenceMs: c.EMITTERS.CADENCE_MS,
+      cadencePuffs: c.EMITTERS.CADENCE_PUFFS,
+      puffSize: c.EMITTERS.PUFF_SIZE,
+      puffLifeMs: c.EMITTERS.PUFF_LIFE_MS,
+      puffColor: c.EMITTERS.PUFF_COLOR,
+      puffOpacity: c.EMITTERS.PUFF_OPACITY,
+    },
+    hologram: {
+      wFrac: c.HOLOGRAM.W_FRAC,
+      hFrac: c.HOLOGRAM.H_FRAC,
+      xFrac: c.HOLOGRAM.X_FRAC,
+      yFrac: c.HOLOGRAM.Y_FRAC,
+      mobileWFrac: c.HOLOGRAM.MOBILE_W_FRAC,
+      mobileHFrac: c.HOLOGRAM.MOBILE_H_FRAC,
+      mobileXFrac: c.HOLOGRAM.MOBILE_X_FRAC,
+      mobileYFrac: c.HOLOGRAM.MOBILE_Y_FRAC,
+      formMs: c.HOLOGRAM.FORM_MS,
+      flickerMs: c.HOLOGRAM.FLICKER_MS,
+      flickerDurMs: c.HOLOGRAM.FLICKER_DUR_MS,
+      flickerDepth: c.HOLOGRAM.FLICKER_DEPTH,
+      glassColor: c.HOLOGRAM.GLASS_COLOR,
+      glassOpacity: c.HOLOGRAM.GLASS_OPACITY,
+      shaftColor: c.HOLOGRAM.SHAFT_COLOR,
+      shaftOpacity: c.HOLOGRAM.SHAFT_OPACITY,
+      shaftSpread: c.HOLOGRAM.SHAFT_SPREAD,
     },
     exitMs: c.EXIT_MS,
   }
