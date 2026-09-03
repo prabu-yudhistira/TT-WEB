@@ -23,6 +23,28 @@
  * bezel ring when scaled up, which the later fly-out would expose. 1024² textures
  * leave headroom for that same fly-out.
  *
+ * ── Why the ORB is 40k / 1024² (measured 2026-09-03, `npm run build:orb`) ──
+ * `emitter_orb.glb` is 1,949,942 triangles — roughly 10x the room LOD — and
+ * ships at 40k.
+ *
+ * ⚠️ The ladder was rendered on the RTX 3050 at the size the orb ACTUALLY
+ * appears (158px on 1440x900, derived from the owner's composition mockup), and
+ * at that size **every rung from 1.95M down to 20k/512² is indistinguishable**.
+ * Geometry is not the lever here and a triangle target chosen by intuition would
+ * have been wrong in either direction: 20k/512² is 272 KB and looks identical on
+ * the page.
+ *
+ * 40k / 1024² (590 KB) is chosen for HEADROOM, not for the default view. The
+ * difference only appears when the orb is enlarged: 512² visibly softens the
+ * engraved filigree, which is the whole character of this model, and below ~40k
+ * the scalloped bezel ring around the hologram lens goes polygonal — and that
+ * ring is the feature the hologram sub-project is built around. Two orbs share
+ * ONE download, so this is 590 KB total, not per orb.
+ *
+ * ⚠️ Same KHR_texture_transform warning as below, and it was verified rather
+ * than assumed: the ladder was rendered side by side against the source and the
+ * skin is intact at every rung.
+ *
  * ── Why Draco rather than meshopt ──
  * The app already loads /models/logo.draco.glb through DRACOLoader with the
  * decoder served from /draco/, so this adds no new decoder and the wasm is
