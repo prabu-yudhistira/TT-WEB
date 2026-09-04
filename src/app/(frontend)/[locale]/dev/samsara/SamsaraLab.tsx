@@ -340,6 +340,35 @@ export default function SamsaraLab({
   const [holdEnabled, setHoldEnabled] = useState(true)
   const [copied, setCopied] = useState(false)
   const [showLogo, setShowLogo] = useState(true)
+  /**
+   * Which edge the panel is docked to.
+   *
+   * Wherever it sits it covers something: the orbs and the holographic screen
+   * are on the LEFT, and SAMSARA parks at LANDING.X_FRAC on the RIGHT. So this
+   * is a toggle rather than a fixed position — the owner flips it depending on
+   * which half is being tuned.
+   *
+   * Defaults to RIGHT, because the emitters and the screen are the surfaces
+   * currently being tuned and they were sitting underneath it.
+   */
+  const [dockRight, setDockRight] = useState(true)
+
+  /**
+   * ⚠️ Read in an EFFECT, not in the useState initialiser above.
+   *
+   * There is no localStorage during SSR, so an initialiser would render one
+   * value on the server and another on the client — a hydration mismatch. The
+   * hero's once-per-session flag was written this way for the same reason
+   * before it was reverted.
+   */
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('tt-bench-dock')
+      if (saved === 'left' || saved === 'right') setDockRight(saved === 'right')
+    } catch {
+      // Private windows and blocked site data throw on access, not on read.
+    }
+  }, [])
   const [showSats, setShowSats] = useState(true)
   const [parkSpin, setParkSpin] = useState(true)
   const [active, setActive] = useState(false)
@@ -607,7 +636,7 @@ export default function SamsaraLab({
         style={{
           position: 'fixed',
           top: 16,
-          left: 16,
+          ...(dockRight ? { right: 16 } : { left: 16 }),
           zIndex: 100,
           width: 310,
           padding: '14px 16px',
@@ -621,7 +650,44 @@ export default function SamsaraLab({
           overscrollBehavior: 'contain',
         }}
       >
-        <strong style={{ display: 'block', marginBottom: 8 }}>SAMSARA — transition bench</strong>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <strong>SAMSARA — transition bench</strong>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !dockRight
+              setDockRight(next)
+              try {
+                window.localStorage.setItem('tt-bench-dock', next ? 'right' : 'left')
+              } catch {
+                // Not being able to remember the choice is not worth throwing over.
+              }
+            }}
+            title={
+              dockRight
+                ? 'Move the panel left — uncovers SAMSARA, covers the orbs and screen'
+                : 'Move the panel right — uncovers the orbs and screen, covers SAMSARA'
+            }
+            style={{
+              font: 'inherit',
+              padding: '2px 8px',
+              cursor: 'pointer',
+              background: 'rgba(43,42,39,0.08)',
+              border: '1px solid rgba(43,42,39,0.25)',
+              borderRadius: 3,
+              color: 'inherit',
+            }}
+          >
+            {dockRight ? '\u2190 dock left' : 'dock right \u2192'}
+          </button>
+        </div>
         <div style={{ marginBottom: 8, opacity: 0.75 }}>{status}</div>
 
         <div
