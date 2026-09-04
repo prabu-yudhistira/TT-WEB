@@ -439,7 +439,21 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.ROOM.DEPTH,
           min: 10,
           max: 140,
-          admin: { description: 'How far back the room runs. SAMSARA enters at the far wall.' },
+          admin: {
+            description:
+              'The room’s world-unit SCALE, not its apparent size. The camera is solved from it, so changing this pulls the camera back by the same factor and the picture does not change. To push the floor and walls out of shot, use Surface extent below.',
+          },
+        },
+        {
+          name: 'extent',
+          type: 'number',
+          defaultValue: d.ROOM.EXTENT,
+          min: 1,
+          max: 12,
+          admin: {
+            description:
+              'How far the floor and walls run past the frame. 1 ends them exactly at the frame edge, which is where their edges are visible. Raise it until the side walls and the wall tops leave shot and the space reads as unbounded — the key light does not reach further, so the surfaces fall off into darkness on their own. The floor stays put at any value, so SAMSARA’s bounce keeps its contact shadow.',
+          },
         },
         colour(
           'mascotTintColor',

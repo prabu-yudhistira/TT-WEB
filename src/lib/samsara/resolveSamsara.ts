@@ -64,6 +64,7 @@ export type SamsaraSequenceInput = {
     fogDensity?: number | null
     cameraFovDeg?: number | null
     depth?: number | null
+    extent?: number | null
     mascotTintColor?: string | null
     mascotTintStrength?: number | null
     mascotRoughnessBoost?: number | null
@@ -262,6 +263,7 @@ export function resolveSamsara(
       FOG_DENSITY: num(r.fogDensity, d.ROOM.FOG_DENSITY),
       CAMERA_FOV_DEG: num(r.cameraFovDeg, d.ROOM.CAMERA_FOV_DEG),
       DEPTH: num(r.depth, d.ROOM.DEPTH),
+      EXTENT: num(r.extent, d.ROOM.EXTENT),
       MASCOT_TINT_COLOR: hex(r.mascotTintColor, d.ROOM.MASCOT_TINT_COLOR),
       MASCOT_TINT_STRENGTH: num(r.mascotTintStrength, d.ROOM.MASCOT_TINT_STRENGTH),
       MASCOT_ROUGHNESS_BOOST: num(r.mascotRoughnessBoost, d.ROOM.MASCOT_ROUGHNESS_BOOST),
@@ -406,6 +408,7 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       fogDensity: c.ROOM.FOG_DENSITY,
       cameraFovDeg: c.ROOM.CAMERA_FOV_DEG,
       depth: c.ROOM.DEPTH,
+      extent: c.ROOM.EXTENT,
       mascotTintColor: c.ROOM.MASCOT_TINT_COLOR,
       mascotTintStrength: c.ROOM.MASCOT_TINT_STRENGTH,
       mascotRoughnessBoost: c.ROOM.MASCOT_ROUGHNESS_BOOST,

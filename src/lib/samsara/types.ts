@@ -150,6 +150,28 @@ export type RoomConfig = {
   DEPTH: number
 
   /**
+   * How far the floor and walls extend past the framed volume. 1 = they end
+   * exactly at the frame edge; larger pushes them out of shot.
+   *
+   * ⚠️ This exists because DEPTH cannot do it. The camera is solved so that
+   * `DEPTH * ROOM_HEIGHT_FACTOR` exactly fills the viewport height, so scaling
+   * DEPTH pulls the camera back by the same factor and the image is
+   * PIXEL-IDENTICAL. DEPTH is the world-unit scale, not the apparent size, and
+   * the slider looks like it should widen the room but cannot.
+   *
+   * ⚠️ It also deliberately does NOT touch ROOM_HEIGHT_FACTOR, which is the
+   * camera's framing reference — raising that reframes the whole composition
+   * instead of enlarging the surfaces inside it. Separating "how the camera
+   * frames the space" from "how big the surfaces are" is the entire point of
+   * this value.
+   *
+   * The key light's reach is unchanged, so at a large extent the surfaces fall
+   * off into darkness well before their edges — which is what produces
+   * unbounded space rather than a visibly bigger box.
+   */
+  EXTENT: number
+
+  /**
    * SAMSARA's own material, as it renders in the ROOM only (spec §6.3b's
    * follow-on). The hero's material is untouched at any strength here —
    * gated on mode !== 'orbit' in the engine — because at 12.6-70px it was
@@ -501,6 +523,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FOG_DENSITY: 0.035,
     CAMERA_FOV_DEG: 55,
     DEPTH: 51,
+    EXTENT: 1,
 
     // Warm bronze-brass, picked to be in the right neighbourhood once
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner

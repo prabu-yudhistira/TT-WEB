@@ -239,6 +239,10 @@ check(
 
 check('kill switch defaults on', DEFAULT_SEQUENCE.ENABLED === true)
 
+// Below 1 the surfaces would end INSIDE the framed volume and their edges
+// would be visible in shot, which is the opposite of what this control is for.
+check('room extent never crops inside the frame', DEFAULT_SEQUENCE.ROOM.EXTENT >= 1)
+
 // ── emitters ────────────────────────────────────────────────────────
 //
 // ⚠️ RELATIONSHIPS ONLY, never magnitudes — unlike everything above, which

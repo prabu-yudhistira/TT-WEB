@@ -136,6 +136,7 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'ROOM.AMBIENT_INTENSITY', label: 'Ambient', min: 0, max: 3, step: 0.01 },
       { kind: 'num', path: 'ROOM.CAMERA_FOV_DEG', label: 'Camera FOV °', min: 15, max: 100, step: 1 },
       { kind: 'num', path: 'ROOM.DEPTH', label: 'Room depth', min: 6, max: 90, step: 1 },
+      { kind: 'num', path: 'ROOM.EXTENT', label: 'Surface extent', min: 1, max: 12, step: 0.25 },
     ],
   },
   {
@@ -329,10 +330,10 @@ export default function SamsaraLab({
   }, [])
 
   /**
-   * ⚠️ ROOM.DEPTH is GEOMETRY. `setRoomConfig` reaches colours and light
-   * intensities, which are uniforms and update live; the floor, walls and
-   * backdrop are all SIZED from DEPTH at build time and cannot be. So a depth
-   * change throws the room away and lets the next reveal build a fresh one.
+   * ⚠️ ROOM.DEPTH and ROOM.EXTENT are GEOMETRY. `setRoomConfig` reaches colours
+   * and light intensities, which are uniforms and update live; the floor, walls
+   * and backdrop are all SIZED at build time and cannot be. So a change to
+   * either throws the room away and lets the next reveal build a fresh one.
    *
    * The camera needs no equivalent: the sequence re-solves it every frame while
    * promoted, which is also what keeps a mid-fall resize from stranding it.
@@ -347,7 +348,7 @@ export default function SamsaraLab({
     // one control needs it, because everything else is a uniform.
     const t = setTimeout(() => engine.rebuildRoom(), 220)
     return () => clearTimeout(t)
-  }, [engine, cfg.ROOM.DEPTH])
+  }, [engine, cfg.ROOM.DEPTH, cfg.ROOM.EXTENT])
 
   /**
    * Parking the spin, per plan Task 12.
