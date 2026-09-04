@@ -141,7 +141,12 @@ check(
 // bleeding sideways. The body simply IS ~4.7% wider than tall, and STRETCH is
 // the owner overriding that on purpose rather than the engine distorting it.
 check('approved body stretch', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_X === 1)
-check('approved body stretch Y', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y === 1.12)
+// Revised 2026-09-04: 1.12 -> 1.01, i.e. the owner has pulled the deliberate
+// vertical stretch almost all the way out. The measurement above still stands —
+// the mesh really is ~4.7% wider than tall — so this is the owner choosing to
+// let the body render close to as modelled rather than a correction being
+// undone by accident.
+check('approved body stretch Y', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y === 1.01)
 // A stretch of 0 collapses the body to a plane and a negative one turns it
 // inside out; neither is a look anyone is reaching for with a slider.
 check(

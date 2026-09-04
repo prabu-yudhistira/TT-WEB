@@ -1,8 +1,8 @@
 /**
  * SAMSARA transition — configuration.
  *
- * Owner-approved on screen 2026-08-31 at /dev/samsara, and frozen here from
- * that session's `copy json`. Pinned value-by-value by types.check.ts, so a
+ * Owner-approved on screen at /dev/samsara and frozen here from that session's
+ * `copy json` — 2026-08-31, revised 2026-09-04 (room, landing and burst). Pinned value-by-value by types.check.ts, so a
  * later edit is a deliberate act with the owner in the loop rather than a
  * silent diff — the same treatment DEFAULT_MASCOT and DEFAULT_MASCOT_EYES get.
  *
@@ -320,7 +320,7 @@ export type BurstConfig = {
   SWIRL: number
   /** How much a mote slows per second. 0 lets them fly on forever. */
   DRAG: number
-  /** Upward drift, in body radii per second — dust rises as it is shed. */
+  /** Vertical drift, body radii per second. Positive rises; negative sinks. */
   RISE: number
   /** Extra spawn radius past the surface, in body radii. */
   SPREAD: number
@@ -496,8 +496,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   LANDING: {
     SIZE_FRAC: 0.455,
     MOBILE_SIZE_FRAC: 0.35,
-    X_FRAC: 0.75,
-    Y_FRAC: 0.635,
+    X_FRAC: 0.82,
+    Y_FRAC: 0.555,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.3,
     HOVER_BOB_PX: 8,
@@ -514,16 +514,16 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // room belongs to a brand that deliberately dropped its dark appearance.
     // UPPERCASE hex throughout: the admin colour swatch writes back uppercase,
     // and a lowercase value here marks the form dirty just from loading it.
-    BG_COLOR: '#08080A',
-    FLOOR_COLOR: '#141416',
+    BG_COLOR: '#000000',
+    FLOOR_COLOR: '#000000',
     WALL_COLOR: '#0E0E11',
-    KEY_LIGHT_COLOR: '#FFF3D6',
+    KEY_LIGHT_COLOR: '#FBF0D5',
     KEY_LIGHT_INTENSITY: 2.2,
-    AMBIENT_INTENSITY: 1.45,
+    AMBIENT_INTENSITY: 0.78,
     FOG_DENSITY: 0.035,
-    CAMERA_FOV_DEG: 55,
-    DEPTH: 51,
-    EXTENT: 1,
+    CAMERA_FOV_DEG: 20,
+    DEPTH: 90,
+    EXTENT: 12,
 
     // Warm bronze-brass, picked to be in the right neighbourhood once
     // STRENGTH is raised — not tuned, since STRENGTH 0 makes it inert. Owner
@@ -533,12 +533,12 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     MASCOT_ROUGHNESS_BOOST: 0.5,
 
     // Warm, so the metal reflects brass rather than steel. See ENV_COLOR.
-    ENV_COLOR: '#FFD9A8',
+    ENV_COLOR: '#140C00',
     ENV_INTENSITY: 1,
 
     // As modelled. 0.955 on X would make the silhouette a true circle.
     MASCOT_STRETCH_X: 1,
-    MASCOT_STRETCH_Y: 1.12,
+    MASCOT_STRETCH_Y: 1.01,
   },
 
   DRAG: {
@@ -605,33 +605,33 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   BURST: {
     ENABLED: true,
     // The owner asked for every 4 seconds.
-    INTERVAL_MS: 4000,
+    INTERVAL_MS: 4800,
     // ⚠️ Count is NOT what separates smoke from dust — an earlier pass here
     // assumed it was and went down to 34, which just gave fewer, more obviously
     // separate orbs. The SHAPE does that (see the fragment shader). Given
     // eroded, noisy sprites, the count's only job is to make the mass
     // CONNECTED, and that wants more of them, not fewer.
-    COUNT: 95,
-    SECONDS: 2.6,
+    COUNT: 80,
+    SECONDS: 1.6,
     // ⚠️ Fast enough to ESCAPE, then slowed. The first smoke pass used SPEED
     // 0.45 against DRAG 1.6, which stops a puff after roughly v/drag = 0.19
     // radii — so almost the entire burst stayed hidden behind the silhouette
     // it was born behind, and only three or four puffs ever reached the screen.
     // These give about 2 radii of travel: out past the body, then hanging.
-    SPEED: 0.62,
+    SPEED: 1,
     DRAG: 0.7,
-    RISE: 0.35,
+    RISE: -1.54,
     GROWTH: 2.5,
     SWIRL: 0.35,
-    SPREAD: 0.3,
-    BACK_OFFSET: 0.4,
+    SPREAD: 0.35,
+    BACK_OFFSET: 0,
     // Large, and larger than it looks: the noise erodes most of each sprite
     // away, so the drawn wisp is much smaller than the point it is cut from.
-    SIZE: 96,
+    SIZE: 68,
     // LOW, and that is what makes it volumetric: single puffs are barely
     // there and the density comes from several overlapping. A high value here
     // gives distinct discs with visible edges.
-    OPACITY: 0.17,
+    OPACITY: 0.11,
     // Very low. Anything higher puts a bright centre back in each puff, and a
     // bright centre in a round sprite is exactly the ember look being escaped.
     GLOW: 0.14,

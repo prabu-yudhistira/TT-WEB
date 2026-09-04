@@ -426,7 +426,7 @@ export const SamsaraSequence: GlobalConfig = {
           name: 'cameraFovDeg',
           type: 'number',
           defaultValue: d.ROOM.CAMERA_FOV_DEG,
-          min: 20,
+          min: 8,
           max: 100,
           admin: {
             description:
@@ -449,7 +449,7 @@ export const SamsaraSequence: GlobalConfig = {
           type: 'number',
           defaultValue: d.ROOM.EXTENT,
           min: 1,
-          max: 12,
+          max: 32,
           admin: {
             description:
               'How far the floor and walls run past the frame. 1 ends them exactly at the frame edge, which is where their edges are visible. Raise it until the side walls and the wall tops leave shot and the space reads as unbounded — the key light does not reach further, so the surfaces fall off into darkness on their own. The floor stays put at any value, so SAMSARA’s bounce keeps its contact shadow.',

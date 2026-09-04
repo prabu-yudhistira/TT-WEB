@@ -32,7 +32,16 @@ const seeded = () => {
 
 // ── the owner's actual requirement ───────────────────────────────────
 check('the burst is on by default', cfg.ENABLED === true)
-check('and fires every 4 seconds, as asked', cfg.INTERVAL_MS === 4000)
+// ⚠️ NOT pinned to a literal any more. It was `=== 4000`, and the owner
+// retuned it to 4800 on 2026-09-04 — at which point a check whose job is the
+// SCHEDULING BEHAVIOUR failed purely because a number it did not care about had
+// moved. The interval is a look decision; that it is sane, and that the machine
+// honours whatever it is set to, is what this file is for.
+check('the burst interval is a sane few seconds',
+  cfg.INTERVAL_MS >= 500 && cfg.INTERVAL_MS <= 30000)
+
+/** The configured interval in SECONDS — `update` takes elapsed seconds. */
+const IVL = cfg.INTERVAL_MS / 1000
 
 // ── it has to read as SMOKE, not as dust ─────────────────────────────
 //
@@ -78,27 +87,29 @@ check('fade never goes negative', burstFade(1.4) === 0)
   // ⚠️ The first burst waits a full interval. Firing on arrival buries it under
   // the bounce and the settle.
   check('nothing fires on the frame it parks', b.update(cfg, 0, true) === false)
-  check('nor part-way through the first interval', b.update(cfg, 3.9, true) === false)
-  check('one fires at the interval', b.update(cfg, 4.0, true) === true)
-  check('and not again immediately', b.update(cfg, 4.1, true) === false)
-  check('the next comes one interval later', b.update(cfg, 8.0, true) === true)
+  check('nor part-way through the first interval', b.update(cfg, IVL * 0.975, true) === false)
+  check('one fires at the interval', b.update(cfg, IVL, true) === true)
+  check('and not again immediately', b.update(cfg, IVL * 1.025, true) === false)
+  check('the next comes one interval later', b.update(cfg, IVL * 2, true) === true)
 }
 {
   const b = new BurstState(makeBurstPool(256), seeded())
   b.update(cfg, 0, true)
   // A backgrounded tab hands back a huge elapsed jump. One burst, not twelve.
   check('a stalled tab fires exactly one burst, not one per missed interval',
-    b.update(cfg, 50, true) === true)
+    b.update(cfg, IVL * 12.5, true) === true)
   check('and re-arms from NOW rather than from the missed schedule',
-    b.update(cfg, 53.9, true) === false)
+    b.update(cfg, IVL * 12.5 + IVL * 0.975, true) === false)
 }
 {
   const b = new BurstState(makeBurstPool(256), seeded())
   b.update(cfg, 0, true)
-  check('nothing fires while not parked', b.update(cfg, 99, false) === false)
+  check('nothing fires while not parked', b.update(cfg, IVL * 24.75, false) === false)
   // Re-entering must not fire instantly on a timer that ran while off screen.
-  check('re-entering re-arms rather than firing at once', b.update(cfg, 99.1, true) === false)
-  check('and then fires an interval after re-entry', b.update(cfg, 103.1, true) === true)
+  check('re-entering re-arms rather than firing at once',
+    b.update(cfg, IVL * 24.775, true) === false)
+  check('and then fires an interval after re-entry',
+    b.update(cfg, IVL * 24.775 + IVL, true) === true)
 }
 {
   const off = { ...cfg, ENABLED: false }
@@ -161,7 +172,25 @@ check('fade never goes negative', burstFade(1.4) === 0)
 
   const meanY0 = t0.reduce((a, m) => a + m.y, 0) / t0.length
   const meanY1 = t1.reduce((a, m) => a + m.y, 0) / t1.length
-  check('and drifts upward as smoke does', meanY1 > meanY0, `${meanY0.toFixed(3)} -> ${meanY1.toFixed(3)}`)
+  /**
+   * ⚠️ Follows the SIGN OF RISE rather than assuming upward.
+   *
+   * This read `meanY1 > meanY0` with the label "drifts upward as smoke does",
+   * which encoded a default (RISE 0.35) as though it were a law. The owner set
+   * RISE to -1.54 on 2026-09-04, so the cloud now SINKS — a deliberate choice,
+   * not a slider slip: it is well past zero, and the room it falls through is
+   * now far larger and pure black.
+   *
+   * What is actually invariant is that the cloud drifts the way RISE says. A
+   * check that demands "up" would either have to be deleted or would quietly
+   * force the config back.
+   */
+  const wantUp = cfg.RISE > 0
+  check(
+    wantUp ? 'and drifts upward, as RISE asks' : 'and sinks, as the negative RISE asks',
+    wantUp ? meanY1 > meanY0 : meanY1 < meanY0,
+    `RISE ${cfg.RISE} · ${meanY0.toFixed(3)} -> ${meanY1.toFixed(3)}`,
+  )
 
   // ⚠️ The single strongest smoke cue, and the one most easily lost: a puff
   // that SHRINKS as it fades reads as a grain falling away. The dust pass
