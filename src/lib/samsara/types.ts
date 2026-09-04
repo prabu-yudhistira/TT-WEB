@@ -503,6 +503,10 @@ export type PokeConfig = {
   SHAKE_HZ: number
   /** How long the shake takes to settle after the pointer lifts. */
   RELEASE_MS: number
+  /**
+   * The flicker's PERIOD, not its duration — it runs for as long as the press
+   * does. Lower is faster.
+   */
   FLICKER_MS: number
   FLICKER_DEPTH: number
   /**

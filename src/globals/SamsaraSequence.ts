@@ -1247,7 +1247,7 @@ export const SamsaraSequence: GlobalConfig = {
       label: 'Press and hold an orb',
       admin: {
         description:
-          'Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker once. It fires ONCE per press — a strobe under a resting finger is a photosensitivity problem on a surface that will carry subtitles.',
+          'Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker, and keep flickering until the pointer lifts. The whole sequence is skipped under prefers-reduced-motion, which is where the photosensitivity guard lives.',
       },
       fields: [
         { name: 'enabled', type: 'checkbox', defaultValue: d.POKE.ENABLED },
@@ -1255,7 +1255,17 @@ export const SamsaraSequence: GlobalConfig = {
         { name: 'shakeAmp', type: 'number', defaultValue: d.POKE.SHAKE_AMP, min: 0, max: 1 },
         { name: 'shakeHz', type: 'number', defaultValue: d.POKE.SHAKE_HZ, min: 1, max: 60 },
         { name: 'releaseMs', type: 'number', defaultValue: d.POKE.RELEASE_MS, min: 0, max: 3000 },
-        { name: 'flickerMs', type: 'number', defaultValue: d.POKE.FLICKER_MS, min: 50, max: 4000 },
+        {
+          name: 'flickerMs',
+          type: 'number',
+          defaultValue: d.POKE.FLICKER_MS,
+          min: 50,
+          max: 4000,
+          admin: {
+            description:
+              'The flicker\u2019s PERIOD, not its duration — it runs for as long as the press does. Lower is faster.',
+          },
+        },
         { name: 'flickerDepth', type: 'number', defaultValue: d.POKE.FLICKER_DEPTH, min: 0, max: 1 },
         {
           name: 'hitSlop',

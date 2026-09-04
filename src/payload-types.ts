@@ -1956,7 +1956,7 @@ export interface SamsaraSequence {
     };
   };
   /**
-   * Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker once. It fires ONCE per press — a strobe under a resting finger is a photosensitivity problem on a surface that will carry subtitles.
+   * Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker, and keep flickering until the pointer lifts. The whole sequence is skipped under prefers-reduced-motion, which is where the photosensitivity guard lives.
    */
   poke?: {
     enabled?: boolean | null;
@@ -1964,6 +1964,9 @@ export interface SamsaraSequence {
     shakeAmp?: number | null;
     shakeHz?: number | null;
     releaseMs?: number | null;
+    /**
+     * The flicker’s PERIOD, not its duration — it runs for as long as the press does. Lower is faster.
+     */
     flickerMs?: number | null;
     flickerDepth?: number | null;
     /**

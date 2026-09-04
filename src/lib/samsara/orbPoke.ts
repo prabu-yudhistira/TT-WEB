@@ -4,24 +4,32 @@ import type { PokeConfig } from './types'
  * Press and hold an orb: the pair shakes, and when the shake tops out the
  * screen and its rays flicker.
  *
- * ⚠️ The flicker is the PAYOFF of the hold, not a second thing that happens at
- * the same time. It fires once, when the shake reaches full, and not again
- * until the pointer is released — otherwise holding still would strobe the
- * screen on a loop, which is both ugly and a photosensitivity problem on a
- * surface that will later carry subtitles.
+ * ⚠️ The flicker RUNS FOR AS LONG AS THE PRESS DOES. It starts when the shake
+ * reaches full and does not stop until release. This reverses a first pass
+ * that fired once per press on photosensitivity grounds; the owner asked for
+ * continuous on 2026-09-05 and that is their call to make. The mitigation that
+ * actually matters is upstream and unchanged: SamsaraSequence bails out
+ * entirely under `prefers-reduced-motion: reduce`, so none of this runs for
+ * anyone who has asked their system for it.
+ *
+ * ⚠️ What is NOT negotiable is how it STOPS. The dip fades over RELEASE_MS
+ * rather than being cut at the release, so the screen can never be left parked
+ * at whatever brightness the flicker happened to be passing through.
  *
  * Pure: no THREE, no DOM. The caller decides what was hit and applies the
  * numbers.
  */
 
-export type PokeState = 'idle' | 'holding' | 'firing' | 'spent'
+export type PokeState = 'idle' | 'holding' | 'firing'
 
 export class PokeController {
   private held = false
   private heldMs = 0
-  /** Milliseconds into the triggered flicker, or -1 when it is not running. */
-  private fireMs = -1
+  /** Free-running once the flicker starts, so the waveform never restarts. */
+  private cycleMs = 0
   private fired = false
+  /** Milliseconds into the release fade, or -1 when the dip is not fading. */
+  private fadeMs = -1
   /**
    * The release tail.
    *
@@ -34,8 +42,8 @@ export class PokeController {
   private tailFrom = 0
 
   get phase(): PokeState {
-    if (this.fireMs >= 0) return 'firing'
-    if (this.held) return this.fired ? 'spent' : 'holding'
+    if (this.fired) return 'firing'
+    if (this.held) return 'holding'
     return 'idle'
   }
 
@@ -44,6 +52,7 @@ export class PokeController {
     this.held = true
     this.heldMs = 0
     this.fired = false
+    this.fadeMs = -1
     this.tailMs = -1
   }
 
@@ -53,15 +62,19 @@ export class PokeController {
     this.tailFrom = this.heldRamp()
     this.held = false
     this.heldMs = 0
-    this.fired = false
     this.tailMs = 0
+    // ⚠️ `fired` stays TRUE here. The dip has to fade out over RELEASE_MS, and
+    // clearing it on the release would cut the flicker off wherever it happened
+    // to be — which is how a screen gets left sitting at half brightness.
+    if (this.fired) this.fadeMs = 0
   }
 
   reset() {
     this.held = false
     this.heldMs = 0
-    this.fireMs = -1
+    this.cycleMs = 0
     this.fired = false
+    this.fadeMs = -1
     this.tailMs = -1
     this.tailFrom = 0
   }
@@ -80,16 +93,21 @@ export class PokeController {
       this.heldMs += dtMs
       if (!this.fired && this.heldMs >= this.rampMs) {
         this.fired = true
-        this.fireMs = 0
+        this.cycleMs = 0
       }
     }
 
-    // ⚠️ Runs whether or not the pointer is still down. Letting go halfway
-    // through the flicker must not cut it off mid-strobe — that leaves the
-    // screen at whatever brightness the dip happened to be on.
-    if (this.fireMs >= 0) {
-      this.fireMs += dtMs
-      if (this.fireMs >= Math.max(1, cfg.FLICKER_MS)) this.fireMs = -1
+    // The waveform keeps running through the fade, so the flicker dies away
+    // rather than freezing on its last value.
+    if (this.fired) this.cycleMs += dtMs
+
+    if (this.fadeMs >= 0) {
+      this.fadeMs += dtMs
+      if (this.fadeMs >= Math.max(1, cfg.RELEASE_MS)) {
+        this.fadeMs = -1
+        this.fired = false
+        this.cycleMs = 0
+      }
     }
 
     if (this.tailMs >= 0) {
@@ -111,14 +129,32 @@ export class PokeController {
   /**
    * Extra flicker depth for the screen and the rays, 0..1.
    *
-   * Two stutters rather than one dip, matching `flickerAt` — the screen's own
-   * idle flicker and this one have to look like the same instability, or the
-   * poke reads as a different mechanism entirely.
+   * ⚠️ TWO RATES, not one. A single sine is a pulse: it repeats exactly, and a
+   * steady rhythm reads as a deliberate animation rather than as an unstable
+   * projection. Beating two incommensurate rates gives a waveform that never
+   * repeats over any realistic hold.
+   *
+   * ⚠️ HALF-WAVE RECTIFIED, and that is the part that makes it a flicker.
+   *
+   * Summing two |sin| terms was the first attempt and it is NOT a flicker: the
+   * two rarely bottom out together, so the dip never returns to zero and the
+   * screen just sits dimmed and wobbling — 5 frames out of 500 came near
+   * normal brightness. Clipping the negative half instead gives real darkness
+   * roughly half the time, which is what makes the panel look like it is
+   * cutting out rather than breathing.
+   *
+   * The weights sum to 1, so the dip reaches FLICKER_DEPTH but never passes it.
    */
   dip(cfg: PokeConfig): number {
-    if (this.fireMs < 0) return 0
-    const p = this.fireMs / Math.max(1, cfg.FLICKER_MS)
-    return Math.abs(Math.sin(p * Math.PI * 2)) * cfg.FLICKER_DEPTH
+    if (!this.fired) return 0
+    const t = this.cycleMs / Math.max(1, cfg.FLICKER_MS)
+    const w = Math.max(
+      0,
+      Math.sin(t * Math.PI * 2) * 0.6 + Math.sin(t * Math.PI * 2 * 2.7 + 1.3) * 0.4,
+    )
+    const fade =
+      this.fadeMs >= 0 ? Math.max(0, 1 - this.fadeMs / Math.max(1, cfg.RELEASE_MS)) : 1
+    return w * cfg.FLICKER_DEPTH * fade
   }
 }
 

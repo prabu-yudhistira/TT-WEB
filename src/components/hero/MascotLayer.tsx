@@ -107,6 +107,7 @@ export function MascotLayer({
   const engineRef = useRef<MascotEngine | null>(null)
   const [behind, setBehind] = useState(true)
   const [overMascot, setOverMascot] = useState(false)
+  const [overOrb, setOverOrb] = useState(false)
   const hintRef = useRef<HTMLDivElement>(null)
   /** Counts hover-ins, so the hint can retire itself. See holdHint. */
   const hintShowsRef = useRef(0)
@@ -145,6 +146,7 @@ export function MascotLayer({
     engine.setChargeSource(() => chargeRef?.current?.() ?? 0)
     engine.onDepth(setBehind)
     engine.onMascotHover(setOverMascot)
+    engine.onOrbHover(setOverOrb)
     if (labelBoxRef) labelBoxRef.current = () => engine.getLabelBox()
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -310,8 +312,17 @@ export function MascotLayer({
            * the holdHint prop. What this buys now is the grab cursor, which is
            * the affordance that survives after the hint has retired itself.
            */
-          cursor: holdHint && overMascot ? 'grab' : 'default',
-          pointerEvents: holdHint && overMascot ? 'auto' : 'none',
+          /**
+           * ⚠️ The orbs need NO hint gate, unlike SAMSARA.
+           *
+           * SAMSARA's grab cursor rides on `holdHint` because the hint is what
+           * teaches the drag, and the cursor is the affordance that outlives
+           * it. The orbs have no hint to outlive, so the cursor IS the whole
+           * affordance and has to be there from the first frame they can be
+           * pressed.
+           */
+          cursor: overOrb || (holdHint && overMascot) ? 'grab' : 'default',
+          pointerEvents: overOrb || (holdHint && overMascot) ? 'auto' : 'none',
         }}
       />
       {holdHint ? (

@@ -206,6 +206,17 @@ export class MascotEngine {
   private ptrSeen = false
   private overMascot = false
   private overListeners = new Set<(over: boolean) => void>()
+  private overOrb = false
+  private orbOverListeners = new Set<(over: boolean) => void>()
+  /**
+   * How much slop the hover test allows, in px.
+   *
+   * ⚠️ THE SAME NUMBER THE PRESS USES. If the cursor changed over a smaller
+   * area than the press accepts, the affordance would lie in one direction; if
+   * larger, it would lie in the other. Pushed in by the sequence rather than
+   * read here, because the config lives there.
+   */
+  private orbHitSlop = 0
   /**
    * World Z the scripted pose sits on while the perspective camera is live.
    * 0 is the plane through the room's origin; negative is deeper into it.
@@ -1486,6 +1497,26 @@ export class MascotEngine {
     }
   }
 
+  /**
+   * Fires when the pointer moves onto or off either emitter orb.
+   *
+   * A sibling of onMascotHover and deliberately separate: the two targets are
+   * different objects with different affordances, and folding them into one
+   * flag would make it impossible to say WHICH is under the pointer.
+   */
+  onOrbHover(cb: ((over: boolean) => void) | null) {
+    this.orbOverListeners.clear()
+    if (cb) {
+      this.orbOverListeners.add(cb)
+      cb(this.overOrb)
+    }
+  }
+
+  /** The press's hit slop, so the hover test can agree with it exactly. */
+  setOrbHitSlop(px: number) {
+    this.orbHitSlop = px
+  }
+
   /** Fires when the pointer moves onto or off SAMSARA's disc. */
   onMascotHover(cb: ((over: boolean) => void) | null) {
     this.overListeners.clear()
@@ -1637,10 +1668,15 @@ export class MascotEngine {
       this.dragIdleMs = -1
       this.releaseSmile()
       this.setOver(false)
+      this.setOverOrb(false)
       return
     }
 
     this.setOver(this.ptrSeen && this.hitsMascot(this.ptrX, this.ptrY))
+    // ⚠️ Evaluated per FRAME, not on pointermove. The orbs bob and drift in on
+    // their own schedule, so one can arrive under a stationary cursor — a
+    // move-driven test would leave the arrow sitting on a pressable orb.
+    this.setOverOrb(this.ptrSeen && this.hitsOrb(this.ptrX, this.ptrY, this.orbHitSlop))
 
     if (this.dragging) return
 
@@ -1695,6 +1731,18 @@ export class MascotEngine {
         cb(v)
       } catch (err) {
         console.error('MascotEngine: hover listener threw', err)
+      }
+    })
+  }
+
+  private setOverOrb(v: boolean) {
+    if (v === this.overOrb) return
+    this.overOrb = v
+    this.orbOverListeners.forEach((cb) => {
+      try {
+        cb(v)
+      } catch (err) {
+        console.error('MascotEngine: orb hover listener threw', err)
       }
     })
   }
@@ -2859,6 +2907,7 @@ export class MascotEngine {
     window.removeEventListener('pointercancel', this.onPointerUp)
     window.removeEventListener('blur', this.onBlur)
     this.overListeners.clear()
+    this.orbOverListeners.clear()
     this.depthCb = null
     // Before the generic scene traversal below, so the room's own lights and
     // shadow map are released explicitly rather than left to the mesh sweep,

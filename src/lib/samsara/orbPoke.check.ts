@@ -40,22 +40,26 @@ const run = (c: PokeController, ms: number, step = 16) => {
   check('at full hold it fires', c.phase === 'firing', c.phase)
   check('the shake is at full', c.shake01(cfg) === 1)
 
-  run(c, cfg.FLICKER_MS + 100)
-  check('the flicker ends on its own', c.dip(cfg) === 0)
-
   /**
-   * ⚠️ THE ONE THAT MATTERS. Holding still must not re-fire: a strobe on a
-   * loop is ugly, and this screen will carry subtitles, so a repeating flash
-   * under a resting finger is a photosensitivity problem and not just a
-   * cosmetic one.
+   * ⚠️ IT KEEPS GOING. The owner asked for continuous on 2026-09-05, reversing
+   * a first pass that fired once. What this pins is that the flicker neither
+   * stops on its own nor saturates: it has to keep MOVING for eight seconds of
+   * hold, which is what separates a flicker from a screen that simply dimmed.
    */
-  let dips = 0
+  let lit = 0
+  let dark = 0
+  let maxHeld = 0
   for (let t = 0; t < 8000; t += 16) {
     c.update(cfg, 16)
-    if (c.dip(cfg) > 0) dips++
+    const d = c.dip(cfg)
+    maxHeld = Math.max(maxHeld, d)
+    if (d > cfg.FLICKER_DEPTH * 0.5) lit++
+    if (d < cfg.FLICKER_DEPTH * 0.1) dark++
   }
-  check('and never fires again while still held', dips === 0, `${dips} frames dipped`)
-  check('but the shake stays up under the finger', c.shake01(cfg) === 1)
+  check('it is still flickering after eight seconds of hold', lit > 50 && dark > 50,
+    `${lit} deep frames, ${dark} shallow`)
+  check('and never exceeds its depth', maxHeld <= cfg.FLICKER_DEPTH + 1e-9, maxHeld.toFixed(3))
+  check('the shake stays up under the finger', c.shake01(cfg) === 1)
 }
 
 // ── release settles rather than stopping dead ───────────────────────
@@ -93,48 +97,80 @@ const run = (c: PokeController, ms: number, step = 16) => {
   check('a press let go early never flickers', dips === 0, `${dips} frames dipped`)
 }
 
-// ── a second press can fire again ───────────────────────────────────
+// ── a second press starts it again ──────────────────────────────────
 {
   const c = new PokeController()
   c.press()
   run(c, cfg.SHAKE_MS + 50)
-  run(c, cfg.FLICKER_MS + 50)
   c.release()
   run(c, cfg.RELEASE_MS + 50)
+  check('released, it stops', c.dip(cfg) === 0)
+  check('and is idle', c.phase === 'idle', c.phase)
   c.press()
   run(c, cfg.SHAKE_MS + 50)
-  check('a fresh press fires again', c.phase === 'firing', c.phase)
+  check('a fresh press starts it again', c.phase === 'firing', c.phase)
 }
 
-// ── a flicker survives an early release ─────────────────────────────
+// ── the release FADES the dip rather than cutting it ────────────────
 {
   const c = new PokeController()
   c.press()
   run(c, cfg.SHAKE_MS + 50)
   check('firing', c.phase === 'firing')
   c.release()
-  // ⚠️ Letting go mid-strobe must not cut the dip off: the screen would be left
-  // at whatever brightness the flicker happened to be passing through.
-  let seen = false
-  for (let t = 0; t < cfg.FLICKER_MS; t += 16) {
-    c.update(cfg, 16)
-    if (c.dip(cfg) > 0) seen = true
+
+  /**
+   * ⚠️ THE ONE THAT MATTERS NOW that the flicker is continuous. Cutting it at
+   * the release leaves the screen parked at whatever brightness the waveform
+   * happened to be passing through — a panel stuck at half opacity with no
+   * finger on it. The envelope has to reach zero.
+   */
+  let peak = 0
+  for (let t = 0; t < cfg.RELEASE_MS; t += 8) {
+    c.update(cfg, 8)
+    peak = Math.max(peak, c.dip(cfg))
   }
-  check('the flicker runs out even if the finger lifts', seen)
+  check('it is still dipping through the fade', peak > 0, peak.toFixed(3))
+  run(c, 200)
+  check('and lands on exactly zero', c.dip(cfg) === 0)
+  check('with nothing left running', c.phase === 'idle', c.phase)
 }
 
-// ── the dip never exceeds its configured depth ──────────────────────
+// ── the waveform does not repeat on a beat ──────────────────────────
 {
+  /**
+   * A single sine is a PULSE — it repeats exactly, and a steady rhythm reads as
+   * a deliberate animation rather than as an unstable projection. Two rates
+   * beat against each other, so the same phase of the fast component lands on
+   * different values of the slow one.
+   */
   const c = new PokeController()
   c.press()
   run(c, cfg.SHAKE_MS + 50)
-  let max = 0
-  for (let t = 0; t < cfg.FLICKER_MS; t += 8) {
+  const a: number[] = []
+  for (let t = 0; t < cfg.FLICKER_MS * 2; t += 8) {
     c.update(cfg, 8)
-    max = Math.max(max, c.dip(cfg))
+    a.push(c.dip(cfg))
   }
-  check('the dip stays within its depth', max <= cfg.FLICKER_DEPTH + 1e-9, max.toFixed(3))
-  check('and actually dips', max > cfg.FLICKER_DEPTH * 0.5, max.toFixed(3))
+  /**
+   * ⚠️ Only the LIT samples are compared. The waveform is half-wave rectified,
+   * so about half of every period is exactly zero — and zero matches zero. A
+   * naive comparison across all samples reports ~47% identical and would pass
+   * a pure single-sine pulse just as happily, which is the thing this exists to
+   * rule out.
+   */
+  const half = Math.floor(a.length / 2)
+  let same = 0
+  let lit = 0
+  for (let i = 0; i < half; i++) {
+    if (a[i] <= 0 && a[i + half] <= 0) continue
+    lit++
+    if (Math.abs(a[i] - a[i + half]) < 1e-4) same++
+  }
+  check('one period does not repeat the next', lit > 20 && same / lit < 0.2,
+    `${same} of ${lit} lit samples identical`)
+  check('and it actually reaches its depth', Math.max(...a) > cfg.FLICKER_DEPTH * 0.8,
+    Math.max(...a).toFixed(3))
 }
 
 // ── the wobble ──────────────────────────────────────────────────────

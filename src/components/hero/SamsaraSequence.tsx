@@ -913,6 +913,9 @@ export function SamsaraSequence({
       z: config.LANDING.ROT_Z_DEG,
     })
     engine?.setDragConfig(config.DRAG)
+    // Same number the press uses, so the cursor never promises a target the
+    // press would miss, nor misses one the press would take.
+    engine?.setOrbHitSlop(config.POKE.ENABLED ? config.POKE.HIT_SLOP : -1e6)
     engine?.setIdleEyes(config.IDLE_EYES)
     engine?.setBurstConfig(config.BURST)
     engine?.setExhaustConfig(config.EXHAUST)
