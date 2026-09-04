@@ -1086,24 +1086,13 @@ export const SamsaraSequence: GlobalConfig = {
               'How far the glass dips. Never 1 — a screen that fully extinguishes reads as a fault rather than a hologram.',
           },
         },
-        colour('glassColor', d.HOLOGRAM.GLASS_COLOR, 'The screen’s own amber.'),
+        colour('glassColor', d.HOLOGRAM.GLASS_COLOR, 'A MULTIPLY over the artwork, which carries its own amber. White leaves it exactly as drawn; anything else shifts it.'),
         {
           name: 'glassOpacity',
           type: 'number',
           defaultValue: d.HOLOGRAM.GLASS_OPACITY,
           min: 0,
           max: 1,
-        },
-        {
-          name: 'glassGlow',
-          type: 'number',
-          defaultValue: d.HOLOGRAM.GLASS_GLOW,
-          min: 0,
-          max: 1.5,
-          admin: {
-            description:
-              'How far the panel’s own halo carries. The artwork is drawn flat with no glow baked in, so all of it comes from here — and that is what lets it breathe with the flicker.',
-          },
         },
         colour(
           'shaftColor',

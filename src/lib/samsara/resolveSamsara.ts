@@ -168,7 +168,6 @@ export type SamsaraSequenceInput = {
     flickerDepth?: number | null
     glassColor?: string | null
     glassOpacity?: number | null
-    glassGlow?: number | null
     shaftColor?: string | null
     shaftOpacity?: number | null
     shaftSpread?: number | null
@@ -444,7 +443,6 @@ export function resolveSamsara(
       FLICKER_DEPTH: num(ho.flickerDepth, d.HOLOGRAM.FLICKER_DEPTH),
       GLASS_COLOR: hex(ho.glassColor, d.HOLOGRAM.GLASS_COLOR),
       GLASS_OPACITY: num(ho.glassOpacity, d.HOLOGRAM.GLASS_OPACITY),
-      GLASS_GLOW: num(ho.glassGlow, d.HOLOGRAM.GLASS_GLOW),
       SHAFT_COLOR: hex(ho.shaftColor, d.HOLOGRAM.SHAFT_COLOR),
       SHAFT_OPACITY: num(ho.shaftOpacity, d.HOLOGRAM.SHAFT_OPACITY),
       SHAFT_SPREAD: num(ho.shaftSpread, d.HOLOGRAM.SHAFT_SPREAD),
@@ -614,7 +612,6 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       flickerDepth: c.HOLOGRAM.FLICKER_DEPTH,
       glassColor: c.HOLOGRAM.GLASS_COLOR,
       glassOpacity: c.HOLOGRAM.GLASS_OPACITY,
-      glassGlow: c.HOLOGRAM.GLASS_GLOW,
       shaftColor: c.HOLOGRAM.SHAFT_COLOR,
       shaftOpacity: c.HOLOGRAM.SHAFT_OPACITY,
       shaftSpread: c.HOLOGRAM.SHAFT_SPREAD,

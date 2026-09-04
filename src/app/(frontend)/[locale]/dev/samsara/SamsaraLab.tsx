@@ -287,7 +287,6 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'HOLOGRAM.FLICKER_DUR_MS', label: 'Flicker ms', min: 20, max: 2000, step: 10 },
       { kind: 'num', path: 'HOLOGRAM.FLICKER_DEPTH', label: 'Flicker depth', min: 0, max: 0.95, step: 0.01 },
       { kind: 'num', path: 'HOLOGRAM.GLASS_OPACITY', label: 'Glass opacity', min: 0, max: 1, step: 0.01 },
-      { kind: 'num', path: 'HOLOGRAM.GLASS_GLOW', label: 'Panel glow', min: 0, max: 1.5, step: 0.01 },
       { kind: 'color', path: 'HOLOGRAM.GLASS_COLOR', label: 'Glass colour' },
       { kind: 'num', path: 'HOLOGRAM.SHAFT_OPACITY', label: 'Shaft opacity', min: 0, max: 1, step: 0.01 },
       { kind: 'num', path: 'HOLOGRAM.SHAFT_REACH', label: 'Ray reach  (?HOLOGRAM.SHAFT_GUIDE=1)', min: 0.2, max: 6, step: 0.05 },

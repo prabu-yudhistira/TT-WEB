@@ -1870,14 +1870,10 @@ export interface SamsaraSequence {
      */
     flickerDepth?: number | null;
     /**
-     * The screen’s own amber.
+     * A MULTIPLY over the artwork, which carries its own amber. White leaves it exactly as drawn; anything else shifts it.
      */
     glassColor?: string | null;
     glassOpacity?: number | null;
-    /**
-     * How far the panel’s own halo carries. The artwork is drawn flat with no glow baked in, so all of it comes from here — and that is what lets it breathe with the flicker.
-     */
-    glassGlow?: number | null;
     /**
      * The light shafts from each lens. Usually the same amber as the glass.
      */
@@ -2544,7 +2540,6 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         flickerDepth?: T;
         glassColor?: T;
         glassOpacity?: T;
-        glassGlow?: T;
         shaftColor?: T;
         shaftOpacity?: T;
         shaftSpread?: T;

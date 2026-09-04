@@ -83,15 +83,6 @@ export type EmitterScene = {
 
 const SLOTS: OrbSlot[] = ['near', 'far']
 
-/**
- * The panel SDF's encoded range, in source pixels.
- *
- * ⚠️ Must match SPREAD in scripts/build-hud-sdf.mjs. A texture carries no
- * header saying what its numbers mean, so the two ends of the encoding are
- * agreed here and nowhere else. A mismatch does not fail — it draws the
- * artwork at the wrong stroke weight with a halo of the wrong size.
- */
-const PANEL_SDF_SPREAD = 32
 
 /**
  * Live puffs one orb can hold.
@@ -377,24 +368,25 @@ const SHAFT_FRAG = /* glsl */ `
 `
 
 /**
- * The glass — the owner's HUD artwork, as a signed distance field.
+ * The glass — the owner's HUD artwork, composited straight.
  *
- * ⚠️ REBUILT 2026-09-04. This was the panel drawn procedurally in SDF
- * primitives, every coordinate measured by eye off a reference image. Three
- * attempts did not converge: the stroke weight was wrong by more than double,
- * one continuous rail was read as two separate pieces, and the tick spacing
- * was guessed. The owner drew the panel instead. Reading their file is not a
- * shortcut past that work — it is the correct source, and nothing here decides
- * what the panel LOOKS like any more. It decides how the drawing is lit.
+ * ⚠️ REBUILT TWICE, and the second time UNDID the first. Attempt one drew the
+ * panel procedurally from a reference image and never converged. Attempt two
+ * read the owner's line art and turned it into a signed distance field, which
+ * was right for THAT file: 1000px of flat, crisp strokes with no glow, where an
+ * SDF buys clean magnification and a halo that can breathe with the flicker.
  *
- * ⚠️ AN SDF, NOT THE PNG ITSELF, for two reasons:
+ * panel2 is a different kind of file and wants the opposite. It is a GLOW
+ * RENDER — 1672x941, colour and bloom already baked, and 43% of its pixels
+ * carry partial alpha. That soft alpha IS the artwork. Thresholding it to the
+ * binary shape an SDF needs would throw the glow away and then reproduce the
+ * ragged edge underneath it perfectly sharply. So: sample it, and get out of
+ * the way.
  *
- *  - the art is 1000px wide and the panel renders about 1580 device pixels, so
- *    a straight texture is magnified and softens exactly where the line work is
- *    the whole point;
- *  - the glow has to BREATHE with the 5s flicker, and a baked bitmap cannot.
- *
- * See scripts/build-hud-sdf.mjs for the encoding.
+ * ⚠️ Its RGB looks like garbage opened cold — a flat orange fill with red and
+ * green dither along every edge. It is not. All of that lives where alpha is
+ * near zero, so premultiplying by alpha removes it exactly. Judging this file
+ * un-composited is what nearly got it rejected.
  */
 const GLASS_VERT = /* glsl */ `
   varying vec2 vUv;
@@ -407,40 +399,22 @@ const GLASS_VERT = /* glsl */ `
 const GLASS_FRAG = /* glsl */ `
   varying vec2 vUv;
   uniform sampler2D uPanel;
-  uniform float uSpread;
   uniform vec3 uColor;
   uniform float uOpacity;
-  uniform float uGlow;
 
   void main() {
-    float v = texture2D(uPanel, vUv).r;
-    // Back to signed source pixels: positive outside the ink, negative inside.
-    float d = (0.5 - v) * uSpread;
-
+    vec4 t = texture2D(uPanel, vUv);
     /**
-     * ⚠️ FLOORED. The panel can be minified — small viewport, or the screen
-     * seen at depth — and there one fragment covers more than one source pixel;
-     * fwidth alone then gives a razor edge that crawls as the camera bobs. The
-     * floor is in source pixels because d is.
-     */
-    float aa = max(fwidth(d), 0.75);
-    float core = 1.0 - smoothstep(-aa, aa, d);
-
-    /**
-     * ⚠️ The halo falls off across the FIELD'S OWN RANGE, not on an exp().
+     * ⚠️ uColor MULTIPLIES, it does not replace.
      *
-     * The field saturates at uSpread/2 outside the ink, so every fragment
-     * beyond that reports the same distance. Any decay curve returns the same
-     * small positive number there — a flat wash over the whole panel that reads
-     * as dirty brown fog. Normalising to the range lands on exactly zero at the
-     * edge of what the field can say.
+     * The artwork carries its own amber. Substituting a flat colour throws away
+     * the difference between the hot core of a stroke and the cool edge of its
+     * bloom, which is most of what makes this read as emitted light — the
+     * alpha-only version of exactly that came out flat. White is the identity
+     * here, and the default, so the picker only ever shifts what was drawn.
      */
-    float t = clamp(max(d, 0.0) / max(uSpread * 0.5, 0.001), 0.0, 1.0);
-    float glow = pow(1.0 - t, 2.2) * uGlow;
-
-    float a = clamp(core + glow, 0.0, 1.0) * uOpacity;
-    // The stroke's centre runs hotter than its edge, as a lit tube does.
-    gl_FragColor = vec4(mix(uColor, vec3(1.0, 0.97, 0.86), core * 0.45), a);
+    float a = t.a * uOpacity;
+    gl_FragColor = vec4(t.rgb * uColor, a);
   }
 `
 
@@ -610,14 +584,10 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
   // ── the glass ─────────────────────────────────────────────────────
   /**
-   * ⚠️ Fails open to INVISIBLE, not to opaque.
-   *
-   * Until the artwork arrives the sampler reads this 1x1 black. At 0 the shader
-   * decodes a distance of +uSpread/2 — fully OUTSIDE the ink — so the panel
-   * simply is not there. A white placeholder decodes as fully INSIDE and would
-   * paint a solid amber rectangle across the room on every slow connection.
+   * ⚠️ Fails open to INVISIBLE. Alpha 0, so until the artwork lands the panel
+   * simply is not there rather than a solid rectangle over the room.
    */
-  const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
+  const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1)
   blank.needsUpdate = true
 
   const glassMat = new THREE.ShaderMaterial({
@@ -625,10 +595,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
     fragmentShader: GLASS_FRAG,
     uniforms: {
       uPanel: { value: blank },
-      uSpread: { value: PANEL_SDF_SPREAD },
       uColor: { value: new THREE.Color('#ffffff') },
       uOpacity: { value: 0 },
-      uGlow: { value: 0.5 },
     },
     transparent: true,
     depthWrite: false,
@@ -645,20 +613,25 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
    *
    * A missing or slow panel has to leave the room working — the same fail-open
    * rule the orbs and the GL context already follow. The blank above keeps the
-   * screen invisible until the real field lands.
+   * screen invisible until the artwork lands.
    *
-   * ⚠️ NO MIPMAPS. Mipmapping averages DISTANCES between levels, and the average
-   * of two distances is not the distance to the average shape: corners round
-   * off and thin strokes dissolve, at exactly the sizes this panel is usually
-   * drawn at. LinearFilter on the base level is what lets an SDF scale cleanly.
+   * ⚠️ MIPMAPS ON, and that is a reversal. The SDF this replaced had to refuse
+   * them: averaging distances between levels is not the distance to the
+   * averaged shape, so corners rounded off. A colour texture has no such
+   * problem — mips are simply correct, and without them a panel minified on a
+   * small screen sparkles.
+   *
+   * SRGBColorSpace because this one carries COLOUR, where the field carried
+   * numbers. Decoding it as linear washes the amber out.
    */
-  const panelTex = new THREE.TextureLoader().load('/hud/panel.sdf.png', (tx) => {
-    tx.minFilter = THREE.LinearFilter
+  const panelTex = new THREE.TextureLoader().load('/hud/panel2.png', (tx) => {
+    tx.colorSpace = THREE.SRGBColorSpace
+    tx.generateMipmaps = true
+    tx.minFilter = THREE.LinearMipmapLinearFilter
     tx.magFilter = THREE.LinearFilter
-    tx.generateMipmaps = false
     tx.wrapS = THREE.ClampToEdgeWrapping
     tx.wrapT = THREE.ClampToEdgeWrapping
-    tx.colorSpace = THREE.NoColorSpace
+    tx.anisotropy = 8
     tx.needsUpdate = true
     glassMat.uniforms.uPanel.value = tx
   })
@@ -764,7 +737,6 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         m.uniforms.uGuide.value = cfg.HOLOGRAM.SHAFT_GUIDE ? 1 : 0
       }
       ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
-      glassMat.uniforms.uGlow.value = cfg.HOLOGRAM.GLASS_GLOW
     },
 
     update(a, cam) {

@@ -251,7 +251,6 @@ check(
       FLICKER_DEPTH: 0.38,
       GLASS_COLOR: '#E8B733',
       GLASS_OPACITY: 0.26,
-      GLASS_GLOW: 0.77,
       SHAFT_COLOR: '#E8B733',
       SHAFT_OPACITY: 0.19,
       SHAFT_SPREAD: 0.48,

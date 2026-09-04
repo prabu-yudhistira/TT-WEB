@@ -515,13 +515,6 @@ export type HologramConfig = {
 
   GLASS_COLOR: string
   GLASS_OPACITY: number
-  /**
-   * How far the panel's own halo carries. 0 leaves the bare line art.
-   *
-   * ⚠️ ALL of the glow comes from here. The owner's artwork is drawn flat with
-   * none baked in, deliberately, so the halo can breathe with the flicker.
-   */
-  GLASS_GLOW: number
   SHAFT_COLOR: string
   SHAFT_OPACITY: number
   /**
@@ -935,7 +928,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   HOLOGRAM: {
     W_FRAC: 0.615,
-    PANEL_ASPECT: 1.7331,
+    PANEL_ASPECT: 1.7768,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
     MOBILE_W_FRAC: 0.78,
@@ -945,12 +938,14 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FLICKER_MS: 4900,
     FLICKER_DUR_MS: 220,
     FLICKER_DEPTH: 0.37,
-    GLASS_COLOR: '#F5C542',
+    // ⚠️ WHITE, and white is the identity. It MULTIPLIES the artwork now
+    // rather than replacing it — panel2 carries its own amber — so anything
+    // else here shifts a colour the owner already chose.
+    GLASS_COLOR: '#FFFFFF',
     // ⚠️ RE-TUNED with the shader, like SHAFT_OPACITY before it. The owner's
     // 0.44 scaled an `ink * 1.9` term plus a separate haze; it now scales a
     // field that peaks at 1, so the same number is about half the brightness.
     GLASS_OPACITY: 0.85,
-    GLASS_GLOW: 0.5,
     SHAFT_COLOR: '#F5C542',
     // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
     // against a solid wedge where every fragment was fully lit; the fan
