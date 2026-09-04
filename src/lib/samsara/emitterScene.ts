@@ -97,11 +97,216 @@ const SMOKE_FRAG = /* glsl */ `
   }
 `
 
+/**
+ * A light shaft, not a translucent wedge.
+ *
+ * A cone drawn at uniform opacity reads as a solid polygon with hard edges,
+ * because every fragment is equally opaque no matter how much notional volume
+ * the eye is looking through. Two terms fix that:
+ *
+ *  - a FRESNEL term, so the surface is most transparent where it faces the
+ *    camera and brightest at grazing angles, which is how looking through a
+ *    volume of lit dust actually behaves;
+ *  - a LENGTH falloff, so the beam is strongest at the lens and dissipates
+ *    toward the screen instead of ending in a hard rim.
+ */
+const SHAFT_VERT = /* glsl */ `
+  varying vec3 vN;
+  varying vec3 vV;
+  varying float vT;
+  void main() {
+    // ConeGeometry runs along local Y from -0.5 (base) to +0.5 (apex).
+    vT = position.y + 0.5;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vN = normalize(normalMatrix * normal);
+    vV = normalize(-mv.xyz);
+    gl_Position = projectionMatrix * mv;
+  }
+`
+
+const SHAFT_FRAG = /* glsl */ `
+  varying vec3 vN;
+  varying vec3 vV;
+  varying float vT;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  void main() {
+    float facing = abs(dot(normalize(vN), normalize(vV)));
+    float rim = pow(1.0 - facing, 1.6);
+    // vT = 1 is the apex, which sits at the lens. Brightest there.
+    float along = mix(0.15, 1.0, vT);
+    gl_FragColor = vec4(uColor, uOpacity * rim * along);
+  }
+`
+
+/**
+ * The glass — the owner's HUD panel, drawn procedurally.
+ *
+ * Signed-distance fields rather than a texture, for three reasons that all
+ * matter here: the panel is re-projected at every viewport so a bitmap would
+ * resample and soften; its colour is CMS-driven, so a baked-in amber would need
+ * re-exporting to retune; and the flicker scales one uniform rather than
+ * cross-fading two images.
+ *
+ * ⚠️ All geometry is laid out in U-SPACE: u = vUv.x * aspect, v = 1 - vUv.y.
+ * That makes u and v share a scale, so a circle stays a circle and a chamfer
+ * keeps 45 degrees whatever the screen's aspect happens to be. It also puts the
+ * origin TOP-LEFT, matching how the reference art is measured.
+ *
+ * Coordinates below are taken directly off the owner's reference at 1012x599.
+ */
+const GLASS_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+const GLASS_FRAG = /* glsl */ `
+  varying vec2 vUv;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  uniform float uAspect;
+
+  /**
+   * ⚠️ Layout is in NORMALISED panel space, not in world or aspect units.
+   *
+   * n = (vUv.x, 1 - vUv.y), so both axes run 0..1 with the origin TOP-LEFT,
+   * matching how the reference art is measured. Every coordinate below is a
+   * fraction of the owner's 1012x599 reference, so the composition holds its
+   * proportions whatever aspect the panel ends up at.
+   *
+   * DISTANCES are a different matter: a step in n.x covers uAspect times more
+   * of the panel than the same step in n.y. Anything that must stay round or
+   * keep an even thickness converts x into y-units by multiplying by uAspect —
+   * without that the ring becomes an ellipse and the frame's verticals come out
+   * thinner than its horizontals.
+   */
+
+  float lineY(float dy, float t, float soft) {
+    return 1.0 - smoothstep(t, t + soft, abs(dy));
+  }
+
+  float boxFill(vec2 p, vec2 c, vec2 h, float soft) {
+    vec2 d = abs(p - c) - h;
+    float o = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+    return 1.0 - smoothstep(0.0, soft, o);
+  }
+
+  void main() {
+    float A = uAspect;
+    vec2 n = vec2(vUv.x, 1.0 - vUv.y);
+    // Same point in y-units, for anything measuring a distance.
+    vec2 y = vec2(n.x * A, n.y);
+
+    float soft = 0.0055;
+    float t = 0.013;      // half-thickness of every rule
+    float ink = 0.0;
+
+    // ── the frame ───────────────────────────────────────────────────
+    //
+    // An octagon: a box intersected with a diamond. The top edge carries a
+    // raised centre section, so v is not folded about the middle the way u is.
+    float inset = 0.048;
+    float cham = 0.115;
+    float hw = A * 0.5 - inset;
+    float hh = 0.5 - inset;
+    float pu = abs(y.x - A * 0.5);
+
+    float plateau = smoothstep(0.205, 0.222, n.x) - smoothstep(0.778, 0.795, n.x);
+    float topY = (0.5 - hh) - plateau * 0.038;
+
+    float box = max(pu - hw, max(y.y - (0.5 + hh), topY - y.y));
+    float diamond = (pu + abs(y.y - 0.5)) - (hw + hh - cham);
+    float frame = max(box, diamond);
+
+    ink += lineY(frame, t, soft);
+
+    // ── left: a short vertical rule ─────────────────────────────────
+    if (n.y > 0.317 && n.y < 0.534) {
+      ink += lineY((n.x - 0.071) * A, 0.009, soft);
+    }
+
+    // ── left: the segmented gauge ───────────────────────────────────
+    //
+    // A ladder of rungs on a repeating v, so the count follows the panel
+    // instead of being a fixed list of quads.
+    if (n.y > 0.481 && n.y < 0.876 && n.x > 0.045 && n.x < 0.071) {
+      float pitch = 0.0188;
+      float rung = mod(n.y - 0.481, pitch);
+      ink += (1.0 - smoothstep(0.0062, 0.0062 + soft, abs(rung - pitch * 0.5)));
+    }
+
+    // ── bottom left: the dashed ring ────────────────────────────────
+    vec2 ringC = vec2(0.155 * A, 0.805);
+    vec2 rv = y - ringC;
+    float rd = length(rv) - 0.092;
+    float ang = atan(rv.y, rv.x);
+    float dash = step(0.36, fract(ang / 6.28318530718 * 22.0));
+    ink += lineY(rd, 0.010, soft) * dash;
+
+    // ── bottom: the long rule ───────────────────────────────────────
+    if (n.x > 0.321 && n.x < 0.692) {
+      ink += lineY(n.y - 0.907, 0.009, soft);
+    }
+
+    // ── bottom right: two blocks and a tick ─────────────────────────
+    ink += boxFill(y, vec2(0.8175 * A, 0.8995), vec2(0.0175 * A, 0.0285), soft);
+    ink += boxFill(y, vec2(0.8500 * A, 0.8995), vec2(0.0100 * A, 0.0285), soft);
+    if (n.x > 0.865 && n.x < 0.884) {
+      ink += lineY(n.y - 0.907, 0.009, soft);
+    }
+
+    ink = clamp(ink, 0.0, 1.0);
+
+    /**
+     * ── the bloom around every stroke ─────────────────────────────
+     *
+     * The reference does not read as vector line-art: every stroke carries a
+     * wide soft halo, and that halo is most of what makes it look emitted
+     * rather than drawn. A crisp SDF edge alone came out looking like a wire
+     * diagram, so the frame's distance field is reused as a falloff.
+     */
+    float halo = exp(-abs(frame) * 22.0) * 0.55;
+
+    /**
+     * ── the inner haze ────────────────────────────────────────────
+     *
+     * Dark in the middle, lifting toward the frame. This is what gives the
+     * panel depth instead of reading as a flat coloured pane, and it is
+     * clipped hard at the frame so nothing hazes the room outside it.
+     */
+    float inside = clamp(-frame, 0.0, 1.0);
+    float haze = exp(-inside * 7.0) * 0.42;
+    float within = step(frame, 0.0);
+
+    float a = uOpacity * (ink * 1.9 + (halo + haze) * within);
+    if (a <= 0.002) discard;
+    gl_FragColor = vec4(uColor, a);
+  }
+`
+
 export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   const group = new THREE.Group()
   group.visible = false
 
   // ── the two orbs: one model, two instances ────────────────────────
+  /**
+   * The clones need their OWN material, and the reflection has to be tamed.
+   *
+   * ⚠️ Object3D.clone() SHARES materials with the source, so setting anything
+   * on a clone would reach back into the model the engine owns.
+   *
+   * ⚠️ And the orb is metalness 1.0 — a metal has no diffuse term, so every lit
+   * pixel is a reflection of scene.environment. That environment is a bright
+   * studio, and at full strength it renders the orbs as pale ceramic rather
+   * than dark patinated brass. scene.environmentIntensity CANNOT be used to fix
+   * it: the scene belongs to the hero orbit too, and dimming it there would
+   * change SAMSARA mid-flight. envMapIntensity is per-material and reaches only
+   * these two clones.
+   */
+  const orbMats = new Map<THREE.Material, THREE.Material>()
   const orbs = SLOTS.map(() => {
     const o = orbModel.clone(true)
     o.traverse((c) => {
@@ -109,6 +314,45 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       if (!m.isMesh) return
       m.castShadow = false
       m.receiveShadow = false
+      const src = m.material as THREE.Material
+      let copy = orbMats.get(src)
+      if (!copy) {
+        copy = src.clone()
+        const std = copy as THREE.MeshStandardMaterial
+        if (std.isMeshStandardMaterial) {
+          /**
+           * ⚠️ The lever here is the BASE COLOUR, and that is not what the
+           * material's own numbers suggest.
+           *
+           * The orb reports metalness 1.0 / roughness 1.0 and carries no
+           * envMap of its own, which says "pure metal, lit entirely by
+           * scene.environment" — so the obvious fix was envMapIntensity, and
+           * it was measured to do NOTHING. Bisected over mean luma on the near
+           * orb at 1440x900:
+           *
+           *   as shipped              86.1
+           *   envMapIntensity 0       85.9   <- the environment contributes ~0
+           *   + emissiveIntensity 0   85.7   <- so does the emissive map
+           *   + base colour black     36.0   <- this is the whole of it
+           *
+           * The metalness MAP overrides the scalar across most of the shell, so
+           * the surface is largely dielectric and the room key light drives an
+           * ordinary diffuse response off the albedo. Dimming the base colour
+           * is the only control that moves it, which is the same lever
+           * ROOM.MASCOT_TINT_STRENGTH provides for SAMSARA.
+           */
+          std.color.multiplyScalar(0.4)
+          // Warmed very slightly toward copper as it darkens, so the orbs read
+          // as patinated brass rather than as grey plastic in shadow.
+          std.color.offsetHSL(-0.01, 0.06, 0)
+          // Kept low even though it measured as inert: if a future room
+          // environment is brighter, this stops the orbs floating up with it.
+          std.envMapIntensity = 0.35
+          std.roughness = Math.min(1, std.roughness * 1.15)
+        }
+        orbMats.set(src, copy)
+      }
+      m.material = copy
     })
     group.add(o)
     return o
@@ -152,7 +396,13 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   })
 
   // ── shafts, one per orb ───────────────────────────────────────────
-  const shaftMat = new THREE.MeshBasicMaterial({
+  const shaftMat = new THREE.ShaderMaterial({
+    vertexShader: SHAFT_VERT,
+    fragmentShader: SHAFT_FRAG,
+    uniforms: {
+      uColor: { value: new THREE.Color('#ffffff') },
+      uOpacity: { value: 0 },
+    },
     transparent: true,
     depthWrite: false,
     depthTest: true,
@@ -168,7 +418,14 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   })
 
   // ── the glass ─────────────────────────────────────────────────────
-  const glassMat = new THREE.MeshBasicMaterial({
+  const glassMat = new THREE.ShaderMaterial({
+    vertexShader: GLASS_VERT,
+    fragmentShader: GLASS_FRAG,
+    uniforms: {
+      uColor: { value: new THREE.Color('#ffffff') },
+      uOpacity: { value: 0 },
+      uAspect: { value: 1 },
+    },
     transparent: true,
     depthWrite: false,
     depthTest: true,
@@ -218,8 +475,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
     setConfig(cfg) {
       ;(smokeMat.uniforms.uColor.value as THREE.Color).set(cfg.EMITTERS.PUFF_COLOR)
-      shaftMat.color.set(cfg.HOLOGRAM.SHAFT_COLOR)
-      glassMat.color.set(cfg.HOLOGRAM.GLASS_COLOR)
+      ;(shaftMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_COLOR)
+      ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
     },
 
     update(a) {
@@ -305,10 +562,13 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
           phase === 'forming'
             ? a.form01 * (0.45 + 0.55 * Math.abs(Math.sin(a.form01 * Math.PI * 6.5)))
             : 1
-        glassMat.opacity = cfg.HOLOGRAM.GLASS_OPACITY * forming * (1 - dip) * a.reveal
-        shaftMat.opacity = cfg.HOLOGRAM.SHAFT_OPACITY * (1 - dip * 0.5) * a.reveal
+        glassMat.uniforms.uAspect.value = quad.w / Math.max(0.001, quad.h)
+        glassMat.uniforms.uOpacity.value =
+          cfg.HOLOGRAM.GLASS_OPACITY * forming * (1 - dip) * a.reveal
+        shaftMat.uniforms.uOpacity.value =
+          cfg.HOLOGRAM.SHAFT_OPACITY * (1 - dip * 0.5) * a.reveal
       } else {
-        shaftMat.opacity = lit ? cfg.HOLOGRAM.SHAFT_OPACITY * a.reveal : 0
+        shaftMat.uniforms.uOpacity.value = lit ? cfg.HOLOGRAM.SHAFT_OPACITY * a.reveal : 0
       }
     },
 
@@ -321,9 +581,10 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       shaftMat.dispose()
       glass.geometry.dispose()
       glassMat.dispose()
-      // The two orbs are clones sharing the source model's geometry and
-      // materials, so disposing them here would break the source. The engine
-      // owns that; this only drops the clones.
+      // The clones share the SOURCE model's geometry, which the engine owns and
+      // disposes. Their materials are copies made here, so those are ours.
+      for (const m of orbMats.values()) m.dispose()
+      orbMats.clear()
       group.clear()
     },
   }
