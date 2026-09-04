@@ -1759,24 +1759,16 @@ export interface SamsaraSequence {
     bobAmp?: number | null;
     bobMs?: number | null;
     /**
-     * Afterburner plume DURING ENTRY, puffs per second per port. This is not the repeating burst below — it ends the moment the orb parks.
+     * Puffs per second PER PORT, across the four afterburners. CONTINUOUS — the orbs emit from the moment they appear until the room closes.
      */
     thrustRate?: number | null;
     thrustSpread?: number | null;
-    /**
-     * The PERMANENT burst interval once parked. It runs for as long as the room is up, not just during the entrance.
-     */
-    cadenceMs?: number | null;
-    /**
-     * Puffs per port per burst, across four ports.
-     */
-    cadencePuffs?: number | null;
     /**
      * In orb radii, so it holds its proportion at every viewport.
      */
     puffSize?: number | null;
     /**
-     * Keep this well below the burst interval. Lifetimes vary up to 1.25x, and a puff outliving its interval turns the bursts into one continuous plume.
+     * How long a puff lasts. Lifetimes vary up to 1.25x around this, so no two are identical. Longer means a denser trail, since the emission is continuous.
      */
     puffLifeMs?: number | null;
     /**
@@ -2427,8 +2419,6 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         bobMs?: T;
         thrustRate?: T;
         thrustSpread?: T;
-        cadenceMs?: T;
-        cadencePuffs?: T;
         puffSize?: T;
         puffLifeMs?: T;
         puffColor?: T;

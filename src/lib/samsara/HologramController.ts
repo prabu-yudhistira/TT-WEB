@@ -106,11 +106,14 @@ export class HologramController {
     return Math.min(1, this.phaseMs / cfg.HOLOGRAM.FORM_MS)
   }
 
-  /** Which of the two smoke behaviours is running. */
+  /**
+   * The orbs emit CONSTANTLY from the moment they appear.
+   *
+   * ⚠️ This used to return 'thrust' while entering and 'cadence' once parked,
+   * per the owner's original brief. Superseded 2026-09-04: constant throughout.
+   */
   smokeMode(): SmokeMode {
-    if (this.phase === 'dormant') return 'off'
-    if (this.phase === 'entering') return 'thrust'
-    return 'cadence'
+    return this.phase === 'dormant' ? 'off' : 'on'
   }
 
   /** The cadence and flicker clock, counting from the park. */

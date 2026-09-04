@@ -33,7 +33,7 @@ const entryTotal = cfg.EMITTERS.ENTRY_MS + cfg.EMITTERS.ENTRY_STAGGER_MS
   const c = new HologramController()
   c.start()
   check('start() enters the entry beat', c.phase === 'entering', c.phase)
-  check('entry runs thrust smoke', c.smokeMode() === 'thrust')
+  check('entry is already emitting', c.smokeMode() === 'on')
 
   // ⚠️ Entry is over only when the LAGGING orb has arrived — entry + stagger.
   // Advancing at ENTRY_MS alone would cut the far orb's arrival off.
@@ -42,14 +42,17 @@ const entryTotal = cfg.EMITTERS.ENTRY_MS + cfg.EMITTERS.ENTRY_STAGGER_MS
 
   run(c, 200)
   check('both orbs parked before the beat advances', c.phase !== 'entering', c.phase)
-  check('parked switches smoke to the cadence', c.smokeMode() === 'cadence')
+  // ⚠️ Parking must NOT change the emission. It used to switch from a
+  // continuous thrust to a repeating burst; the owner superseded that on
+  // 2026-09-04 and the orbs now emit constantly across the boundary.
+  check('parking does not interrupt the emission', c.smokeMode() === 'on')
 
   run(c, 400)
   check('then it emits', c.phase === 'emitting' || c.phase === 'forming', c.phase)
 
   run(c, cfg.HOLOGRAM.FORM_MS + 1200)
   check('and reaches live', c.phase === 'live', c.phase)
-  check('live keeps the cadence running', c.smokeMode() === 'cadence')
+  check('live keeps emitting', c.smokeMode() === 'on')
 }
 
 // ── live is terminal, because the cadence and flicker are permanent ─
@@ -58,7 +61,7 @@ const entryTotal = cfg.EMITTERS.ENTRY_MS + cfg.EMITTERS.ENTRY_STAGGER_MS
   c.start()
   run(c, 60000)
   check('live is terminal', c.phase === 'live', c.phase)
-  check('and smoke never stops', c.smokeMode() === 'cadence')
+  check('and smoke never stops', c.smokeMode() === 'on')
 }
 
 // ── progress ratios ─────────────────────────────────────────────────

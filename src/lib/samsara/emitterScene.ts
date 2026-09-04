@@ -40,8 +40,20 @@ export type EmitterUpdateArgs = {
   phase: HoloPhase
   entry01: number
   form01: number
-  /** Milliseconds since the lagging orb parked — the cadence and flicker clock. */
+  /** Milliseconds since the lagging orb parked — the flicker and bob clock. */
   parkedMs: number
+  /**
+   * Milliseconds since the sequence armed. MONOTONIC.
+   *
+   * ⚠️ Separate from parkedMs on purpose. The smoke clock stamps every puff's
+   * birth and is what `sample` measures age against, so it must never go
+   * backwards. It used to be `entry01 * entryTotal` while entering and then
+   * `parkedMs`, which JUMPS BACK to zero at the hand-off — every live puff
+   * would read as unborn and the whole cloud would vanish for a second and a
+   * half. Harmless while the entrance was a separate burst mode; not harmless
+   * now the emission is continuous across that boundary.
+   */
+  smokeMs: number
   dtMs: number
   /** The room's own reveal ramp, so the orbs arrive with the room rather than before it. */
   reveal: number
@@ -550,13 +562,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       const quad = screenQuad(cfg.HOLOGRAM, ctx)
       corners = quad.corners as unknown as Vec3[]
 
-      const mode: SmokeMode =
-        phase === 'dormant' ? 'off' : phase === 'entering' ? 'thrust' : 'cadence'
-      // Thrust counts from the start of entry; the cadence counts from the park.
-      const clock =
-        phase === 'entering'
-          ? a.entry01 * (cfg.EMITTERS.ENTRY_MS + cfg.EMITTERS.ENTRY_STAGGER_MS)
-          : a.parkedMs
+      const mode: SmokeMode = phase === 'dormant' ? 'off' : 'on'
+      const clock = a.smokeMs
 
       const lit = phase === 'emitting' || phase === 'forming' || phase === 'live'
 

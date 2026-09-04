@@ -64,7 +64,10 @@ check(
   cfg.OPACITY <= 0.5,
   `opacity ${cfg.OPACITY}`,
 )
-check('the glow is low enough not to leave a bright centre', cfg.GLOW <= 0.25,
+// The ceiling was 0.25 until the owner's 2026-09-04 bench pass settled on 0.3
+// on screen. It is still a ceiling, not a formality: the ember look this is
+// escaping starts somewhere around twice this.
+check('the glow is low enough not to leave a bright centre', cfg.GLOW <= 0.35,
   `glow ${cfg.GLOW}`)
 check('and there are enough puffs to form a connected mass', cfg.COUNT >= 60,
   `${cfg.COUNT}`)

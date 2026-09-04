@@ -263,11 +263,12 @@ check('the near orb is nearer the camera than the far orb',
 check('entry has a positive duration', DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS > 0)
 check('the stagger is shorter than the entry it offsets',
   DEFAULT_SEQUENCE.EMITTERS.ENTRY_STAGGER_MS < DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS)
-// A puff outliving its interval means the cadence never reads as separate
-// bursts — it becomes a continuous plume, which is the thrust, not the cadence.
-// ⚠️ Lifetimes are randomised up to 1.25x, so the headroom is real, not spare.
-check('a cadenced puff dies before the next burst',
-  DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS * 1.25 < DEFAULT_SEQUENCE.EMITTERS.CADENCE_MS)
+// The emission is continuous now, so there is no interval for a puff to
+// outlive — only that it lasts long enough to be seen and short enough that the
+// pool is not permanently saturated by an ever-growing cloud.
+check('a puff lives long enough to read, and expires',
+  DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS > 200 &&
+    DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS < 12000)
 check('thrust emits at a positive rate', DEFAULT_SEQUENCE.EMITTERS.THRUST_RATE > 0)
 {
   const ports = portOffsets(DEFAULT_SEQUENCE.EMITTERS)

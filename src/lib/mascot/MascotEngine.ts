@@ -927,14 +927,12 @@ export class MascotEngine {
     const shim = {
       THRUST_RATE: c.RATE,
       THRUST_SPREAD: c.SPREAD,
-      CADENCE_MS: 1e9,
-      CADENCE_PUFFS: 0,
       PUFF_SIZE: c.PUFF_SIZE,
       PUFF_LIFE_MS: c.PUFF_LIFE_MS,
       PUFF_OPACITY: c.PUFF_OPACITY,
     } as unknown as typeof DEFAULT_SEQUENCE.EMITTERS
 
-    this.exhaust.update(shim, live ? 'thrust' : 'off', this.exhaustMs, dtSec * 1000)
+    this.exhaust.update(shim, live ? 'on' : 'off', this.exhaustMs, dtSec * 1000)
     const samples = this.exhaust.sample(this.exhaustMs, shim)
 
     const cx = this.placer.position.x

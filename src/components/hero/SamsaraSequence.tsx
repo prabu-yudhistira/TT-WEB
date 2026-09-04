@@ -728,6 +728,7 @@ export function SamsaraSequence({
           entry01: holo.entry01(cfg),
           form01: holo.form01(cfg),
           parkedMs: holo.parkedMs(),
+          smokeMs: holo.totalMs,
           dtMs: dt,
           reveal: eng.getRoomReveal(),
         })

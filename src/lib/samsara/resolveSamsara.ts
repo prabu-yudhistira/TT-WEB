@@ -131,8 +131,6 @@ export type SamsaraSequenceInput = {
     bobMs?: number | null
     thrustRate?: number | null
     thrustSpread?: number | null
-    cadenceMs?: number | null
-    cadencePuffs?: number | null
     puffSize?: number | null
     puffLifeMs?: number | null
     puffColor?: string | null
@@ -376,8 +374,6 @@ export function resolveSamsara(
       BOB_MS: num(em.bobMs, d.EMITTERS.BOB_MS),
       THRUST_RATE: num(em.thrustRate, d.EMITTERS.THRUST_RATE),
       THRUST_SPREAD: num(em.thrustSpread, d.EMITTERS.THRUST_SPREAD),
-      CADENCE_MS: num(em.cadenceMs, d.EMITTERS.CADENCE_MS),
-      CADENCE_PUFFS: num(em.cadencePuffs, d.EMITTERS.CADENCE_PUFFS),
       PUFF_SIZE: num(em.puffSize, d.EMITTERS.PUFF_SIZE),
       PUFF_LIFE_MS: num(em.puffLifeMs, d.EMITTERS.PUFF_LIFE_MS),
       PUFF_COLOR: hex(em.puffColor, d.EMITTERS.PUFF_COLOR),
@@ -534,8 +530,6 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       bobMs: c.EMITTERS.BOB_MS,
       thrustRate: c.EMITTERS.THRUST_RATE,
       thrustSpread: c.EMITTERS.THRUST_SPREAD,
-      cadenceMs: c.EMITTERS.CADENCE_MS,
-      cadencePuffs: c.EMITTERS.CADENCE_PUFFS,
       puffSize: c.EMITTERS.PUFF_SIZE,
       puffLifeMs: c.EMITTERS.PUFF_LIFE_MS,
       puffColor: c.EMITTERS.PUFF_COLOR,

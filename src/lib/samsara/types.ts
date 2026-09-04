@@ -452,20 +452,16 @@ export type EmittersConfig = {
   BOB_MS: number
 
   /**
-   * ⚠️ TWO smoke behaviours from the same four ports, and one interval control
-   * cannot express both.
+   * The afterburner plume. CONTINUOUS, from the moment the orbs appear until
+   * the room closes.
    *
-   * THRUST_* is the continuous afterburner plume while the orbs fly in — it is
-   * what makes the entry read as propulsion rather than as two objects sliding
-   * into place, and it ends when the orb parks.
-   *
-   * CADENCE_* is the permanent every-3s burst from `parked` onward, which runs
-   * for as long as the room is up.
+   * ⚠️ There was a second behaviour here until 2026-09-04 — a repeating burst
+   * once parked, per the owner's original brief — with its own CADENCE_MS and
+   * CADENCE_PUFFS. Superseded: the emission is constant, and those two went
+   * rather than staying as config nothing reads.
    */
   THRUST_RATE: number
   THRUST_SPREAD: number
-  CADENCE_MS: number
-  CADENCE_PUFFS: number
 
   /** Shared by both behaviours. Sizes are in ORB RADII. */
   PUFF_SIZE: number
@@ -665,7 +661,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      */
     WEIGHTS: {
       neutral: 15,
-      blink: 7,
+      blink: 5,
       squint: 2,
       // ⚠️ ZERO is a decision, not an omission. Every expression keeps its key
       // so the bench always has a slider for it and pickWeighted can never miss
@@ -689,7 +685,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
       lookDownLeft: 0,
       lookDownRight: 0,
     },
-    INTERVAL_MS: 2000,
+    INTERVAL_MS: 4200,
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
     HOLD_EXPRESSION: 'happy',
@@ -698,14 +694,14 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   BURST: {
     ENABLED: true,
     // The owner asked for every 4 seconds.
-    INTERVAL_MS: 4800,
+    INTERVAL_MS: 8200,
     // ⚠️ Count is NOT what separates smoke from dust — an earlier pass here
     // assumed it was and went down to 34, which just gave fewer, more obviously
     // separate orbs. The SHAPE does that (see the fragment shader). Given
     // eroded, noisy sprites, the count's only job is to make the mass
     // CONNECTED, and that wants more of them, not fewer.
     COUNT: 80,
-    SECONDS: 1.6,
+    SECONDS: 1.4,
     // ⚠️ Fast enough to ESCAPE, then slowed. The first smoke pass used SPEED
     // 0.45 against DRAG 1.6, which stops a puff after roughly v/drag = 0.19
     // radii — so almost the entire burst stayed hidden behind the silhouette
@@ -725,9 +721,9 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // there and the density comes from several overlapping. A high value here
     // gives distinct discs with visible edges.
     OPACITY: 0.11,
-    // Very low. Anything higher puts a bright centre back in each puff, and a
-    // bright centre in a round sprite is exactly the ember look being escaped.
-    GLOW: 0.14,
+    // Low. Much higher puts a bright centre back in each puff, and a bright
+    // centre in a round sprite is exactly the ember look being escaped.
+    GLOW: 0.3,
     // The hero's own dust, so the room reads as the same material rather
     // than as a second gold. Matches MascotConfig.TRAIL_COLOR / _CORE_COLOR.
     COLOR: '#FDB721',
@@ -744,10 +740,16 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
    * owner tunes them at /dev/samsara and presses `copy json`.
    */
   EMITTERS: {
-    SIZE_FRAC: 0.14,
-    MOBILE_SIZE_FRAC: 0.13,
-    NEAR: { X_FRAC: 0.12, Y_FRAC: 0.82, DEPTH_FRAC: 0.28 },
-    FAR: { X_FRAC: 0.45, Y_FRAC: 0.74, DEPTH_FRAC: 0.95 },
+    SIZE_FRAC: 0.13,
+    // ⚠️ Kept BELOW the landscape value, not merely different. The fraction is
+    // of ROOM.DEPTH, which is the same in both orientations, so an equal value
+    // gives an equal world radius — and a portrait viewport is narrower, so
+    // the same orb eats far more of the width. The owner's 2026-09-04 bench
+    // moved landscape 0.14 -> 0.13 on a desktop; this follows by the same
+    // ratio, because the bench cannot show what portrait is doing.
+    MOBILE_SIZE_FRAC: 0.12,
+    NEAR: { X_FRAC: 0.1, Y_FRAC: 0.82, DEPTH_FRAC: 0.25 },
+    FAR: { X_FRAC: 0.48, Y_FRAC: 0.78, DEPTH_FRAC: 1.27 },
     MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     // Starting points read off an underside render, NOT measured — the ports are
@@ -760,19 +762,17 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     LENS_Y: 0.9,
     LENS_Z: 0,
     SHOW_PORTS: false,
-    NEAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
-    FAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
+    NEAR_ROT: { X_DEG: -31, Y_DEG: -15, Z_DEG: -26 },
+    FAR_ROT: { X_DEG: 31, Y_DEG: -15, Z_DEG: 7 },
     ENTRY_MS: 1600,
     ENTRY_STAGGER_MS: 200,
     BOB_AMP: 0.08,
     BOB_MS: 3400,
     THRUST_RATE: 26,
     THRUST_SPREAD: 0.5,
-    CADENCE_MS: 3000,
-    CADENCE_PUFFS: 3,
-    PUFF_SIZE: 0.34,
-    PUFF_LIFE_MS: 1500,
-    PUFF_COLOR: '#C9B896',
+    PUFF_SIZE: 0.32,
+    PUFF_LIFE_MS: 1850,
+    PUFF_COLOR: '#FFF1D1',
     PUFF_OPACITY: 0.34,
   },
 
@@ -788,35 +788,35 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     PORT_Z: -0.266,
     // Radially outward through the tip, which for a tube protruding from a
     // spheroid IS its axis.
-    DIR_X: 0.665,
-    DIR_Y: 0.710,
+    DIR_X: 0.45,
+    DIR_Y: 0.95,
     DIR_Z: -0.231,
     RATE: 14,
     SPREAD: 0.45,
     PUFF_SIZE: 54,
     PUFF_LIFE_MS: 1800,
-    PUFF_COLOR: '#C9B896',
+    PUFF_COLOR: '#D2C5AD',
     PUFF_OPACITY: 0.13,
   },
 
   HOLOGRAM: {
     W_FRAC: 0.63,
-    H_FRAC: 0.7,
+    H_FRAC: 0.765,
     X_FRAC: 0.275,
     Y_FRAC: 0.33,
     MOBILE_W_FRAC: 0.78,
     MOBILE_H_FRAC: 0.3,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.66,
-    FORM_MS: 1525,
+    FORM_MS: 2100,
     FLICKER_MS: 5000,
     FLICKER_DUR_MS: 220,
     FLICKER_DEPTH: 0.35,
     GLASS_COLOR: '#F5C542',
-    GLASS_OPACITY: 0.3,
+    GLASS_OPACITY: 0.22,
     SHAFT_COLOR: '#F5C542',
-    SHAFT_OPACITY: 0.16,
-    SHAFT_SPREAD: 0.55,
+    SHAFT_OPACITY: 0.15,
+    SHAFT_SPREAD: 1.05,
   },
 
   EXIT_MS: 800,

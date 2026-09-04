@@ -16,16 +16,17 @@ import type { EmittersConfig } from './types'
  * sibling of `mascotTrail`, and for the same reason. This project now runs
  * three particle systems and each split has paid for itself.
  *
- * ── Two behaviours, one pool ────────────────────────────────────────
+ * ── One behaviour: continuous ───────────────────────────────────────
  *
- * THRUST is the continuous afterburner plume while the orbs fly in; it is what
- * makes the entry read as propulsion rather than as two objects sliding into
- * place, and it ends when the orb parks. CADENCE is the permanent every-3s
- * burst once parked, which runs for as long as the room is up.
+ * ⚠️ There were TWO until 2026-09-04 — a continuous thrust during entry, then a
+ * repeating burst once parked, which was the owner's original brief. They
+ * superseded it: the orbs emit constantly, entrance and idle alike. The
+ * cadence and its CADENCE_MS / CADENCE_PUFFS went with it rather than being
+ * left in place unused, because config nothing reads is the failure this
+ * project has already paid for once with LANDING.ROT_*.
  *
- * ⚠️ Size the pool for THRUST, which is far denser. A pool sized for the
- * cadence truncates the entrance silently — puffs simply stop appearing, and
- * nothing logs.
+ * Rate is per SECOND per PORT, carried across frames as a fraction so a low
+ * rate still emits rather than rounding to nothing every frame.
  */
 
 export type Puff = {
@@ -61,7 +62,7 @@ export type PuffSample = {
   port: number
 }
 
-export type SmokeMode = 'thrust' | 'cadence' | 'off'
+export type SmokeMode = 'on' | 'off'
 
 export function makeSmokePool(size: number): Puff[] {
   const pool = new Array<Puff>(size)
@@ -98,10 +99,8 @@ export class SmokeState {
   private next = 0
   /** Fractional puff budget carried between frames, so a low rate still emits. */
   private carry = 0
-  /** Index of the last cadence burst already fired. */
-  private lastBurst = 0
   /**
-   * Which port thrust emits from next.
+   * Which port emits next.
    *
    * ⚠️ PERSISTENT across frames, and that is the whole point. Cycling on the
    * index within a single frame's batch looks equivalent and is not: at a
@@ -150,38 +149,23 @@ export class SmokeState {
   /**
    * Advance and emit. Returns how many puffs were spawned this step.
    *
-   * `elapsedMs` is time within the CURRENT behaviour, not absolute — so the
-   * cadence counts from the moment the orb parked, which is what makes the
-   * "first burst waits a full interval" rule expressible at all.
+   * ⚠️ `elapsedMs` must be MONOTONIC. It stamps each puff's birth and `sample`
+   * measures age against it, so a clock that jumps backwards makes every live
+   * puff read as unborn and the cloud disappears.
    */
   update(cfg: EmittersConfig, mode: SmokeMode, elapsedMs: number, dtMs: number): number {
     if (mode === 'off') return 0
 
-    if (mode === 'thrust') {
-      // THRUST_RATE is per SECOND per PORT, across four ports.
-      this.carry += (cfg.THRUST_RATE * this.ports.length * dtMs) / 1000
-      const n = Math.floor(this.carry)
-      this.carry -= n
-      for (let i = 0; i < n; i++) {
-        this.spawn(cfg, elapsedMs, this.thrustPort, cfg.THRUST_SPREAD)
-        this.thrustPort = (this.thrustPort + 1) % this.ports.length
-      }
-      return n
+    // THRUST_RATE is per SECOND per PORT, across however many ports the caller
+    // supplied — four afterburners on an orb, two exhausts on SAMSARA.
+    this.carry += (cfg.THRUST_RATE * this.ports.length * dtMs) / 1000
+    const n = Math.floor(this.carry)
+    this.carry -= n
+    for (let i = 0; i < n; i++) {
+      this.spawn(cfg, elapsedMs, this.thrustPort, cfg.THRUST_SPREAD)
+      this.thrustPort = (this.thrustPort + 1) % this.ports.length
     }
-
-    // ⚠️ The first cadenced burst waits a FULL interval. Firing on the arrival
-    // frame lands it on top of the thrust smoke still dissipating, and reads as
-    // a continuation of the entrance rather than as its own event. `roomBurst`
-    // established the same rule for the same reason.
-    const due = Math.floor(elapsedMs / cfg.CADENCE_MS)
-    if (due <= this.lastBurst) return 0
-    this.lastBurst = due
-    for (let port = 0; port < this.ports.length; port++) {
-      for (let k = 0; k < cfg.CADENCE_PUFFS; k++) {
-        this.spawn(cfg, elapsedMs, port, cfg.THRUST_SPREAD * 0.6)
-      }
-    }
-    return cfg.CADENCE_PUFFS * this.ports.length
+    return n
   }
 
   /** Live puffs at `nowMs`, in orb radii. Dead ones are simply omitted. */
@@ -218,7 +202,6 @@ export class SmokeState {
     for (const p of this.pool) p.born = -1
     this.next = 0
     this.carry = 0
-    this.lastBurst = 0
     this.thrustPort = 0
   }
 }

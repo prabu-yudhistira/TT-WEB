@@ -212,8 +212,6 @@ check(
       BOB_MS: 2900,
       THRUST_RATE: 51,
       THRUST_SPREAD: 0.62,
-      CADENCE_MS: 2600,
-      CADENCE_PUFFS: 4,
       PUFF_SIZE: 0.29,
       PUFF_LIFE_MS: 1250,
       PUFF_COLOR: '#B0A382',

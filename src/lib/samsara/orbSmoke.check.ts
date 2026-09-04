@@ -1,5 +1,5 @@
 /**
- * Pins `orbSmoke` — the two smoke behaviours of spec §5.2.
+ * Pins `orbSmoke` — continuous emission from an arbitrary set of ports.
  *
  * ⚠️ Three assertions here were rewritten from the plan, which had them wrong:
  *
@@ -50,7 +50,7 @@ const seeded = () => {
 {
   const st = new SmokeState(makeSmokePool(512), ORB_PORTS, seeded())
   let total = 0
-  for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'thrust', t, 16)
+  for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'on', t, 16)
   const want = cfg.THRUST_RATE * 4
   check('thrust emits at roughly its rate over one second',
     Math.abs(total - want) / want < 0.2, `${total} vs ~${want}`)
@@ -60,42 +60,40 @@ const seeded = () => {
   check('thrust uses all four ports', ports.size === 4, `ports seen: ${[...ports].sort().join(',')}`)
 }
 
-// ── cadence is discrete, and permanent ──────────────────────────────
+// ── emission is continuous, and never stops ─────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
-  // ⚠️ The first cadenced burst waits a FULL interval after parking. Firing on
-  // the arrival frame would land it on top of the thrust smoke still
-  // dissipating and read as a continuation of it, not as its own event.
-  check('nothing fires on the frame it parks', st.update(cfg, 'cadence', 0, 16) === 0)
-
-  let before = 0
-  for (let t = 16; t < cfg.CADENCE_MS - 20; t += 16) before += st.update(cfg, 'cadence', t, 16)
-  check('nothing fires part-way through the first interval', before === 0, `${before}`)
-
-  check('a burst fires at the interval',
-    st.update(cfg, 'cadence', cfg.CADENCE_MS, 16) === cfg.CADENCE_PUFFS * 4)
-
-  // Three intervals, not one — a single reading cannot tell a cadence from a
-  // one-shot, and "keeps bursting all the time" is the owner's decision #3.
-  // ⚠️ The upper bound is padded past the fourth interval on purpose. Stepping
-  // 16ms from CADENCE_MS+16 does not land exactly on every multiple of 3000, so
-  // a bound of exactly CADENCE_MS*4 stops one frame short of the third burst
-  // and the cadence reads as broken when it is not.
-  let bursts = 0
-  for (let t = cfg.CADENCE_MS + 16; t <= cfg.CADENCE_MS * 4 + 100; t += 16) {
-    if (st.update(cfg, 'cadence', t, 16) > 0) bursts++
+  const st = new SmokeState(makeSmokePool(512), ORB_PORTS, seeded())
+  // ⚠️ There is no interval any more. This used to assert a burst every
+  // CADENCE_MS with nothing in between; the owner superseded that on
+  // 2026-09-04, so what matters is that emission NEVER PAUSES.
+  let gaps = 0
+  let steps = 0
+  for (let t = 0; t < 4000; t += 16) {
+    steps++
+    if (st.update(cfg, 'on', t, 16) === 0) gaps++
   }
-  check('and keeps firing every interval', bursts === 3, `${bursts} bursts across 3 intervals`)
+  // A fractional rate cannot emit on literally every frame, but it must not
+  // leave a visible hole: at THRUST_RATE across four ports the budget clears
+  // one whole puff most frames.
+  check('emission never pauses for long', gaps / steps < 0.5,
+    `${gaps} idle of ${steps} frames`)
+
+  const alive = st.sample(4000, cfg)
+  check('and a steady cloud is standing', alive.length > 10, `${alive.length} puffs`)
+  check('drawn from every port', new Set(alive.map((p) => p.port)).size === 4)
 }
 
 // ── a puff blooms, then dies ────────────────────────────────────────
 {
   const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
-  st.update(cfg, 'cadence', cfg.CADENCE_MS, 16)
-  const t0 = cfg.CADENCE_MS
+  const t0 = 1000
+  // ⚠️ ONE long step, so the whole cohort shares a birth stamp and ages
+  // together. Stepping at frame length instead would smear births across the
+  // window and every age assertion below would read a mixture.
+  const n = st.update(cfg, 'on', t0, 250)
 
   const born = st.sample(t0 + 5, cfg)
-  check('a fresh burst is alive', born.length === cfg.CADENCE_PUFFS * 4, `${born.length}`)
+  check('a fresh cohort is alive', n > 0 && born.length === n, `${born.length} of ${n}`)
   // ⚠️ Alpha is a BLOOM, not a step. A fresh puff is deliberately faint so it
   // grows into visibility instead of popping into existence.
   check('a fresh puff is faint', born.every((p) => p.alpha < cfg.PUFF_OPACITY * 0.35),
@@ -123,7 +121,7 @@ const seeded = () => {
   // truncates the entry plume silently.
   const small = new SmokeState(makeSmokePool(8), ORB_PORTS, seeded())
   let spawned = 0
-  for (let t = 0; t < 500; t += 16) spawned += small.update(cfg, 'thrust', t, 16)
+  for (let t = 0; t < 500; t += 16) spawned += small.update(cfg, 'on', t, 16)
   check('a small pool recycles rather than throwing',
     spawned > 0 && Number.isFinite(spawned) && small.sample(500, cfg).length <= 8)
 }
@@ -131,12 +129,12 @@ const seeded = () => {
 // ── reset ───────────────────────────────────────────────────────────
 {
   const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
-  st.update(cfg, 'cadence', cfg.CADENCE_MS, 16)
+  st.update(cfg, 'on', 1000, 250)
   st.reset()
-  check('reset clears every live puff', st.sample(cfg.CADENCE_MS + 5, cfg).length === 0)
+  check('reset clears every live puff', st.sample(1005, cfg).length === 0)
   // The sequence re-enters `landed` on every replay; a state that could not
-  // restart its cadence would burst once per page load.
-  check('and the cadence can fire again', st.update(cfg, 'cadence', cfg.CADENCE_MS, 16) > 0)
+  // emit again would go quiet for the rest of the page load.
+  check('and it emits again', st.update(cfg, 'on', 1000, 250) > 0)
 }
 
 // ── the port list is a parameter, not four ──────────────────────────
@@ -150,15 +148,20 @@ const seeded = () => {
   ]
   const st = new SmokeState(makeSmokePool(512), two, seeded())
   let total = 0
-  for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'thrust', t, 16)
+  for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'on', t, 16)
   const want = cfg.THRUST_RATE * 2
   check('a two-port emitter emits at two ports\u2019 worth',
     Math.abs(total - want) / want < 0.2, `${total} vs ~${want}`)
   check('and uses both of them',
     new Set(st.sample(500, cfg).map((p) => p.port)).size === 2)
 
-  const burst = new SmokeState(makeSmokePool(256), two, seeded())
-  check('its cadence fires once per port', burst.update(cfg, 'cadence', cfg.CADENCE_MS, 16) === cfg.CADENCE_PUFFS * 2)
+  // ⚠️ The port cursor is PERSISTENT across frames. Two ports at THRUST_RATE
+  // clear well under one puff per frame, so a cursor reset each frame would
+  // fire port 0 forever and one exhaust would never smoke.
+  const drip = new SmokeState(makeSmokePool(256), two, seeded())
+  for (let t = 0; t < 1000; t += 16) drip.update(cfg, 'on', t, 16)
+  check('a one-puff-per-frame drip still alternates ports',
+    new Set(drip.sample(900, cfg).map((p) => p.port)).size === 2)
 
   // Direction has to reach the puff, or every emitter plumes the same way.
   const up = st.sample(600, cfg)
