@@ -487,11 +487,16 @@ export type EmittersConfig = {
 export type HologramConfig = {
   /** Screen extent and centre, as fractions of the viewport. */
   W_FRAC: number
-  H_FRAC: number
+  /**
+   * The artwork's own width divided by its height.
+   *
+   * ⚠️ Not a free number — it has to match public/hud/panel.png or the drawing
+   * distorts. The build script prints the source aspect every run.
+   */
+  PANEL_ASPECT: number
   X_FRAC: number
   Y_FRAC: number
   MOBILE_W_FRAC: number
-  MOBILE_H_FRAC: number
   MOBILE_X_FRAC: number
   MOBILE_Y_FRAC: number
 
@@ -510,6 +515,13 @@ export type HologramConfig = {
 
   GLASS_COLOR: string
   GLASS_OPACITY: number
+  /**
+   * How far the panel's own halo carries. 0 leaves the bare line art.
+   *
+   * ⚠️ ALL of the glow comes from here. The owner's artwork is drawn flat with
+   * none baked in, deliberately, so the halo can breathe with the flicker.
+   */
+  GLASS_GLOW: number
   SHAFT_COLOR: string
   SHAFT_OPACITY: number
   /**
@@ -923,11 +935,10 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   HOLOGRAM: {
     W_FRAC: 0.615,
-    H_FRAC: 0.77,
+    PANEL_ASPECT: 1.7331,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
     MOBILE_W_FRAC: 0.78,
-    MOBILE_H_FRAC: 0.3,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.66,
     FORM_MS: 1500,
@@ -935,7 +946,11 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FLICKER_DUR_MS: 220,
     FLICKER_DEPTH: 0.37,
     GLASS_COLOR: '#F5C542',
-    GLASS_OPACITY: 0.44,
+    // ⚠️ RE-TUNED with the shader, like SHAFT_OPACITY before it. The owner's
+    // 0.44 scaled an `ink * 1.9` term plus a separate haze; it now scales a
+    // field that peaks at 1, so the same number is about half the brightness.
+    GLASS_OPACITY: 0.85,
+    GLASS_GLOW: 0.5,
     SHAFT_COLOR: '#F5C542',
     // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
     // against a solid wedge where every fragment was fully lit; the fan

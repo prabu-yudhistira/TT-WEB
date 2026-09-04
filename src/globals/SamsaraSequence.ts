@@ -1001,7 +1001,17 @@ export const SamsaraSequence: GlobalConfig = {
       },
       fields: [
         { name: 'wFrac', type: 'number', defaultValue: d.HOLOGRAM.W_FRAC, min: 0.05, max: 1.2 },
-        { name: 'hFrac', type: 'number', defaultValue: d.HOLOGRAM.H_FRAC, min: 0.05, max: 1.2 },
+        {
+          name: 'panelAspect',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.PANEL_ASPECT,
+          min: 0.4,
+          max: 4,
+          admin: {
+            description:
+              'The artwork’s width over its height. The panel’s height follows from this and its width, so the drawing never stretches — it must MATCH public/hud/panel.png, and scripts/build-hud-sdf.mjs prints the source aspect on every run.',
+          },
+        },
         {
           name: 'xFrac',
           type: 'number',
@@ -1017,13 +1027,6 @@ export const SamsaraSequence: GlobalConfig = {
           name: 'mobileWFrac',
           type: 'number',
           defaultValue: d.HOLOGRAM.MOBILE_W_FRAC,
-          min: 0.05,
-          max: 1.2,
-        },
-        {
-          name: 'mobileHFrac',
-          type: 'number',
-          defaultValue: d.HOLOGRAM.MOBILE_H_FRAC,
           min: 0.05,
           max: 1.2,
         },
@@ -1090,6 +1093,17 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.HOLOGRAM.GLASS_OPACITY,
           min: 0,
           max: 1,
+        },
+        {
+          name: 'glassGlow',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.GLASS_GLOW,
+          min: 0,
+          max: 1.5,
+          admin: {
+            description:
+              'How far the panel’s own halo carries. The artwork is drawn flat with no glow baked in, so all of it comes from here — and that is what lets it breathe with the flicker.',
+          },
         },
         colour(
           'shaftColor',

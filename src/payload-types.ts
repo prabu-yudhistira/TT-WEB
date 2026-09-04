@@ -1838,14 +1838,16 @@ export interface SamsaraSequence {
    */
   hologram?: {
     wFrac?: number | null;
-    hFrac?: number | null;
+    /**
+     * The artwork’s width over its height. The panel’s height follows from this and its width, so the drawing never stretches — it must MATCH public/hud/panel.png, and scripts/build-hud-sdf.mjs prints the source aspect on every run.
+     */
+    panelAspect?: number | null;
     /**
      * Landscape. Keep the screen clear of SAMSARA, which parks at 0.75.
      */
     xFrac?: number | null;
     yFrac?: number | null;
     mobileWFrac?: number | null;
-    mobileHFrac?: number | null;
     mobileXFrac?: number | null;
     /**
      * Portrait. The screen goes BELOW SAMSARA, which parks at 0.3.
@@ -1872,6 +1874,10 @@ export interface SamsaraSequence {
      */
     glassColor?: string | null;
     glassOpacity?: number | null;
+    /**
+     * How far the panel’s own halo carries. The artwork is drawn flat with no glow baked in, so all of it comes from here — and that is what lets it breathe with the flicker.
+     */
+    glassGlow?: number | null;
     /**
      * The light shafts from each lens. Usually the same amber as the glass.
      */
@@ -2526,11 +2532,10 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
     | T
     | {
         wFrac?: T;
-        hFrac?: T;
+        panelAspect?: T;
         xFrac?: T;
         yFrac?: T;
         mobileWFrac?: T;
-        mobileHFrac?: T;
         mobileXFrac?: T;
         mobileYFrac?: T;
         formMs?: T;
@@ -2539,6 +2544,7 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         flickerDepth?: T;
         glassColor?: T;
         glassOpacity?: T;
+        glassGlow?: T;
         shaftColor?: T;
         shaftOpacity?: T;
         shaftSpread?: T;

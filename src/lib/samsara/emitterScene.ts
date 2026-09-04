@@ -84,6 +84,16 @@ export type EmitterScene = {
 const SLOTS: OrbSlot[] = ['near', 'far']
 
 /**
+ * The panel SDF's encoded range, in source pixels.
+ *
+ * ⚠️ Must match SPREAD in scripts/build-hud-sdf.mjs. A texture carries no
+ * header saying what its numbers mean, so the two ends of the encoding are
+ * agreed here and nowhere else. A mismatch does not fail — it draws the
+ * artwork at the wrong stroke weight with a halo of the wrong size.
+ */
+const PANEL_SDF_SPREAD = 32
+
+/**
  * Live puffs one orb can hold.
  *
  * ⚠️ THE RATE SLIDER'S REAL CEILING, so it is sized from the slider and not
@@ -366,6 +376,26 @@ const SHAFT_FRAG = /* glsl */ `
   }
 `
 
+/**
+ * The glass — the owner's HUD artwork, as a signed distance field.
+ *
+ * ⚠️ REBUILT 2026-09-04. This was the panel drawn procedurally in SDF
+ * primitives, every coordinate measured by eye off a reference image. Three
+ * attempts did not converge: the stroke weight was wrong by more than double,
+ * one continuous rail was read as two separate pieces, and the tick spacing
+ * was guessed. The owner drew the panel instead. Reading their file is not a
+ * shortcut past that work — it is the correct source, and nothing here decides
+ * what the panel LOOKS like any more. It decides how the drawing is lit.
+ *
+ * ⚠️ AN SDF, NOT THE PNG ITSELF, for two reasons:
+ *
+ *  - the art is 1000px wide and the panel renders about 1580 device pixels, so
+ *    a straight texture is magnified and softens exactly where the line work is
+ *    the whole point;
+ *  - the glow has to BREATHE with the 5s flicker, and a baked bitmap cannot.
+ *
+ * See scripts/build-hud-sdf.mjs for the encoding.
+ */
 const GLASS_VERT = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -376,125 +406,41 @@ const GLASS_VERT = /* glsl */ `
 
 const GLASS_FRAG = /* glsl */ `
   varying vec2 vUv;
+  uniform sampler2D uPanel;
+  uniform float uSpread;
   uniform vec3 uColor;
   uniform float uOpacity;
-  uniform float uAspect;
-
-  /**
-   * ⚠️ Layout is in NORMALISED panel space, not in world or aspect units.
-   *
-   * n = (vUv.x, 1 - vUv.y), so both axes run 0..1 with the origin TOP-LEFT,
-   * matching how the reference art is measured. Every coordinate below is a
-   * fraction of the owner's 1012x599 reference, so the composition holds its
-   * proportions whatever aspect the panel ends up at.
-   *
-   * DISTANCES are a different matter: a step in n.x covers uAspect times more
-   * of the panel than the same step in n.y. Anything that must stay round or
-   * keep an even thickness converts x into y-units by multiplying by uAspect —
-   * without that the ring becomes an ellipse and the frame's verticals come out
-   * thinner than its horizontals.
-   */
-
-  float lineY(float dy, float t, float soft) {
-    return 1.0 - smoothstep(t, t + soft, abs(dy));
-  }
-
-  float boxFill(vec2 p, vec2 c, vec2 h, float soft) {
-    vec2 d = abs(p - c) - h;
-    float o = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-    return 1.0 - smoothstep(0.0, soft, o);
-  }
+  uniform float uGlow;
 
   void main() {
-    float A = uAspect;
-    vec2 n = vec2(vUv.x, 1.0 - vUv.y);
-    // Same point in y-units, for anything measuring a distance.
-    vec2 y = vec2(n.x * A, n.y);
-
-    float soft = 0.0055;
-    float t = 0.013;      // half-thickness of every rule
-    float ink = 0.0;
-
-    // ── the frame ───────────────────────────────────────────────────
-    //
-    // An octagon: a box intersected with a diamond. The top edge carries a
-    // raised centre section, so v is not folded about the middle the way u is.
-    float inset = 0.048;
-    float cham = 0.115;
-    float hw = A * 0.5 - inset;
-    float hh = 0.5 - inset;
-    float pu = abs(y.x - A * 0.5);
-
-    float plateau = smoothstep(0.205, 0.222, n.x) - smoothstep(0.778, 0.795, n.x);
-    float topY = (0.5 - hh) - plateau * 0.038;
-
-    float box = max(pu - hw, max(y.y - (0.5 + hh), topY - y.y));
-    float diamond = (pu + abs(y.y - 0.5)) - (hw + hh - cham);
-    float frame = max(box, diamond);
-
-    ink += lineY(frame, t, soft);
-
-    // ── left: a short vertical rule ─────────────────────────────────
-    if (n.y > 0.317 && n.y < 0.534) {
-      ink += lineY((n.x - 0.071) * A, 0.009, soft);
-    }
-
-    // ── left: the segmented gauge ───────────────────────────────────
-    //
-    // A ladder of rungs on a repeating v, so the count follows the panel
-    // instead of being a fixed list of quads.
-    if (n.y > 0.481 && n.y < 0.876 && n.x > 0.045 && n.x < 0.071) {
-      float pitch = 0.0188;
-      float rung = mod(n.y - 0.481, pitch);
-      ink += (1.0 - smoothstep(0.0062, 0.0062 + soft, abs(rung - pitch * 0.5)));
-    }
-
-    // ── bottom left: the dashed ring ────────────────────────────────
-    vec2 ringC = vec2(0.155 * A, 0.805);
-    vec2 rv = y - ringC;
-    float rd = length(rv) - 0.092;
-    float ang = atan(rv.y, rv.x);
-    float dash = step(0.36, fract(ang / 6.28318530718 * 22.0));
-    ink += lineY(rd, 0.010, soft) * dash;
-
-    // ── bottom: the long rule ───────────────────────────────────────
-    if (n.x > 0.321 && n.x < 0.692) {
-      ink += lineY(n.y - 0.907, 0.009, soft);
-    }
-
-    // ── bottom right: two blocks and a tick ─────────────────────────
-    ink += boxFill(y, vec2(0.8175 * A, 0.8995), vec2(0.0175 * A, 0.0285), soft);
-    ink += boxFill(y, vec2(0.8500 * A, 0.8995), vec2(0.0100 * A, 0.0285), soft);
-    if (n.x > 0.865 && n.x < 0.884) {
-      ink += lineY(n.y - 0.907, 0.009, soft);
-    }
-
-    ink = clamp(ink, 0.0, 1.0);
+    float v = texture2D(uPanel, vUv).r;
+    // Back to signed source pixels: positive outside the ink, negative inside.
+    float d = (0.5 - v) * uSpread;
 
     /**
-     * ── the bloom around every stroke ─────────────────────────────
-     *
-     * The reference does not read as vector line-art: every stroke carries a
-     * wide soft halo, and that halo is most of what makes it look emitted
-     * rather than drawn. A crisp SDF edge alone came out looking like a wire
-     * diagram, so the frame's distance field is reused as a falloff.
+     * ⚠️ FLOORED. The panel can be minified — small viewport, or the screen
+     * seen at depth — and there one fragment covers more than one source pixel;
+     * fwidth alone then gives a razor edge that crawls as the camera bobs. The
+     * floor is in source pixels because d is.
      */
-    float halo = exp(-abs(frame) * 22.0) * 0.55;
+    float aa = max(fwidth(d), 0.75);
+    float core = 1.0 - smoothstep(-aa, aa, d);
 
     /**
-     * ── the inner haze ────────────────────────────────────────────
+     * ⚠️ The halo falls off across the FIELD'S OWN RANGE, not on an exp().
      *
-     * Dark in the middle, lifting toward the frame. This is what gives the
-     * panel depth instead of reading as a flat coloured pane, and it is
-     * clipped hard at the frame so nothing hazes the room outside it.
+     * The field saturates at uSpread/2 outside the ink, so every fragment
+     * beyond that reports the same distance. Any decay curve returns the same
+     * small positive number there — a flat wash over the whole panel that reads
+     * as dirty brown fog. Normalising to the range lands on exactly zero at the
+     * edge of what the field can say.
      */
-    float inside = clamp(-frame, 0.0, 1.0);
-    float haze = exp(-inside * 7.0) * 0.42;
-    float within = step(frame, 0.0);
+    float t = clamp(max(d, 0.0) / max(uSpread * 0.5, 0.001), 0.0, 1.0);
+    float glow = pow(1.0 - t, 2.2) * uGlow;
 
-    float a = uOpacity * (ink * 1.9 + (halo + haze) * within);
-    if (a <= 0.002) discard;
-    gl_FragColor = vec4(uColor, a);
+    float a = clamp(core + glow, 0.0, 1.0) * uOpacity;
+    // The stroke's centre runs hotter than its edge, as a lit tube does.
+    gl_FragColor = vec4(mix(uColor, vec3(1.0, 0.97, 0.86), core * 0.45), a);
   }
 `
 
@@ -663,13 +609,26 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   })
 
   // ── the glass ─────────────────────────────────────────────────────
+  /**
+   * ⚠️ Fails open to INVISIBLE, not to opaque.
+   *
+   * Until the artwork arrives the sampler reads this 1x1 black. At 0 the shader
+   * decodes a distance of +uSpread/2 — fully OUTSIDE the ink — so the panel
+   * simply is not there. A white placeholder decodes as fully INSIDE and would
+   * paint a solid amber rectangle across the room on every slow connection.
+   */
+  const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)
+  blank.needsUpdate = true
+
   const glassMat = new THREE.ShaderMaterial({
     vertexShader: GLASS_VERT,
     fragmentShader: GLASS_FRAG,
     uniforms: {
+      uPanel: { value: blank },
+      uSpread: { value: PANEL_SDF_SPREAD },
       uColor: { value: new THREE.Color('#ffffff') },
       uOpacity: { value: 0 },
-      uAspect: { value: 1 },
+      uGlow: { value: 0.5 },
     },
     transparent: true,
     depthWrite: false,
@@ -680,6 +639,29 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glassMat)
   glass.visible = false
   group.add(glass)
+
+  /**
+   * ⚠️ Loaded, never awaited, and with no error path.
+   *
+   * A missing or slow panel has to leave the room working — the same fail-open
+   * rule the orbs and the GL context already follow. The blank above keeps the
+   * screen invisible until the real field lands.
+   *
+   * ⚠️ NO MIPMAPS. Mipmapping averages DISTANCES between levels, and the average
+   * of two distances is not the distance to the average shape: corners round
+   * off and thin strokes dissolve, at exactly the sizes this panel is usually
+   * drawn at. LinearFilter on the base level is what lets an SDF scale cleanly.
+   */
+  const panelTex = new THREE.TextureLoader().load('/hud/panel.sdf.png', (tx) => {
+    tx.minFilter = THREE.LinearFilter
+    tx.magFilter = THREE.LinearFilter
+    tx.generateMipmaps = false
+    tx.wrapS = THREE.ClampToEdgeWrapping
+    tx.wrapT = THREE.ClampToEdgeWrapping
+    tx.colorSpace = THREE.NoColorSpace
+    tx.needsUpdate = true
+    glassMat.uniforms.uPanel.value = tx
+  })
 
   /**
    * A marker at each port and at the lens, for placing them by eye.
@@ -782,6 +764,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         m.uniforms.uGuide.value = cfg.HOLOGRAM.SHAFT_GUIDE ? 1 : 0
       }
       ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
+      glassMat.uniforms.uGlow.value = cfg.HOLOGRAM.GLASS_GLOW
     },
 
     update(a, cam) {
@@ -980,7 +963,6 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
           phase === 'forming'
             ? a.form01 * (0.45 + 0.55 * Math.abs(Math.sin(a.form01 * Math.PI * 6.5)))
             : 1
-        glassMat.uniforms.uAspect.value = quad.w / Math.max(0.001, quad.h)
         glassMat.uniforms.uOpacity.value =
           cfg.HOLOGRAM.GLASS_OPACITY * forming * (1 - dip) * a.reveal
         setShaftOpacity(cfg.HOLOGRAM.SHAFT_OPACITY * (1 - dip * 0.5) * a.reveal)
@@ -1006,6 +988,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       shaftMats.forEach((m) => m.dispose())
       glass.geometry.dispose()
       glassMat.dispose()
+      panelTex.dispose()
+      blank.dispose()
       // The clones share the SOURCE model's geometry, which the engine owns and
       // disposes. Their materials are copies made here, so those are ours.
       for (const m of orbMats.values()) m.dispose()

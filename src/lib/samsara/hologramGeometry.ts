@@ -32,12 +32,23 @@ export function screenQuad(cfg: HologramConfig, ctx: OrbCtx): ScreenQuad {
   const halfW = halfH * (ctx.W / ctx.H)
 
   const wf = ctx.mobile ? cfg.MOBILE_W_FRAC : cfg.W_FRAC
-  const hf = ctx.mobile ? cfg.MOBILE_H_FRAC : cfg.H_FRAC
   const xf = ctx.mobile ? cfg.MOBILE_X_FRAC : cfg.X_FRAC
   const yf = ctx.mobile ? cfg.MOBILE_Y_FRAC : cfg.Y_FRAC
 
   const w = wf * 2 * halfW
-  const h = hf * 2 * halfH
+  /**
+   * ⚠️ HEIGHT FOLLOWS THE ART, and H_FRAC is gone because of it.
+   *
+   * The panel is the owner's drawing now, not a procedural frame. W_FRAC and
+   * H_FRAC were fractions of the VIEWPORT, so the panel's shape changed with
+   * the browser window and the drawing stretched with it — the dashed circle
+   * became an ellipse and the 45-degree chamfers stopped being 45 degrees. A
+   * width and an aspect is the only pair that cannot do that.
+   *
+   * PANEL_ASPECT must match the artwork. `scripts/build-hud-sdf.mjs` prints
+   * the source's aspect on every run for exactly this reason.
+   */
+  const h = w / Math.max(0.01, cfg.PANEL_ASPECT)
   // Same viewport-fraction convention as LANDING and EMITTERS: 0..1 across the
   // viewport with y DOWN, negated into world y UP.
   const cx = (xf - 0.5) * 2 * halfW

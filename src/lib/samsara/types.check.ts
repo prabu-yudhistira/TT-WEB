@@ -304,7 +304,7 @@ for (const [label, r] of [['near', DEFAULT_SEQUENCE.EMITTERS.NEAR_ROT], ['far', 
 
 // ── hologram ────────────────────────────────────────────────────────
 check('the screen has positive extent',
-  DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC > 0 && DEFAULT_SEQUENCE.HOLOGRAM.H_FRAC > 0)
+  DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC > 0 && DEFAULT_SEQUENCE.HOLOGRAM.PANEL_ASPECT > 0)
 check('forming has a positive duration', DEFAULT_SEQUENCE.HOLOGRAM.FORM_MS > 0)
 check('the flicker is briefer than its own interval',
   DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DUR_MS < DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_MS)
@@ -314,10 +314,23 @@ check('the flicker dips rather than extinguishing',
 check('the screen clears SAMSARA horizontally in landscape',
   DEFAULT_SEQUENCE.HOLOGRAM.X_FRAC + DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC / 2
     < DEFAULT_SEQUENCE.LANDING.X_FRAC)
-// Portrait: the screen sits BELOW SAMSARA, which parks at MOBILE_Y_FRAC 0.3.
-check('the screen clears SAMSARA vertically in portrait',
-  DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_Y_FRAC - DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_H_FRAC / 2
-    > DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC)
+/**
+ * Portrait: the screen sits BELOW SAMSARA, which parks at MOBILE_Y_FRAC 0.3.
+ *
+ * ⚠️ The height is DERIVED now — width over the artwork's aspect — so the
+ * panel's height as a fraction of the viewport depends on the VIEWPORT's own
+ * aspect: short on a narrow phone, tall on a wide one. There is no MOBILE_H_FRAC
+ * to read, and picking a representative portrait viewport is the honest way to
+ * assert the clearance rather than pretending the coupling is not there.
+ */
+{
+  const va = 390 / 844
+  const hFracEff =
+    (DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_W_FRAC * va) / DEFAULT_SEQUENCE.HOLOGRAM.PANEL_ASPECT
+  check('the screen clears SAMSARA vertically in portrait',
+    DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_Y_FRAC - hFracEff / 2 >
+      DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC)
+}
 
 // ── the orb plume splays, and that is the whole point ───────────────
 {

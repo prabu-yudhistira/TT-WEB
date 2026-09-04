@@ -156,11 +156,10 @@ export type SamsaraSequenceInput = {
   } | null
   hologram?: {
     wFrac?: number | null
-    hFrac?: number | null
+    panelAspect?: number | null
     xFrac?: number | null
     yFrac?: number | null
     mobileWFrac?: number | null
-    mobileHFrac?: number | null
     mobileXFrac?: number | null
     mobileYFrac?: number | null
     formMs?: number | null
@@ -169,6 +168,7 @@ export type SamsaraSequenceInput = {
     flickerDepth?: number | null
     glassColor?: string | null
     glassOpacity?: number | null
+    glassGlow?: number | null
     shaftColor?: string | null
     shaftOpacity?: number | null
     shaftSpread?: number | null
@@ -432,11 +432,10 @@ export function resolveSamsara(
 
     HOLOGRAM: {
       W_FRAC: num(ho.wFrac, d.HOLOGRAM.W_FRAC),
-      H_FRAC: num(ho.hFrac, d.HOLOGRAM.H_FRAC),
+      PANEL_ASPECT: num(ho.panelAspect, d.HOLOGRAM.PANEL_ASPECT),
       X_FRAC: num(ho.xFrac, d.HOLOGRAM.X_FRAC),
       Y_FRAC: num(ho.yFrac, d.HOLOGRAM.Y_FRAC),
       MOBILE_W_FRAC: num(ho.mobileWFrac, d.HOLOGRAM.MOBILE_W_FRAC),
-      MOBILE_H_FRAC: num(ho.mobileHFrac, d.HOLOGRAM.MOBILE_H_FRAC),
       MOBILE_X_FRAC: num(ho.mobileXFrac, d.HOLOGRAM.MOBILE_X_FRAC),
       MOBILE_Y_FRAC: num(ho.mobileYFrac, d.HOLOGRAM.MOBILE_Y_FRAC),
       FORM_MS: num(ho.formMs, d.HOLOGRAM.FORM_MS),
@@ -445,6 +444,7 @@ export function resolveSamsara(
       FLICKER_DEPTH: num(ho.flickerDepth, d.HOLOGRAM.FLICKER_DEPTH),
       GLASS_COLOR: hex(ho.glassColor, d.HOLOGRAM.GLASS_COLOR),
       GLASS_OPACITY: num(ho.glassOpacity, d.HOLOGRAM.GLASS_OPACITY),
+      GLASS_GLOW: num(ho.glassGlow, d.HOLOGRAM.GLASS_GLOW),
       SHAFT_COLOR: hex(ho.shaftColor, d.HOLOGRAM.SHAFT_COLOR),
       SHAFT_OPACITY: num(ho.shaftOpacity, d.HOLOGRAM.SHAFT_OPACITY),
       SHAFT_SPREAD: num(ho.shaftSpread, d.HOLOGRAM.SHAFT_SPREAD),
@@ -602,11 +602,10 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
     },
     hologram: {
       wFrac: c.HOLOGRAM.W_FRAC,
-      hFrac: c.HOLOGRAM.H_FRAC,
+      panelAspect: c.HOLOGRAM.PANEL_ASPECT,
       xFrac: c.HOLOGRAM.X_FRAC,
       yFrac: c.HOLOGRAM.Y_FRAC,
       mobileWFrac: c.HOLOGRAM.MOBILE_W_FRAC,
-      mobileHFrac: c.HOLOGRAM.MOBILE_H_FRAC,
       mobileXFrac: c.HOLOGRAM.MOBILE_X_FRAC,
       mobileYFrac: c.HOLOGRAM.MOBILE_Y_FRAC,
       formMs: c.HOLOGRAM.FORM_MS,
@@ -615,6 +614,7 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       flickerDepth: c.HOLOGRAM.FLICKER_DEPTH,
       glassColor: c.HOLOGRAM.GLASS_COLOR,
       glassOpacity: c.HOLOGRAM.GLASS_OPACITY,
+      glassGlow: c.HOLOGRAM.GLASS_GLOW,
       shaftColor: c.HOLOGRAM.SHAFT_COLOR,
       shaftOpacity: c.HOLOGRAM.SHAFT_OPACITY,
       shaftSpread: c.HOLOGRAM.SHAFT_SPREAD,
