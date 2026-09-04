@@ -608,6 +608,14 @@ export type ShaftSlotConfig = {
    * falloff is the one thing it visibly does not.
    */
   SPREAD: number
+  /**
+   * Multiplies SHAFT_REACH for this fan only.
+   *
+   * ⚠️ A TRIM, like SPREAD, and for the same reason: the two orbs sit at very
+   * different distances from the camera, so the reach that suits one overshoots
+   * the other. The global stays the master.
+   */
+  REACH: number
 }
 
 /**
@@ -944,8 +952,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.45,
     // Both zero, so the slot config changes nothing until a slider moves.
-    NEAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1 },
-    FAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1 },
+    NEAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1, REACH: 1 },
+    FAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1, REACH: 1 },
   },
 
   EXIT_MS: 800,

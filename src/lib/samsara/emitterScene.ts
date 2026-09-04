@@ -177,6 +177,8 @@ const SHAFT_FRAG = /* glsl */ `
   uniform float uContrast;
   /** The screen's left and right edges, in this plane's own x. */
   uniform vec2 uClip;
+  /** The screen's TOP edge, in this plane's own y. */
+  uniform float uClipTop;
   uniform float uBound;
   uniform float uCore;
   uniform float uTip;
@@ -282,8 +284,17 @@ const SHAFT_FRAG = /* glsl */ `
      * stays equally soft on a narrow viewport as on a wide one.
      */
     float soft = max(0.01, (uClip.y - uClip.x) * 0.05);
+    /**
+     * ⚠️ THREE edges, not four. Left, right and top are the screen's; the
+     * BOTTOM is deliberately open, because the orbs float below the panel and
+     * the light has to be seen travelling up into it. Clipping there too would
+     * cut the fan flat at the panel's lower border and the beam would appear
+     * out of nothing, which is the one thing that would give the projection
+     * away.
+     */
     float edge = smoothstep(uClip.x - soft, uClip.x + soft, vP.x)
-               * smoothstep(uClip.y + soft, uClip.y - soft, vP.x);
+               * smoothstep(uClip.y + soft, uClip.y - soft, vP.x)
+               * smoothstep(uClipTop + soft, uClipTop - soft, vP.y);
     // ⚠️ A MIX, not a switch. At 0 the fan is free of the screen entirely; the
     // owner has asked for both looks on different references, and a hard
     // boolean would make the choice a code change instead of a slider.
@@ -327,9 +338,16 @@ const SHAFT_FRAG = /* glsl */ `
      */
     if (uGuide > 0.5) {
       float w = 0.012 + dist * 0.01;
-      float onEdge = 1.0 - smoothstep(0.0, w, abs(ang - uHalf));
-      if (onEdge > 0.0 && dist < 0.85) {
-        gl_FragColor = vec4(0.2, 1.0, 0.35, max(alpha, onEdge * 0.9));
+      // The two edges, drawn the full length of the fan rather than stopping
+      // short — where they END is the reach, and that is the second thing
+      // being set here.
+      float onEdge = (1.0 - smoothstep(0.0, w, abs(ang - uHalf))) * step(ang, uHalf + w);
+      // The cap. Off frame while the reach is at or above 1, which is itself
+      // the answer to "is my reach bigger than the screen".
+      float onArc = (1.0 - smoothstep(0.0, 0.02, abs(dist - 1.0))) * step(ang, uHalf);
+      float g = max(onEdge, onArc);
+      if (g > 0.0) {
+        gl_FragColor = vec4(0.2, 1.0, 0.35, max(alpha, g * 0.9));
         return;
       }
     }
@@ -605,6 +623,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       uFade: { value: 1 },
       uContrast: { value: 2 },
       uClip: { value: new THREE.Vector2(-1, 1) },
+      uClipTop: { value: 1e3 },
       uBound: { value: 1 },
       uCore: { value: 0 },
       uTip: { value: 1 },
@@ -839,12 +858,13 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
           // shaftReach: anything derived from the composition instead leaves
           // the disc's edge inside the frame for whichever orb sits closest.
           const persp = cam as THREE.PerspectiveCamera
-          const reach = shaftReach(
-            cam.position.distanceTo(shafts[i].position),
-            persp.isPerspectiveCamera ? persp.fov : 20,
-            persp.isPerspectiveCamera ? persp.aspect : ctx.W / ctx.H,
-            cfg.HOLOGRAM,
-          )
+          const reach =
+            shaftReach(
+              cam.position.distanceTo(shafts[i].position),
+              persp.isPerspectiveCamera ? persp.fov : 20,
+              persp.isPerspectiveCamera ? persp.aspect : ctx.W / ctx.H,
+              cfg.HOLOGRAM,
+            ) * Math.max(0.05, slotShaft.REACH)
           shafts[i].scale.setScalar(reach)
 
           /**
@@ -884,7 +904,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
            * that exactly.
            */
           pv.set(s.origin[0], s.origin[1], s.origin[2]).project(cam)
-          const lensNdc = pv.x
+          const lensNdcX = pv.x
+          const lensNdcY = pv.y
           pv
             .set(
               s.origin[0] + camRight.x * reach,
@@ -892,21 +913,35 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
               s.origin[2] + camRight.z * reach,
             )
             .project(cam)
-          const halfNdc = Math.abs(pv.x - lensNdc)
+          const halfNdcX = Math.abs(pv.x - lensNdcX)
+          pv
+            .set(
+              s.origin[0] + camUp.x * reach,
+              s.origin[1] + camUp.y * reach,
+              s.origin[2] + camUp.z * reach,
+            )
+            .project(cam)
+          const halfNdcY = Math.abs(pv.y - lensNdcY)
           const clip = shaftMats[i].uniforms.uClip.value as THREE.Vector2
-          if (halfNdc > 1e-6) {
+          if (halfNdcX > 1e-6 && halfNdcY > 1e-6) {
             let lo = Infinity
             let hi = -Infinity
+            let top = -Infinity
             for (const corner of quad.corners) {
               pv.set(corner[0], corner[1], corner[2]).project(cam)
               if (pv.x < lo) lo = pv.x
               if (pv.x > hi) hi = pv.x
+              if (pv.y > top) top = pv.y
             }
-            clip.set((lo - lensNdc) / halfNdc, (hi - lensNdc) / halfNdc)
+            clip.set((lo - lensNdcX) / halfNdcX, (hi - lensNdcX) / halfNdcX)
+            // ⚠️ Only the TOP. The owner wants the bottom left open so the beam
+            // is seen leaving the orb and entering the panel.
+            shaftMats[i].uniforms.uClipTop.value = (top - lensNdcY) / halfNdcY
           } else {
             // Degenerate only if the plane has collapsed; leave it unbounded
             // rather than blanking the fan on a divide by nothing.
             clip.set(-1e3, 1e3)
+            shaftMats[i].uniforms.uClipTop.value = 1e3
           }
         }
       })

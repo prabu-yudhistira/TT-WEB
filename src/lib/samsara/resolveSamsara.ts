@@ -194,6 +194,7 @@ type ShaftSlotCms = {
   dy?: number | null
   angleDeg?: number | null
   spread?: number | null
+  reach?: number | null
 } | null
 
 type OrbSlotCms = {
@@ -259,6 +260,7 @@ export function resolveSamsara(
     DY: num(v?.dy, d0.DY),
     ANGLE_DEG: num(v?.angleDeg, d0.ANGLE_DEG),
     SPREAD: num(v?.spread, d0.SPREAD),
+    REACH: num(v?.reach, d0.REACH),
   })
 
   const rot = (v: OrbRotCms | undefined, d0: OrbRotConfig): OrbRotConfig => ({
@@ -627,12 +629,14 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
         dy: c.HOLOGRAM.NEAR_SHAFT.DY,
         angleDeg: c.HOLOGRAM.NEAR_SHAFT.ANGLE_DEG,
         spread: c.HOLOGRAM.NEAR_SHAFT.SPREAD,
+        reach: c.HOLOGRAM.NEAR_SHAFT.REACH,
       },
       farShaft: {
         dx: c.HOLOGRAM.FAR_SHAFT.DX,
         dy: c.HOLOGRAM.FAR_SHAFT.DY,
         angleDeg: c.HOLOGRAM.FAR_SHAFT.ANGLE_DEG,
         spread: c.HOLOGRAM.FAR_SHAFT.SPREAD,
+        reach: c.HOLOGRAM.FAR_SHAFT.REACH,
       },
     },
     exitMs: c.EXIT_MS,

@@ -1925,22 +1925,24 @@ export interface SamsaraSequence {
      */
     shaftCoreSpan?: number | null;
     /**
-     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread multiplies the global shaft spread for this fan alone — 1 leaves it be.
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread and reach multiply the global half-angle and reach for this fan alone — 1 leaves them be.
      */
     nearShaft?: {
       dx?: number | null;
       dy?: number | null;
       angleDeg?: number | null;
       spread?: number | null;
+      reach?: number | null;
     };
     /**
-     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread multiplies the global shaft spread for this fan alone — 1 leaves it be.
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread and reach multiply the global half-angle and reach for this fan alone — 1 leaves them be.
      */
     farShaft?: {
       dx?: number | null;
       dy?: number | null;
       angleDeg?: number | null;
       spread?: number | null;
+      reach?: number | null;
     };
   };
   /**
@@ -2549,6 +2551,7 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               dy?: T;
               angleDeg?: T;
               spread?: T;
+              reach?: T;
             };
         farShaft?:
           | T
@@ -2557,6 +2560,7 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               dy?: T;
               angleDeg?: T;
               spread?: T;
+              reach?: T;
             };
       };
   exitMs?: T;
