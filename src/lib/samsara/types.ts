@@ -734,12 +734,17 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   // moves them onto the real tube mouths at the bench.
   EXHAUST: {
     ENABLED: true,
-    PORT_X: 0.52,
-    PORT_Y: 0.62,
-    PORT_Z: -0.55,
-    DIR_X: 0.35,
-    DIR_Y: 0.85,
-    DIR_Z: -0.4,
+    // MEASURED off the mesh by scripts/_find-exhausts.mjs, not eyeballed. It
+    // found exactly two protrusion clusters, symmetric to 0.003 across X at
+    // 116 and 115 verts — nothing else on the hull reaches that far out.
+    PORT_X: 0.765,
+    PORT_Y: 0.816,
+    PORT_Z: -0.266,
+    // Radially outward through the tip, which for a tube protruding from a
+    // spheroid IS its axis.
+    DIR_X: 0.665,
+    DIR_Y: 0.710,
+    DIR_Z: -0.231,
     RATE: 14,
     SPREAD: 0.45,
     PUFF_SIZE: 54,
