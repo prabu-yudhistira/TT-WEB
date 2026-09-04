@@ -24,6 +24,7 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
+import { orbHit } from '../samsara/orbPoke'
 import { createEmitterScene, type EmitterScene, type EmitterUpdateArgs } from '../samsara/emitterScene'
 import { projectQuad, type Rect, type Vec3 } from '../samsara/hologramGeometry'
 import {
@@ -1790,6 +1791,40 @@ export class MascotEngine {
     } finally {
       this.orbLoading = false
     }
+  }
+
+  /**
+   * Is a pointer over one of the emitter orbs?
+   *
+   * ⚠️ Discs in SCREEN PIXELS, not a raycast against the meshes. The orb is a
+   * spiky ball: raycasting reads its actual silhouette, so the gaps between the
+   * nozzles become dead spots and the press "does not work" perhaps half the
+   * time. A disc is what the visitor thinks they are pressing.
+   *
+   * ⚠️ From the RENDERED poses, so the target agrees with what is on screen.
+   * The orbs bob, and a pose recomputed at pointer time is a different pose.
+   */
+  hitsOrb(clientX: number, clientY: number, slopPx: number): boolean {
+    if (!this.emitters || !this.emitters.group.visible) return false
+    const cam = this.activeCamera()
+    const spheres = this.emitters.orbSpheres()
+    const v = new THREE.Vector3()
+    const discs = spheres.map((s) => {
+      v.set(s.x, s.y, s.z).project(cam)
+      const cx = ((v.x + 1) / 2) * this.W
+      const cy = ((1 - v.y) / 2) * this.H
+      // The radius in pixels, measured by projecting a point one radius to the
+      // camera's right. Scaling a world radius by a constant would be wrong at
+      // two different depths, which is exactly what these two orbs are at.
+      v.set(s.x, s.y, s.z).add(this.camRightScratch(cam).multiplyScalar(s.r)).project(cam)
+      const rx = ((v.x + 1) / 2) * this.W
+      return { cx, cy, r: Math.abs(rx - cx) }
+    })
+    return orbHit(clientX, clientY, discs, slopPx) >= 0
+  }
+
+  private camRightScratch(cam: THREE.Camera): THREE.Vector3 {
+    return new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0)
   }
 
   /** True once the orbs are loaded and their scene is in the graph. */

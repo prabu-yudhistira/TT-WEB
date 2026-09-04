@@ -299,6 +299,18 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'HOLOGRAM.SHAFT_TIP', label: 'Ray tip sharpness', min: 1, max: 10, step: 0.05 },
       { kind: 'num', path: 'HOLOGRAM.SHAFT_CORE_SPAN', label: 'Hot colour span', min: 0.02, max: 1, step: 0.01 },
       { kind: 'color', path: 'HOLOGRAM.SHAFT_CORE_COLOR', label: 'Ray core colour' },
+    ],
+  },
+  {
+    title: 'press and hold an orb  (?POKE.ENABLED=0 to disable)',
+    rows: [
+      { kind: 'num', path: 'POKE.SHAKE_MS', label: 'Hold to fire, ms', min: 100, max: 4000, step: 25 },
+      { kind: 'num', path: 'POKE.SHAKE_AMP', label: 'Shake amp (radii)', min: 0, max: 1, step: 0.005 },
+      { kind: 'num', path: 'POKE.SHAKE_HZ', label: 'Shake Hz', min: 1, max: 60, step: 0.5 },
+      { kind: 'num', path: 'POKE.RELEASE_MS', label: 'Settle ms', min: 0, max: 3000, step: 10 },
+      { kind: 'num', path: 'POKE.FLICKER_MS', label: 'Poke flicker ms', min: 50, max: 4000, step: 10 },
+      { kind: 'num', path: 'POKE.FLICKER_DEPTH', label: 'Poke flicker depth', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'POKE.HIT_SLOP', label: 'Hit slop px', min: 0, max: 120, step: 1 },
       { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.DX', label: 'Near fan x', min: -8, max: 8, step: 0.05 },
       { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.DY', label: 'Near fan y', min: -8, max: 8, step: 0.05 },
       { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.ANGLE_DEG', label: 'Near fan aim °', min: -180, max: 180, step: 1 },

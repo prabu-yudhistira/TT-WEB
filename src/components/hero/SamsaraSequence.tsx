@@ -5,6 +5,7 @@ import { lenisRef } from '../providers/SmoothScroll'
 import { MascotEngine } from '../../lib/mascot/MascotEngine'
 import { SequenceController, type Mode } from '../../lib/samsara/SequenceController'
 import { HologramController } from '../../lib/samsara/HologramController'
+import { PokeController } from '@/lib/samsara/orbPoke'
 import {
   createGestureState,
   endTouch,
@@ -209,6 +210,7 @@ export function SamsaraSequence({
      */
     const holo = new HologramController()
     let holoStarted = false
+    const poke = new PokeController()
     let lastHoloAttr: string | null = null
     let orbsRequested = false
     let cameraDistance = 0
@@ -399,6 +401,36 @@ export function SamsaraSequence({
       touchY = null
       endTouch(gest)
     }
+
+    /**
+     * Press and hold an orb.
+     *
+     * ⚠️ On WINDOW, not on the hero element, and pointerUP especially. A press
+     * that starts on an orb and lifts anywhere else — over the DOM that will
+     * sit on this screen, outside the window entirely — must still release, or
+     * the orbs shake forever with nothing holding them.
+     *
+     * ⚠️ Does NOT fight the drag-to-turn. That is gated on hitsMascot(), and
+     * SAMSARA parks well clear of the orbs, so the two hit tests never both
+     * pass on the same press.
+     */
+    const onOrbDown = (e: PointerEvent) => {
+      const c = cfgRef.current
+      if (!c.POKE.ENABLED) return
+      // Only once the screen exists — the flicker is the payoff, and there is
+      // nothing to flicker while the orbs are still flying in.
+      if (holo.phase !== 'emitting' && holo.phase !== 'forming' && holo.phase !== 'live') return
+      const eng = engineRef.current
+      if (!eng || !eng.hitsOrb(e.clientX, e.clientY, c.POKE.HIT_SLOP)) return
+      poke.press()
+    }
+    const onOrbUp = () => poke.release()
+
+    window.addEventListener('pointerdown', onOrbDown)
+    window.addEventListener('pointerup', onOrbUp)
+    window.addEventListener('pointercancel', onOrbUp)
+    // A press whose release lands in another window would otherwise never end.
+    window.addEventListener('blur', onOrbUp)
 
     heroEl.addEventListener('wheel', onWheel, { passive: false })
     heroEl.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -706,11 +738,15 @@ export function SamsaraSequence({
           holo.start()
         }
         holo.update(cfg, dt)
+        poke.update(cfg.POKE, dt)
       } else if (holoStarted) {
         // Leaving the room stands the whole thing down, so a replay starts
         // from the entry beat rather than mid-flicker.
         holoStarted = false
         holo.reset()
+        // Leaving the room drops any press with it, or a hold that survived the
+        // exit would still be shaking orbs nobody can see on the next entry.
+        poke.reset()
       }
 
       const holoPhase = holo.phase
@@ -729,6 +765,8 @@ export function SamsaraSequence({
           form01: holo.form01(cfg),
           parkedMs: holo.parkedMs(),
           smokeMs: holo.totalMs,
+          shake01: poke.shake01(cfg.POKE),
+          pokeDip: poke.dip(cfg.POKE),
           dtMs: dt,
           reveal: eng.getRoomReveal(),
         })
@@ -786,6 +824,13 @@ export function SamsaraSequence({
       phase: holo.phase,
       rect: engineRef.current?.rendered.holoRect ?? null,
       attr: document.documentElement.dataset.ttHologram ?? null,
+      // The press-and-hold state. A gate cannot see a shake in a screenshot,
+      // and the flicker it fires lasts about half a second.
+      poke: {
+        phase: poke.phase,
+        shake: poke.shake01(cfgRef.current.POKE),
+        dip: poke.dip(cfgRef.current.POKE),
+      },
     })
     w.__ttSamsara = () => ({
       mode: ctrl.mode,
@@ -820,6 +865,10 @@ export function SamsaraSequence({
 
     return () => {
       cancelAnimationFrame(raf)
+      window.removeEventListener('pointerdown', onOrbDown)
+      window.removeEventListener('pointerup', onOrbUp)
+      window.removeEventListener('pointercancel', onOrbUp)
+      window.removeEventListener('blur', onOrbUp)
       heroEl.removeEventListener('wheel', onWheel)
       heroEl.removeEventListener('touchstart', onTouchStart)
       heroEl.removeEventListener('touchmove', onTouchMove)

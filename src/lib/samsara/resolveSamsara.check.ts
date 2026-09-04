@@ -267,7 +267,17 @@ check(
       SHAFT_CORE_COLOR: '#FFEEBB',
       SHAFT_CORE_SPAN: 0.31,
       NEAR_SHAFT: { DX: -1.4, DY: 0.8, ANGLE_DEG: 17, SPREAD: 0.7, REACH: 1.3 },
-      FAR_SHAFT: { DX: 2.1, DY: -0.6, ANGLE_DEG: -23, SPREAD: 1.9, REACH: 0.6 },
+      FAR_SHAFT: { DX: 2.1, DY: -1.35, ANGLE_DEG: -23, SPREAD: 1.9, REACH: 0.6 },
+    },
+    POKE: {
+      ENABLED: false,
+      SHAKE_MS: 810,
+      SHAKE_AMP: 0.17,
+      SHAKE_HZ: 24,
+      RELEASE_MS: 510,
+      FLICKER_MS: 730,
+      FLICKER_DEPTH: 0.61,
+      HIT_SLOP: 27,
     },
     EXIT_MS: 1250,
   }

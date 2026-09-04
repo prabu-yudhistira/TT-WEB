@@ -186,6 +186,16 @@ export type SamsaraSequenceInput = {
     nearShaft?: ShaftSlotCms
     farShaft?: ShaftSlotCms
   } | null
+  poke?: {
+    enabled?: boolean | null
+    shakeMs?: number | null
+    shakeAmp?: number | null
+    shakeHz?: number | null
+    releaseMs?: number | null
+    flickerMs?: number | null
+    flickerDepth?: number | null
+    hitSlop?: number | null
+  } | null
   exitMs?: number | null
 }
 
@@ -462,6 +472,17 @@ export function resolveSamsara(
       FAR_SHAFT: shaftSlot(ho.farShaft, d.HOLOGRAM.FAR_SHAFT),
     },
 
+    POKE: {
+      ENABLED: bool(cms?.poke?.enabled, d.POKE.ENABLED),
+      SHAKE_MS: num(cms?.poke?.shakeMs, d.POKE.SHAKE_MS),
+      SHAKE_AMP: num(cms?.poke?.shakeAmp, d.POKE.SHAKE_AMP),
+      SHAKE_HZ: num(cms?.poke?.shakeHz, d.POKE.SHAKE_HZ),
+      RELEASE_MS: num(cms?.poke?.releaseMs, d.POKE.RELEASE_MS),
+      FLICKER_MS: num(cms?.poke?.flickerMs, d.POKE.FLICKER_MS),
+      FLICKER_DEPTH: num(cms?.poke?.flickerDepth, d.POKE.FLICKER_DEPTH),
+      HIT_SLOP: num(cms?.poke?.hitSlop, d.POKE.HIT_SLOP),
+    },
+
     EXIT_MS: num(cms?.exitMs, d.EXIT_MS),
   }
 }
@@ -641,6 +662,16 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
         spread: c.HOLOGRAM.FAR_SHAFT.SPREAD,
         reach: c.HOLOGRAM.FAR_SHAFT.REACH,
       },
+    },
+    poke: {
+      enabled: c.POKE.ENABLED,
+      shakeMs: c.POKE.SHAKE_MS,
+      shakeAmp: c.POKE.SHAKE_AMP,
+      shakeHz: c.POKE.SHAKE_HZ,
+      releaseMs: c.POKE.RELEASE_MS,
+      flickerMs: c.POKE.FLICKER_MS,
+      flickerDepth: c.POKE.FLICKER_DEPTH,
+      hitSlop: c.POKE.HIT_SLOP,
     },
     exitMs: c.EXIT_MS,
   }

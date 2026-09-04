@@ -1242,6 +1242,35 @@ export const SamsaraSequence: GlobalConfig = {
     },
 
     {
+      name: 'poke',
+      type: 'group',
+      label: 'Press and hold an orb',
+      admin: {
+        description:
+          'Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker once. It fires ONCE per press — a strobe under a resting finger is a photosensitivity problem on a surface that will carry subtitles.',
+      },
+      fields: [
+        { name: 'enabled', type: 'checkbox', defaultValue: d.POKE.ENABLED },
+        { name: 'shakeMs', type: 'number', defaultValue: d.POKE.SHAKE_MS, min: 100, max: 4000 },
+        { name: 'shakeAmp', type: 'number', defaultValue: d.POKE.SHAKE_AMP, min: 0, max: 1 },
+        { name: 'shakeHz', type: 'number', defaultValue: d.POKE.SHAKE_HZ, min: 1, max: 60 },
+        { name: 'releaseMs', type: 'number', defaultValue: d.POKE.RELEASE_MS, min: 0, max: 3000 },
+        { name: 'flickerMs', type: 'number', defaultValue: d.POKE.FLICKER_MS, min: 50, max: 4000 },
+        { name: 'flickerDepth', type: 'number', defaultValue: d.POKE.FLICKER_DEPTH, min: 0, max: 1 },
+        {
+          name: 'hitSlop',
+          type: 'number',
+          defaultValue: d.POKE.HIT_SLOP,
+          min: 0,
+          max: 120,
+          admin: {
+            description:
+              'Extra pixels around each orb that still count as a press. Not optional on touch — the orbs are small and a finger is not a pixel.',
+          },
+        },
+      ],
+    },
+    {
       name: 'exitMs',
       type: 'number',
       defaultValue: d.EXIT_MS,

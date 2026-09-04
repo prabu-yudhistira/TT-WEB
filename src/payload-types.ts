@@ -1956,6 +1956,22 @@ export interface SamsaraSequence {
     };
   };
   /**
+   * Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker once. It fires ONCE per press — a strobe under a resting finger is a photosensitivity problem on a surface that will carry subtitles.
+   */
+  poke?: {
+    enabled?: boolean | null;
+    shakeMs?: number | null;
+    shakeAmp?: number | null;
+    shakeHz?: number | null;
+    releaseMs?: number | null;
+    flickerMs?: number | null;
+    flickerDepth?: number | null;
+    /**
+     * Extra pixels around each orb that still count as a press. Not optional on touch — the orbs are small and a finger is not a pixel.
+     */
+    hitSlop?: number | null;
+  };
+  /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
    */
   exitMs?: number | null;
@@ -2573,6 +2589,18 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               spread?: T;
               reach?: T;
             };
+      };
+  poke?:
+    | T
+    | {
+        enabled?: T;
+        shakeMs?: T;
+        shakeAmp?: T;
+        shakeHz?: T;
+        releaseMs?: T;
+        flickerMs?: T;
+        flickerDepth?: T;
+        hitSlop?: T;
       };
   exitMs?: T;
   updatedAt?: T;

@@ -484,6 +484,37 @@ export type EmittersConfig = {
   PUFF_OPACITY: number
 }
 
+/**
+ * Press and hold an orb: the pair shakes, then the screen and its rays flicker.
+ *
+ * ⚠️ TOP LEVEL, not inside HOLOGRAM or EMITTERS, because it spans both — the
+ * shake belongs to the orbs and the flicker to the screen. Filing it under
+ * either would leave half of it in the wrong place.
+ */
+export type PokeConfig = {
+  ENABLED: boolean
+  /**
+   * How long the hold has to last before the flicker fires, and the time the
+   * shake takes to build to full.
+   */
+  SHAKE_MS: number
+  /** Peak wobble, in ORB RADII, so it holds at any orb size. */
+  SHAKE_AMP: number
+  SHAKE_HZ: number
+  /** How long the shake takes to settle after the pointer lifts. */
+  RELEASE_MS: number
+  FLICKER_MS: number
+  FLICKER_DEPTH: number
+  /**
+   * Extra pixels around each orb that still count as a press.
+   *
+   * ⚠️ Not optional on touch. The orbs are roughly 120px across on a desktop
+   * viewport and much smaller on a phone; without slop the press is a game of
+   * darts.
+   */
+  HIT_SLOP: number
+}
+
 export type HologramConfig = {
   /** Screen extent and centre, as fractions of the viewport. */
   W_FRAC: number
@@ -699,6 +730,7 @@ export type SequenceConfig = {
   EXHAUST: ExhaustConfig
   HOLOGRAM: HologramConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
+  POKE: PokeConfig
   EXIT_MS: number
 }
 
@@ -707,7 +739,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   GESTURES: {
     BEATS_TO_COMMIT: 3,
-    WHEEL_THRESHOLD: 160,
+    WHEEL_THRESHOLD: 145,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
     TOUCH_THRESHOLD: 60,
@@ -888,7 +920,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     LENS_Z: 0,
     SHOW_PORTS: false,
     NEAR_ROT: { X_DEG: 13, Y_DEG: 161, Z_DEG: 23 },
-    FAR_ROT: { X_DEG: 31, Y_DEG: -15, Z_DEG: 7 },
+    FAR_ROT: { X_DEG: 31, Y_DEG: -21, Z_DEG: 7 },
     ENTRY_MS: 1600,
     ENTRY_STAGGER_MS: 200,
     BOB_AMP: 0.08,
@@ -928,16 +960,16 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   HOLOGRAM: {
     W_FRAC: 0.615,
-    PANEL_ASPECT: 1.7768,
+    PANEL_ASPECT: 1.651,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
     MOBILE_W_FRAC: 0.78,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.66,
-    FORM_MS: 1500,
-    FLICKER_MS: 4900,
-    FLICKER_DUR_MS: 220,
-    FLICKER_DEPTH: 0.37,
+    FORM_MS: 1875,
+    FLICKER_MS: 5900,
+    FLICKER_DUR_MS: 360,
+    FLICKER_DEPTH: 0.49,
     // ⚠️ WHITE, and white is the identity. It MULTIPLIES the artwork now
     // rather than replacing it — panel2 carries its own amber — so anything
     // else here shifts a colour the owner already chose.
@@ -945,30 +977,41 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // ⚠️ RE-TUNED with the shader, like SHAFT_OPACITY before it. The owner's
     // 0.44 scaled an `ink * 1.9` term plus a separate haze; it now scales a
     // field that peaks at 1, so the same number is about half the brightness.
-    GLASS_OPACITY: 0.85,
-    SHAFT_COLOR: '#F5C542',
+    GLASS_OPACITY: 0.6,
+    SHAFT_COLOR: '#FFC547',
     // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
     // against a solid wedge where every fragment was fully lit; the fan
     // multiplies this by the striation and the cone falloff, so the same
     // number reads as almost nothing.
-    SHAFT_OPACITY: 0.39,
+    SHAFT_OPACITY: 0.46,
     SHAFT_SPREAD: 2.52,
     // The owner's annotated target: edges up and out, not out sideways.
-    SHAFT_HALF_DEG: 68,
+    SHAFT_HALF_DEG: 64,
     SHAFT_GUIDE: false,
-    SHAFT_REACH: 0.35,
-    SHAFT_RAYS: 4.8,
-    SHAFT_SPEED: 1,
+    SHAFT_REACH: 0.4,
+    SHAFT_RAYS: 3.3,
+    SHAFT_SPEED: 3.35,
     SHAFT_FADE: 1.35,
     SHAFT_CONTRAST: 2.2,
     SHAFT_BOUND: 1,
     SHAFT_CORE: 0.7,
     SHAFT_TIP: 4.6,
     SHAFT_CORE_COLOR: '#FFF3D0',
-    SHAFT_CORE_SPAN: 0.45,
+    SHAFT_CORE_SPAN: 0.5,
     // Both zero, so the slot config changes nothing until a slider moves.
     NEAR_SHAFT: { DX: 0.05, DY: -0.2, ANGLE_DEG: 11, SPREAD: 0.85, REACH: 0.75 },
-    FAR_SHAFT: { DX: 0.05, DY: -0.55, ANGLE_DEG: -15, SPREAD: 0.9, REACH: 0.8 },
+    FAR_SHAFT: { DX: 0.1, DY: -0.6, ANGLE_DEG: -20, SPREAD: 0.75, REACH: 0.65 },
+  },
+
+  POKE: {
+    ENABLED: true,
+    SHAKE_MS: 700,
+    SHAKE_AMP: 0.09,
+    SHAKE_HZ: 19,
+    RELEASE_MS: 420,
+    FLICKER_MS: 620,
+    FLICKER_DEPTH: 0.8,
+    HIT_SLOP: 18,
   },
 
   EXIT_MS: 800,

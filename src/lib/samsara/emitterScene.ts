@@ -13,6 +13,7 @@ import {
   type OrbSlot,
 } from './emitterOrbs'
 import { makeSmokePool, SmokeState, type PortSpec, type SmokeMode } from './orbSmoke'
+import { shakeOffset } from './orbPoke'
 import {
   screenQuad,
   shaftFor,
@@ -65,6 +66,10 @@ export type EmitterUpdateArgs = {
   dtMs: number
   /** The room's own reveal ramp, so the orbs arrive with the room rather than before it. */
   reveal: number
+  /** Press-and-hold shake, 0..1 of POKE.SHAKE_AMP. */
+  shake01: number
+  /** The poked flicker's extra depth, on top of the screen's idle one. */
+  pokeDip: number
 }
 
 export type EmitterScene = {
@@ -78,6 +83,14 @@ export type EmitterScene = {
   update(a: EmitterUpdateArgs, cam: THREE.Camera): void
   /** The screen's four world-space corners, for the projected-rect contract. */
   screenCorners(): Vec3[]
+  /**
+   * Where the orbs are and how big, in world units, as of the last update.
+   *
+   * ⚠️ Read from the RENDERED frame, not recomputed. The hit test has to agree
+   * with what the visitor is looking at, and the orbs bob — a pose derived
+   * again at pointer time is a different pose.
+   */
+  orbSpheres(): { x: number; y: number; z: number; r: number }[]
   dispose(): void
 }
 
@@ -665,6 +678,9 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
   let corners: Vec3[] = []
   const dir = new THREE.Vector3()
+  const ZERO2: [number, number] = [0, 0]
+  /** Last rendered orb placement, for the hit test. See orbSpheres(). */
+  const orbSpheresOut = SLOTS.map(() => ({ x: 0, y: 0, z: 0, r: 0 }))
   /** Scratch for the NDC projections that place the screen-edge bound. */
   const pv = new THREE.Vector3()
   const camRight = new THREE.Vector3()
@@ -773,7 +789,31 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         const bob = phase === 'entering' ? 0 : orbBobY(slot, a.parkedMs, cfg.EMITTERS) * pose.radius
 
         const rot = orbRot(slot, cfg.EMITTERS)
-        orbs[i].position.set(pose.x, pose.y + bob, pose.z)
+
+        /**
+         * The press-and-hold wobble, on the SCREEN'S axes.
+         *
+         * ⚠️ Camera right and up, not world x and y. The orbs sit at very
+         * different depths, and a world-space offset of the same size moves the
+         * far one visibly less — they would shake by different amounts on
+         * screen from a single amplitude. In orb radii for the same reason
+         * SHAKE_AMP is: it has to read the same whatever size the orbs are.
+         */
+        camRight.setFromMatrixColumn(cam.matrixWorld, 0)
+        camUp.setFromMatrixColumn(cam.matrixWorld, 1)
+        const [sx, sy] =
+          a.shake01 > 0 ? shakeOffset(a.smokeMs, cfg.POKE, a.shake01, i) : ZERO2
+        const shakeX = (camRight.x * sx + camUp.x * sy) * pose.radius
+        const shakeY = (camRight.y * sx + camUp.y * sy) * pose.radius
+        const shakeZ = (camRight.z * sx + camUp.z * sy) * pose.radius
+
+        orbSpheresOut[i] = {
+          x: pose.x + shakeX,
+          y: pose.y + bob + shakeY,
+          z: pose.z + shakeZ,
+          r: pose.radius,
+        }
+        orbs[i].position.set(pose.x + shakeX, pose.y + bob + shakeY, pose.z + shakeZ)
         // ⚠️ Default XYZ Euler order, which is what `rotateLocal` reproduces
         // term for term. Changing one without the other detaches the plume.
         orbs[i].rotation.set(
@@ -804,13 +844,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
         shafts[i].visible = lit
         if (lit) {
-          // ⚠️ Read BEFORE the origin, not after. The slot's nudge is measured
-          // along these two axes, so an origin computed first would be offset
-          // by last frame's camera — invisible while the camera is still and a
-          // lag the moment it is not.
-          camRight.setFromMatrixColumn(cam.matrixWorld, 0)
-          camUp.setFromMatrixColumn(cam.matrixWorld, 1)
-
+          // camRight/camUp were read above, for the shake, and both the nudge
+          // and the wobble measure along them.
           const slotShaft = slot === 'near' ? cfg.HOLOGRAM.NEAR_SHAFT : cfg.HOLOGRAM.FAR_SHAFT
           const lens = lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot)
           // In ORB RADII along the screen's own axes, so a nudge means the same
@@ -928,7 +963,16 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
          * DOM on top. A rect that moved with the flicker would jitter that text
          * five times a minute.
          */
-        const dip = phase === 'live' ? flickerAt(a.parkedMs, cfg.HOLOGRAM) : 0
+        /**
+         * ⚠️ The two flickers COMBINE rather than replace. The idle one is on a
+         * timer and the poked one is on a press; whichever is deeper wins, so a
+         * poke that lands during an idle dip does not read as the screen
+         * briefly recovering.
+         */
+        const dip = Math.min(
+          1,
+          Math.max(phase === 'live' ? flickerAt(a.parkedMs, cfg.HOLOGRAM) : 0, a.pokeDip),
+        )
         // Forming is an UNSTABLE ramp, not a clean fade — the owner's words
         // were "start from flickering then appear".
         const forming =
@@ -949,6 +993,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
     },
 
     screenCorners: () => corners,
+
+    orbSpheres: () => orbSpheresOut,
 
     dispose() {
       markerGeo.dispose()
