@@ -250,6 +250,8 @@ check(
       SHAFT_COLOR: '#E8B733',
       SHAFT_OPACITY: 0.19,
       SHAFT_SPREAD: 0.48,
+      SHAFT_HALF_DEG: 41,
+      SHAFT_GUIDE: true,
       SHAFT_REACH: 2.4,
       SHAFT_RAYS: 1.7,
       SHAFT_SPEED: 0.6,

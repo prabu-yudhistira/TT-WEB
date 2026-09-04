@@ -170,6 +170,8 @@ export type SamsaraSequenceInput = {
     shaftColor?: string | null
     shaftOpacity?: number | null
     shaftSpread?: number | null
+    shaftHalfDeg?: number | null
+    shaftGuide?: boolean | null
     shaftReach?: number | null
     shaftRays?: number | null
     shaftSpeed?: number | null
@@ -440,6 +442,8 @@ export function resolveSamsara(
       SHAFT_COLOR: hex(ho.shaftColor, d.HOLOGRAM.SHAFT_COLOR),
       SHAFT_OPACITY: num(ho.shaftOpacity, d.HOLOGRAM.SHAFT_OPACITY),
       SHAFT_SPREAD: num(ho.shaftSpread, d.HOLOGRAM.SHAFT_SPREAD),
+      SHAFT_HALF_DEG: num(ho.shaftHalfDeg, d.HOLOGRAM.SHAFT_HALF_DEG),
+      SHAFT_GUIDE: bool(ho.shaftGuide, d.HOLOGRAM.SHAFT_GUIDE),
       SHAFT_REACH: num(ho.shaftReach, d.HOLOGRAM.SHAFT_REACH),
       SHAFT_RAYS: num(ho.shaftRays, d.HOLOGRAM.SHAFT_RAYS),
       SHAFT_SPEED: num(ho.shaftSpeed, d.HOLOGRAM.SHAFT_SPEED),
@@ -606,6 +610,8 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       shaftColor: c.HOLOGRAM.SHAFT_COLOR,
       shaftOpacity: c.HOLOGRAM.SHAFT_OPACITY,
       shaftSpread: c.HOLOGRAM.SHAFT_SPREAD,
+      shaftHalfDeg: c.HOLOGRAM.SHAFT_HALF_DEG,
+      shaftGuide: c.HOLOGRAM.SHAFT_GUIDE,
       shaftReach: c.HOLOGRAM.SHAFT_REACH,
       shaftRays: c.HOLOGRAM.SHAFT_RAYS,
       shaftSpeed: c.HOLOGRAM.SHAFT_SPEED,

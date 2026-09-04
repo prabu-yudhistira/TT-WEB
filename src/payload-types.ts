@@ -1873,9 +1873,17 @@ export interface SamsaraSequence {
      */
     shaftOpacity?: number | null;
     /**
-     * How wide the fan opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.
+     * Brightness distribution INSIDE the fan — use shaftHalfDeg to set how wide it opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.
      */
     shaftSpread?: number | null;
+    /**
+     * Half-angle of the fan — where it actually ends. Not the same as shaft spread, which only shapes brightness inside it: a cosine falloff reaches zero at exactly 90 degrees whatever it is set to, so without this the fan always throws a tail out sideways.
+     */
+    shaftHalfDeg?: number | null;
+    /**
+     * TUNING AID — leave off for visitors. Draws the fan’s two edges in green so the half-angle is visible while it is being set.
+     */
+    shaftGuide?: boolean | null;
     /**
      * How far the rays travel, as a multiple of the frame’s diagonal at the orb’s own depth. At 1 or above the fan always runs off the frame; below 1 you will see where it ends.
      */
@@ -2522,6 +2530,8 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         shaftColor?: T;
         shaftOpacity?: T;
         shaftSpread?: T;
+        shaftHalfDeg?: T;
+        shaftGuide?: T;
         shaftReach?: T;
         shaftRays?: T;
         shaftSpeed?: T;

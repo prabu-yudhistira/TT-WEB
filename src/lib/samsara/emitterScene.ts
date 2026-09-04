@@ -182,6 +182,9 @@ const SHAFT_FRAG = /* glsl */ `
   uniform float uTip;
   uniform vec3 uCoreColor;
   uniform float uCoreSpan;
+  /** Half-angle of the fan, radians. Where it actually ends. */
+  uniform float uHalf;
+  uniform float uGuide;
   /** Per-orb phase, so two fans are not the same fan twice. */
   uniform float uSeed;
   uniform float uTime;
@@ -201,7 +204,21 @@ const SHAFT_FRAG = /* glsl */ `
     vec2 n = vP / max(dist, 1e-4);
     float cosA = dot(n, uDir);
     if (cosA <= 0.0) discard;
-    float cone = pow(cosA, 1.0 / max(uSpread, 0.001));
+    /**
+     * ⚠️ TWO terms, and the second is the one the owner asked for.
+     *
+     * pow(cos, n) only reaches zero at exactly 90 degrees, so however hard it
+     * is tuned the fan still throws a faint tail out sideways — the owner drew
+     * that as a pair of near-horizontal lines running off the panel. It shapes
+     * brightness INSIDE the fan; it cannot say where the fan stops.
+     *
+     * uHalf says where it stops. Feathered over the last fifth so the edge is
+     * an edge and not a cut, and multiplied rather than replacing the power,
+     * so SHAFT_SPREAD keeps the meaning it was tuned with.
+     */
+    float ang = acos(clamp(cosA, -1.0, 1.0));
+    float gate = 1.0 - smoothstep(uHalf * 0.8, uHalf, ang);
+    float cone = pow(cosA, 1.0 / max(uSpread, 0.001)) * gate;
     /**
      * ONE falloff, shaped.
      *
@@ -298,7 +315,26 @@ const SHAFT_FRAG = /* glsl */ `
      */
     vec3 tint = mix(uCoreColor, uColor, smoothstep(0.0, max(uCoreSpan, 1e-4), sqrt(dist)));
 
-    gl_FragColor = vec4(tint, min(1.0, uOpacity * rays * cone * falloff * bound + core));
+    float alpha = min(1.0, uOpacity * rays * cone * falloff * bound + core);
+
+    /**
+     * TUNING AID — the fan's two edges, drawn where uHalf actually puts them.
+     *
+     * The owner has now annotated this angle by hand twice, on a screenshot,
+     * because there is nothing on screen that says where the fan ends. A
+     * cosine tail has no visible edge to point at. Reach it with
+     * ?HOLOGRAM.SHAFT_GUIDE=1 on the bench.
+     */
+    if (uGuide > 0.5) {
+      float w = 0.012 + dist * 0.01;
+      float onEdge = 1.0 - smoothstep(0.0, w, abs(ang - uHalf));
+      if (onEdge > 0.0 && dist < 0.85) {
+        gl_FragColor = vec4(0.2, 1.0, 0.35, max(alpha, onEdge * 0.9));
+        return;
+      }
+    }
+
+    gl_FragColor = vec4(tint, alpha);
   }
 `
 
@@ -574,6 +610,8 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       uTip: { value: 1 },
       uCoreColor: { value: new THREE.Color('#ffffff') },
       uCoreSpan: { value: 0.5 },
+      uHalf: { value: Math.PI / 2 },
+      uGuide: { value: 0 },
       uSeed: { value: i * 7.31 },
       uTime: { value: 0 },
     },
@@ -710,6 +748,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         m.uniforms.uTip.value = cfg.HOLOGRAM.SHAFT_TIP
         ;(m.uniforms.uCoreColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_CORE_COLOR)
         m.uniforms.uCoreSpan.value = cfg.HOLOGRAM.SHAFT_CORE_SPAN
+        m.uniforms.uGuide.value = cfg.HOLOGRAM.SHAFT_GUIDE ? 1 : 0
       }
       ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
     },
@@ -825,12 +864,14 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
           const [ax, ay] = shaftAim(dir.dot(camRight), dir.dot(camUp), slotShaft.ANGLE_DEG)
           ;(shaftMats[i].uniforms.uDir.value as THREE.Vector2).set(ax, ay)
 
-          // ⚠️ Per FRAME, not in setConfig with the other shaft uniforms. It is
-          // the only one that differs between the two orbs under a shared
-          // config, so setting it there would hand both fans whichever slot
-          // happened to be written last.
-          shaftMats[i].uniforms.uSpread.value =
-            cfg.HOLOGRAM.SHAFT_SPREAD * Math.max(0.01, slotShaft.SPREAD)
+          // ⚠️ Per FRAME, not in setConfig with the other shaft uniforms. The
+          // half-angle differs between the two orbs under a shared config, so
+          // setting it there would hand both fans whichever slot happened to
+          // be written last.
+          shaftMats[i].uniforms.uSpread.value = cfg.HOLOGRAM.SHAFT_SPREAD
+          shaftMats[i].uniforms.uHalf.value =
+            (Math.min(90, Math.max(1, cfg.HOLOGRAM.SHAFT_HALF_DEG * slotShaft.SPREAD)) * Math.PI) /
+            180
 
           /**
            * The screen's edges, in this plane's own x.

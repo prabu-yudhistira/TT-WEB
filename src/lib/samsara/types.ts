@@ -509,6 +509,17 @@ export type HologramConfig = {
    */
   SHAFT_SPREAD: number
   /**
+   * The fan's half-angle in degrees — where it actually ends.
+   *
+   * ⚠️ NOT the same knob as SHAFT_SPREAD, which only shapes brightness inside
+   * the fan. pow(cos, n) reaches zero at exactly 90 degrees whatever n is, so
+   * without this the fan always throws a faint tail out horizontally however
+   * tightly it is tuned. Turn on SHAFT_GUIDE to see where this sits.
+   */
+  SHAFT_HALF_DEG: number
+  /** TUNING AID — draws the fan's two edges in green. Never on for visitors. */
+  SHAFT_GUIDE: boolean
+  /**
    * How far the rays travel, as a multiple of the frame's diagonal at the
    * orb's own depth. At 1 the fan always covers the frame, so its edge is
    * never on screen; below 1 the edge comes into view.
@@ -584,13 +595,17 @@ export type ShaftSlotConfig = {
    */
   ANGLE_DEG: number
   /**
-   * Multiplies SHAFT_SPREAD for this fan only.
+   * Multiplies SHAFT_HALF_DEG for this fan only.
    *
    * ⚠️ A TRIM, not a second master. The two orbs sit at very different depths
    * and aim across different distances, so one of them is always wrong when
-   * both share a spread — but two independent absolutes would leave the global
+   * both share an angle — but two independent absolutes would leave the global
    * slider doing nothing, which is the config-nothing-reads failure this
    * project has already paid for once.
+   *
+   * ⚠️ It multiplies the HALF-ANGLE, not SHAFT_SPREAD, since 2026-09-04. A
+   * slider called "spread" has to change how wide the fan looks; the interior
+   * falloff is the one thing it visibly does not.
    */
   SPREAD: number
 }
@@ -915,6 +930,9 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // number reads as almost nothing.
     SHAFT_OPACITY: 0.2,
     SHAFT_SPREAD: 0.8,
+    // The owner's annotated target: edges up and out, not out sideways.
+    SHAFT_HALF_DEG: 62,
+    SHAFT_GUIDE: false,
     SHAFT_REACH: 1.15,
     SHAFT_RAYS: 4,
     SHAFT_SPEED: 1,
