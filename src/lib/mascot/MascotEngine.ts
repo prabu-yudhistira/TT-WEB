@@ -23,12 +23,15 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
+import { createEmitterScene, type EmitterScene, type EmitterUpdateArgs } from '../samsara/emitterScene'
+import { projectQuad, type Rect, type Vec3 } from '../samsara/hologramGeometry'
 import {
   DEFAULT_SEQUENCE,
   type BurstConfig,
   type DragConfig,
   type IdleEyesConfig,
   type RoomConfig,
+  type SequenceConfig,
 } from '../samsara/types'
 
 /**
@@ -211,6 +214,15 @@ export class MascotEngine {
     orbitAngle: 0,
     camera: 'ortho' as 'ortho' | 'perspective',
     mode: 'orbit' as 'orbit' | 'transit' | 'room',
+    /**
+     * The holographic screen's projected rect in CSS px, or null when no
+     * screen exists.
+     *
+     * Lives in THIS snapshot, beside the pose, for the same reason the pose
+     * does: three rAF callbacks run per browser frame, so a rect read from a
+     * later callback is this frame's render labelled with next frame's state.
+     */
+    holoRect: null as Rect | null,
   }
   private spin = 0
   private elapsed = 0
@@ -245,6 +257,19 @@ export class MascotEngine {
    * pays nothing — no geometry, no shadow map, no extra draw calls.
    */
   private room: Room | null = null
+  private emitters: EmitterScene | null = null
+  private orbModel: THREE.Object3D | null = null
+  private orbLoading = false
+  private holoArgs: EmitterUpdateArgs | null = null
+  /**
+   * Identity of the last config pushed into the emitter scene.
+   *
+   * The engine holds `roomCfg`, not the whole SequenceConfig, so the emitter
+   * colours arrive with the per-frame args. Pushing them every frame would
+   * call `Color.set()` five times a frame for values that change when an
+   * editor moves a slider; comparing the reference is enough.
+   */
+  private holoCfgApplied: SequenceConfig | null = null
   private roomCfg: RoomConfig = DEFAULT_SEQUENCE.ROOM
   /** The room's warm environment, and the config it was built from. */
   private roomEnvRT: THREE.WebGLRenderTarget | null = null
@@ -1539,6 +1564,67 @@ export class MascotEngine {
    * Leaving shadowMap.enabled on for the orbit would pay a shadow pass on every
    * hero frame for a scene that casts none.
    */
+  /**
+   * Lazily fetch the emitter orb model and build the hologram scene.
+   *
+   * ⚠️ LAZY on purpose. A hero-only visit must never pay 590 KB for a model it
+   * will not draw, exactly as the room's own high-detail LOD is deferred.
+   *
+   * Resolves false rather than throwing when the fetch fails: a missing orb
+   * must degrade to a room with no hologram, never to a broken room. That is
+   * the same fail-open rule the sequence itself follows for a missing GL
+   * context.
+   */
+  async loadEmitters(url: string): Promise<boolean> {
+    if (this.disposed || this.emitters || this.orbLoading) return !!this.emitters
+    this.orbLoading = true
+    try {
+      const draco = new DRACOLoader()
+      draco.setDecoderPath('/draco/')
+      const loader = new GLTFLoader()
+      loader.setDRACOLoader(draco)
+      const gltf = await loader.loadAsync(url)
+      if (this.disposed) return false
+
+      // Normalise to a unit radius so `pose.radius` is the only scale that
+      // matters downstream, whatever units the file happens to carry.
+      const model = gltf.scene
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const centre = box.getCenter(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z) || 1
+      model.position.sub(centre)
+      const norm = new THREE.Group()
+      norm.add(model)
+      norm.scale.setScalar(2 / maxDim)
+
+      this.orbModel = norm
+      this.emitters = createEmitterScene(norm)
+      this.scene.add(this.emitters.group)
+      return true
+    } catch {
+      return false
+    } finally {
+      this.orbLoading = false
+    }
+  }
+
+  /** True once the orbs are loaded and their scene is in the graph. */
+  hasEmitters(): boolean {
+    return !!this.emitters
+  }
+
+  /**
+   * The hologram's per-frame state, or null to stand it down.
+   *
+   * Stored rather than applied here: the scene must be updated from inside the
+   * render loop so its rect lands in the SAME snapshot as the pose.
+   */
+  setHologram(a: EmitterUpdateArgs | null) {
+    this.holoArgs = a
+    if (!a && this.emitters) this.emitters.group.visible = false
+  }
+
   setRoomVisible(v: boolean) {
     if (v && !this.room) {
       this.room = buildRoom(this.roomCfg)
@@ -2195,6 +2281,49 @@ export class MascotEngine {
     this.lastRendered.diameterPx = Math.abs(toPxY(top.y) - y) * 2
     this.lastRendered.camera = this.cameraMode
     this.lastRendered.mode = this.mode
+
+    // ── the hologram, drawn and measured in the SAME frame ──────────
+    //
+    // ⚠️ Both halves happen HERE, next to the pose, and that placement is the
+    // whole point rather than convenience.
+    //
+    // Three rAF callbacks run per browser frame in registration order: the
+    // engine's loop, the sequence's loop, then any sampler. A rect computed in
+    // a later callback describes THIS frame's render but carries NEXT frame's
+    // camera and phase. samsara-seam.mjs cost three separate false readings
+    // learning that — a 6px seam and a 2,332px jump that did not exist.
+    const holo = this.holoArgs
+    if (this.emitters && holo) {
+      if (this.holoCfgApplied !== holo.cfg) {
+        this.emitters.setConfig(holo.cfg)
+        this.holoCfgApplied = holo.cfg
+      }
+      this.emitters.update(holo)
+
+      const pts = this.emitters.screenCorners()
+      if (pts.length === 4 && this.emitters.group.visible) {
+        // ⚠️ The bounding box of the four PROJECTED corners — never a
+        // projection of the centre plus the world size. Under perspective
+        // those differ, and the difference is what would put future subtitles
+        // subtly out of place with nothing looking broken.
+        //
+        // ⚠️ this.W / this.H are the CSS size. The canvas ATTRIBUTES are
+        // cssSize x devicePixelRatio, and using them here would reproduce the
+        // 25%-too-large presentation bug at dpr 1.25.
+        const v = new THREE.Vector3()
+        this.lastRendered.holoRect = projectQuad(
+          { corners: pts as [Vec3, Vec3, Vec3, Vec3], centre: [0, 0, 0], w: 0, h: 0 },
+          (pt) => {
+            v.set(pt[0], pt[1], pt[2]).project(cam)
+            return [((v.x + 1) / 2) * this.W, ((1 - v.y) / 2) * this.H]
+          },
+        )
+      } else {
+        this.lastRendered.holoRect = null
+      }
+    } else {
+      this.lastRendered.holoRect = null
+    }
   }
 
   getLabelBox(): LabelBox | null {
@@ -2485,6 +2614,25 @@ export class MascotEngine {
     this.stop()
     this.roomEnvRT?.dispose()
     this.roomEnvRT = null
+    if (this.emitters) {
+      this.scene.remove(this.emitters.group)
+      this.emitters.dispose()
+      this.emitters = null
+    }
+    // The orb model is the emitters' source, so it is retired here rather than
+    // in emitterScene.dispose(), which only owns the clones.
+    if (this.orbModel) {
+      this.orbModel.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        m.geometry?.dispose()
+        const mat = m.material as THREE.Material | THREE.Material[]
+        for (const one of Array.isArray(mat) ? mat : [mat]) one?.dispose()
+      })
+      this.orbModel = null
+    }
+    this.holoArgs = null
+    this.holoCfgApplied = null
     window.removeEventListener('scroll', this.onScroll)
     window.removeEventListener('pointerdown', this.onPointerDown)
     window.removeEventListener('pointermove', this.onPointerMove)
