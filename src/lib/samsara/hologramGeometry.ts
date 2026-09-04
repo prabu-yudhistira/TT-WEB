@@ -116,6 +116,24 @@ export function shaftFor(
  * at SHAFT_REACH 1 the fan can never be seen to end. Above 1 is headroom for
  * the falloff; below 1 deliberately brings the edge into view.
  */
+/**
+ * A fan's axis on screen, turned by its slot's angle.
+ *
+ * ⚠️ Falls back to straight up rather than to zero. A zero-length direction
+ * makes `dot(n, uDir)` zero everywhere and the fan vanishes silently; up is
+ * where the screen sits from both orbs, so the degenerate case still draws
+ * something sensible. Degenerate happens when the fan points straight at the
+ * viewer, which the entry animation passes through.
+ */
+export function shaftAim(dx: number, dy: number, angleDeg: number): [number, number] {
+  const len = Math.hypot(dx, dy)
+  const [ux, uy] = len > 1e-6 ? [dx / len, dy / len] : [0, 1]
+  const a = (angleDeg * Math.PI) / 180
+  const c = Math.cos(a)
+  const s = Math.sin(a)
+  return [ux * c - uy * s, ux * s + uy * c]
+}
+
 export function shaftReach(
   camDist: number,
   fovDeg: number,

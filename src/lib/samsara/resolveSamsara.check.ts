@@ -260,6 +260,8 @@ check(
       SHAFT_TIP: 2.2,
       SHAFT_CORE_COLOR: '#FFEEBB',
       SHAFT_CORE_SPAN: 0.31,
+      NEAR_SHAFT: { DX: -1.4, DY: 0.8, ANGLE_DEG: 17, SPREAD: 0.7 },
+      FAR_SHAFT: { DX: 2.1, DY: -0.6, ANGLE_DEG: -23, SPREAD: 1.9 },
     },
     EXIT_MS: 1250,
   }

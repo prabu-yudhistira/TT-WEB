@@ -12,7 +12,14 @@ import {
   type OrbSlot,
 } from './emitterOrbs'
 import { makeSmokePool, SmokeState, type PortSpec, type SmokeMode } from './orbSmoke'
-import { screenQuad, shaftFor, shaftReach, flickerAt, type Vec3 } from './hologramGeometry'
+import {
+  screenQuad,
+  shaftFor,
+  shaftReach,
+  shaftAim,
+  flickerAt,
+  type Vec3,
+} from './hologramGeometry'
 import type { HoloPhase } from './HologramController'
 import { DEFAULT_SEQUENCE } from './types'
 
@@ -694,7 +701,6 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       for (let i = 0; i < markers.length; i++) markers[i].visible = cfg.EMITTERS.SHOW_PORTS
       for (const m of shaftMats) {
         ;(m.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_COLOR)
-        m.uniforms.uSpread.value = cfg.HOLOGRAM.SHAFT_SPREAD
         m.uniforms.uRays.value = cfg.HOLOGRAM.SHAFT_RAYS
         m.uniforms.uSpeed.value = cfg.HOLOGRAM.SHAFT_SPEED
         m.uniforms.uFade.value = cfg.HOLOGRAM.SHAFT_FADE
@@ -773,7 +779,21 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
         shafts[i].visible = lit
         if (lit) {
-          const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot), quad, cfg.HOLOGRAM)
+          // ⚠️ Read BEFORE the origin, not after. The slot's nudge is measured
+          // along these two axes, so an origin computed first would be offset
+          // by last frame's camera — invisible while the camera is still and a
+          // lag the moment it is not.
+          camRight.setFromMatrixColumn(cam.matrixWorld, 0)
+          camUp.setFromMatrixColumn(cam.matrixWorld, 1)
+
+          const slotShaft = slot === 'near' ? cfg.HOLOGRAM.NEAR_SHAFT : cfg.HOLOGRAM.FAR_SHAFT
+          const lens = lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot)
+          // In ORB RADII along the screen's own axes, so a nudge means the same
+          // thing at any orb size and at either depth.
+          const nx = (camRight.x * slotShaft.DX + camUp.x * slotShaft.DY) * pose.radius
+          const ny = (camRight.y * slotShaft.DX + camUp.y * slotShaft.DY) * pose.radius
+          const nz = (camRight.z * slotShaft.DX + camUp.z * slotShaft.DY) * pose.radius
+          const s = shaftFor([lens[0] + nx, lens[1] + ny, lens[2] + nz], quad, cfg.HOLOGRAM)
           shafts[i].position.set(s.origin[0], s.origin[1], s.origin[2])
           shafts[i].quaternion.copy(cam.quaternion)
           // ⚠️ Sized from the REAL camera, at THIS orb's own distance. See
@@ -799,17 +819,18 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
           dir
             .set(s.target[0] - s.origin[0], s.target[1] - s.origin[1], s.target[2] - s.origin[2])
             .normalize()
-          camRight.setFromMatrixColumn(cam.matrixWorld, 0)
-          camUp.setFromMatrixColumn(cam.matrixWorld, 1)
-          const dx = dir.dot(camRight)
-          const dy = dir.dot(camUp)
-          const dl = Math.hypot(dx, dy)
-          // Degenerate only when the fan points straight at the viewer, where
-          // there is no on-screen direction to have. Up is the sane default —
-          // it is where the screen sits relative to both orbs.
-          const u = shaftMats[i].uniforms.uDir.value as THREE.Vector2
-          if (dl > 1e-3) u.set(dx / dl, dy / dl)
-          else u.set(0, 1)
+          // shaftAim normalises and handles the degenerate case — the fan can
+          // point straight at the viewer during the entry, and a zero
+          // direction blanks it with nothing logged.
+          const [ax, ay] = shaftAim(dir.dot(camRight), dir.dot(camUp), slotShaft.ANGLE_DEG)
+          ;(shaftMats[i].uniforms.uDir.value as THREE.Vector2).set(ax, ay)
+
+          // ⚠️ Per FRAME, not in setConfig with the other shaft uniforms. It is
+          // the only one that differs between the two orbs under a shared
+          // config, so setting it there would hand both fans whichever slot
+          // happened to be written last.
+          shaftMats[i].uniforms.uSpread.value =
+            cfg.HOLOGRAM.SHAFT_SPREAD * Math.max(0.01, slotShaft.SPREAD)
 
           /**
            * The screen's edges, in this plane's own x.

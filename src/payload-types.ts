@@ -1916,6 +1916,24 @@ export interface SamsaraSequence {
      * How far the hot colour carries before the ray is fully amber.
      */
     shaftCoreSpan?: number | null;
+    /**
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread multiplies the global shaft spread for this fan alone — 1 leaves it be.
+     */
+    nearShaft?: {
+      dx?: number | null;
+      dy?: number | null;
+      angleDeg?: number | null;
+      spread?: number | null;
+    };
+    /**
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread multiplies the global shaft spread for this fan alone — 1 leaves it be.
+     */
+    farShaft?: {
+      dx?: number | null;
+      dy?: number | null;
+      angleDeg?: number | null;
+      spread?: number | null;
+    };
   };
   /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
@@ -2514,6 +2532,22 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         shaftTip?: T;
         shaftCoreColor?: T;
         shaftCoreSpan?: T;
+        nearShaft?:
+          | T
+          | {
+              dx?: T;
+              dy?: T;
+              angleDeg?: T;
+              spread?: T;
+            };
+        farShaft?:
+          | T
+          | {
+              dx?: T;
+              dy?: T;
+              angleDeg?: T;
+              spread?: T;
+            };
       };
   exitMs?: T;
   updatedAt?: T;

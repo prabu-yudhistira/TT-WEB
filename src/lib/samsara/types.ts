@@ -552,6 +552,47 @@ export type HologramConfig = {
   SHAFT_CORE_COLOR: string
   /** How far the hot colour carries, 0..1 of the reach. */
   SHAFT_CORE_SPAN: number
+  NEAR_SHAFT: ShaftSlotConfig
+  FAR_SHAFT: ShaftSlotConfig
+}
+
+/**
+ * Where one orb's fan sits and which way it points.
+ *
+ * ⚠️ ON SCREEN, not in the room, and that is the point rather than a
+ * shortcut. The fan is drawn on a plane turned to face the camera, so its
+ * whole geometry is two-dimensional; expressing its placement in world x/y/z
+ * would make three sliders that move it in ways the eye cannot predict, two
+ * of which do nearly the same thing from this camera.
+ *
+ * ⚠️ NOT a second lens position. EMITTERS.LENS_* is where the projector sits
+ * on the MODEL — geometry, shared by both orbs because they are the same
+ * mesh. This is composition: how far this particular fan is nudged off that
+ * point, in orb radii so it holds at any orb size.
+ */
+export type ShaftSlotConfig = {
+  /** Nudge across the screen from the lens, in orb radii. Right is positive. */
+  DX: number
+  /** Nudge up the screen from the lens, in orb radii. Up is positive. */
+  DY: number
+  /**
+   * Turns the fan's axis on screen, degrees, anticlockwise.
+   *
+   * ⚠️ RELATIVE to the aim at the screen's centre, not an absolute heading.
+   * At 0 the fan points where it always did, so this is inert until moved —
+   * and the fan keeps following the screen if the screen is moved.
+   */
+  ANGLE_DEG: number
+  /**
+   * Multiplies SHAFT_SPREAD for this fan only.
+   *
+   * ⚠️ A TRIM, not a second master. The two orbs sit at very different depths
+   * and aim across different distances, so one of them is always wrong when
+   * both share a spread — but two independent absolutes would leave the global
+   * slider doing nothing, which is the config-nothing-reads failure this
+   * project has already paid for once.
+   */
+  SPREAD: number
 }
 
 /**
@@ -884,6 +925,9 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SHAFT_TIP: 3.4,
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.45,
+    // Both zero, so the slot config changes nothing until a slider moves.
+    NEAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1 },
+    FAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1 },
   },
 
   EXIT_MS: 800,

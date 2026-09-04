@@ -3,7 +3,15 @@
  * that will become the DOM contract.
  */
 import { DEFAULT_SEQUENCE } from './types'
-import { screenQuad, projectQuad, shaftFor, shaftReach, flickerAt, type Vec3 } from './hologramGeometry'
+import {
+  screenQuad,
+  projectQuad,
+  shaftFor,
+  shaftReach,
+  shaftAim,
+  flickerAt,
+  type Vec3,
+} from './hologramGeometry'
 import type { OrbCtx } from './emitterOrbs'
 
 let failures = 0
@@ -109,6 +117,34 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
   check('and with a wider viewport',
     shaftReach(camDist, fov, aspect * 2, cfg1) > r)
   check('SHAFT_REACH scales it', Math.abs(shaftReach(camDist, fov, aspect, { ...cfg, SHAFT_REACH: 2 }) - r * 2) < 1e-9)
+}
+
+// ── the fan's aim ───────────────────────────────────────────────────
+{
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9
+  const [x0, y0] = shaftAim(3, 4, 0)
+  // ⚠️ At 0 degrees this must be INERT. The slot config ships at 0 for both
+  // orbs, so anything else here silently moves a composition the owner has
+  // already approved.
+  check('0 degrees leaves the aim alone', near(x0, 0.6) && near(y0, 0.8),
+    `${x0.toFixed(3)}, ${y0.toFixed(3)}`)
+  check('and it is normalised', near(Math.hypot(x0, y0), 1))
+
+  const [x1, y1] = shaftAim(1, 0, 90)
+  check('90 turns right into up', near(x1, 0) && near(y1, 1), `${x1.toFixed(3)}, ${y1.toFixed(3)}`)
+  const [x2, y2] = shaftAim(1, 0, -90)
+  check('and -90 turns it into down', near(x2, 0) && near(y2, -1))
+  const [x3, y3] = shaftAim(0, 1, 180)
+  check('180 reverses it', near(x3, 0) && near(y3, -1))
+
+  // A zero direction is reachable during the entry, when the fan points at the
+  // viewer. Returning (0,0) there makes dot(n, uDir) zero everywhere and the
+  // whole fan disappears with nothing logged.
+  const [x4, y4] = shaftAim(0, 0, 0)
+  check('a degenerate aim falls back to up, not to nothing', near(x4, 0) && near(y4, 1))
+  check('and the fallback still turns', near(shaftAim(0, 0, 90)[0], -1))
+
+  check('the turn preserves length', near(Math.hypot(...shaftAim(-2, 5, 37)), 1))
 }
 
 // ── flicker ─────────────────────────────────────────────────────────

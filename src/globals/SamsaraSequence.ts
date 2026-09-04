@@ -64,6 +64,26 @@ const orbSlot = (
  * Shared between landscape and portrait: which way a machine faces is a
  * property of the machine, not of the viewport.
  */
+const shaftSlotGroup = (
+  name: string,
+  label: string,
+  d0: { DX: number; DY: number; ANGLE_DEG: number; SPREAD: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  admin: {
+    description:
+      'Where this orb\u2019s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen\u2019s centre, so 0 leaves it exactly where it was. Spread multiplies the global shaft spread for this fan alone \u2014 1 leaves it be.',
+  },
+  fields: [
+    { name: 'dx', type: 'number', defaultValue: d0.DX, min: -8, max: 8 },
+    { name: 'dy', type: 'number', defaultValue: d0.DY, min: -8, max: 8 },
+    { name: 'angleDeg', type: 'number', defaultValue: d0.ANGLE_DEG, min: -180, max: 180 },
+    { name: 'spread', type: 'number', defaultValue: d0.SPREAD, min: 0.05, max: 4 },
+  ],
+})
+
 const orbRotGroup = (
   name: string,
   label: string,
@@ -1168,6 +1188,8 @@ export const SamsaraSequence: GlobalConfig = {
           max: 1,
           admin: { description: 'How far the hot colour carries before the ray is fully amber.' },
         },
+        shaftSlotGroup('nearShaft', 'Near orb — fan placement', d.HOLOGRAM.NEAR_SHAFT),
+        shaftSlotGroup('farShaft', 'Far orb — fan placement', d.HOLOGRAM.FAR_SHAFT),
       ],
     },
 

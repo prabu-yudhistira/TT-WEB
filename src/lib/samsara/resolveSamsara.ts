@@ -1,6 +1,7 @@
 import {
   DEFAULT_SEQUENCE,
   type OrbRotConfig,
+  type ShaftSlotConfig,
   type OrbSlotConfig,
   type SequenceConfig,
 } from './types'
@@ -179,11 +180,19 @@ export type SamsaraSequenceInput = {
     shaftTip?: number | null
     shaftCoreColor?: string | null
     shaftCoreSpan?: number | null
+    nearShaft?: ShaftSlotCms
+    farShaft?: ShaftSlotCms
   } | null
   exitMs?: number | null
 }
 
 type OrbRotCms = { xDeg?: number | null; yDeg?: number | null; zDeg?: number | null } | null
+type ShaftSlotCms = {
+  dx?: number | null
+  dy?: number | null
+  angleDeg?: number | null
+  spread?: number | null
+} | null
 
 type OrbSlotCms = {
   xFrac?: number | null
@@ -243,6 +252,13 @@ export function resolveSamsara(
   })
 
   /** One orb's parked orientation. Degrees, falling back field by field. */
+  const shaftSlot = (v: ShaftSlotCms | undefined, d0: ShaftSlotConfig): ShaftSlotConfig => ({
+    DX: num(v?.dx, d0.DX),
+    DY: num(v?.dy, d0.DY),
+    ANGLE_DEG: num(v?.angleDeg, d0.ANGLE_DEG),
+    SPREAD: num(v?.spread, d0.SPREAD),
+  })
+
   const rot = (v: OrbRotCms | undefined, d0: OrbRotConfig): OrbRotConfig => ({
     X_DEG: num(v?.xDeg, d0.X_DEG),
     Y_DEG: num(v?.yDeg, d0.Y_DEG),
@@ -434,6 +450,8 @@ export function resolveSamsara(
       SHAFT_TIP: num(ho.shaftTip, d.HOLOGRAM.SHAFT_TIP),
       SHAFT_CORE_COLOR: hex(ho.shaftCoreColor, d.HOLOGRAM.SHAFT_CORE_COLOR),
       SHAFT_CORE_SPAN: num(ho.shaftCoreSpan, d.HOLOGRAM.SHAFT_CORE_SPAN),
+      NEAR_SHAFT: shaftSlot(ho.nearShaft, d.HOLOGRAM.NEAR_SHAFT),
+      FAR_SHAFT: shaftSlot(ho.farShaft, d.HOLOGRAM.FAR_SHAFT),
     },
 
     EXIT_MS: num(cms?.exitMs, d.EXIT_MS),
@@ -598,6 +616,18 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       shaftTip: c.HOLOGRAM.SHAFT_TIP,
       shaftCoreColor: c.HOLOGRAM.SHAFT_CORE_COLOR,
       shaftCoreSpan: c.HOLOGRAM.SHAFT_CORE_SPAN,
+      nearShaft: {
+        dx: c.HOLOGRAM.NEAR_SHAFT.DX,
+        dy: c.HOLOGRAM.NEAR_SHAFT.DY,
+        angleDeg: c.HOLOGRAM.NEAR_SHAFT.ANGLE_DEG,
+        spread: c.HOLOGRAM.NEAR_SHAFT.SPREAD,
+      },
+      farShaft: {
+        dx: c.HOLOGRAM.FAR_SHAFT.DX,
+        dy: c.HOLOGRAM.FAR_SHAFT.DY,
+        angleDeg: c.HOLOGRAM.FAR_SHAFT.ANGLE_DEG,
+        spread: c.HOLOGRAM.FAR_SHAFT.SPREAD,
+      },
     },
     exitMs: c.EXIT_MS,
   }
