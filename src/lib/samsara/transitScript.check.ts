@@ -125,7 +125,7 @@ const samples = Array.from({ length: 400 }, (_, i) => transitPoseAt(i / 399, ctx
 }
 
 // ── mobile portrait ─────────────────────────────────────────────────
-// Owner's composition: SAMSARA on top, chatbox below it.
+// Owner's composition: SAMSARA high in the frame, Section 2 content below it.
 {
   const m: TransitContext = { ...ctx, W: 390, H: 844, mobile: true, cx: 195, cy: 300, hh: 101 }
   const end = transitPoseAt(1, m)

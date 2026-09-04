@@ -313,14 +313,6 @@ export interface Page {
             blockType: 'hero';
           }
         | {
-            /**
-             * Heading above the chat box in the dark room. The box is a STUB — it is styled and positioned but does not send anything yet.
-             */
-            chatHeading?: string | null;
-            /**
-             * Placeholder inside the disabled input. Say what SAMSARA will eventually answer, so the stub reads as a promise rather than a broken field.
-             */
-            chatPlaceholder?: string | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'samsaraRoom';
@@ -630,8 +622,6 @@ export interface PagesSelect<T extends boolean = true> {
         samsaraRoom?:
           | T
           | {
-              chatHeading?: T;
-              chatPlaceholder?: T;
               id?: T;
               blockName?: T;
             };
@@ -1435,7 +1425,7 @@ export interface SamsaraSequence {
     settleMs?: number | null;
   };
   /**
-   * Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because the chatbox moves from beside SAMSARA to below it.
+   * Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because SAMSARA sits beside Section 2’s content on wide screens and above it in portrait.
    */
   landing?: {
     /**
@@ -1455,11 +1445,11 @@ export interface SamsaraSequence {
      */
     yFrac?: number | null;
     /**
-     * Portrait: centred, with the chatbox below.
+     * Portrait: centred, sitting high in the frame.
      */
     mobileXFrac?: number | null;
     /**
-     * Portrait height. Lowering this pushes SAMSARA down into the chatbox — the check at docs/superpowers/verification/samsara-room-chatbox.mjs measures the real gap.
+     * Portrait height. Lowering this pushes SAMSARA down into whatever Section 2 renders below it.
      */
     mobileYFrac?: number | null;
     /**
@@ -1511,9 +1501,13 @@ export interface SamsaraSequence {
      */
     cameraFovDeg?: number | null;
     /**
-     * How far back the room runs. SAMSARA enters at the far wall.
+     * The room’s world-unit SCALE, not its apparent size. The camera is solved from it, so changing this pulls the camera back by the same factor and the picture does not change. To push the floor and walls out of shot, use Surface extent below.
      */
     depth?: number | null;
+    /**
+     * How far the floor and walls run past the frame. 1 ends them exactly at the frame edge, which is where their edges are visible. Raise it until the side walls and the wall tops leave shot and the space reads as unbounded — the key light does not reach further, so the surfaces fall off into darkness on their own. The floor stays put at any value, so SAMSARA’s bounce keeps its contact shadow.
+     */
+    extent?: number | null;
     /**
      * Warm bronze-brass. Inert while the strength below is 0.
      */
@@ -1615,7 +1609,7 @@ export interface SamsaraSequence {
   burst?: {
     enabled?: boolean | null;
     /**
-     * Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.
+     * Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the settle.
      */
     intervalMs?: number | null;
     /**
@@ -1673,17 +1667,312 @@ export interface SamsaraSequence {
     coreColor?: string | null;
   };
   /**
-   * Its wording lives on the SAMSARA room block, in Pages. These are only its timings.
+   * Two instances of ONE model, sharing one download. They differ by DEPTH, not by size, which is why there is a single size control and four positions.
    */
-  chatbox?: {
+  emitters?: {
     /**
-     * From the moment SAMSARA leaves the hero. It should overlap the settle, so the box arrives as the body stops moving rather than after it.
+     * On-screen height as a fraction of viewport height — the same units as SAMSARA’s own landing size. Both orbs share it.
      */
-    delayMs?: number | null;
+    sizeFrac?: number | null;
     /**
-     * The fade and rise.
+     * Portrait, where the orbs flank the screen below SAMSARA.
      */
-    enterMs?: number | null;
+    mobileSizeFrac?: number | null;
+    near?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    far?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    mobileNear?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    mobileFar?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    /**
+     * The four steam nozzles, in orb radii. ONE set of coordinates, mirrored on X and Z — the nozzles sit in a square on the underside, so four loose values could only drift out of it. Turn on the port markers below to place them by eye.
+     */
+    portX?: number | null;
+    /**
+     * Height. Negative, since the nozzles are underneath.
+     */
+    portY?: number | null;
+    portZ?: number | null;
+    lensX?: number | null;
+    /**
+     * The domed projector lens on top. The light shafts start here.
+     */
+    lensY?: number | null;
+    lensZ?: number | null;
+    /**
+     * TUNING AID — leave off for visitors. Draws a green marker at each nozzle and a pink one at the lens. Without it a port is invisible until smoke happens to come out of it, which is a slow way to find out where it actually is.
+     */
+    showPorts?: boolean | null;
+    /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    nearRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    farRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
+     * How long one orb takes to fly in from behind the camera.
+     */
+    entryMs?: number | null;
+    /**
+     * How far the far orb lags the near one. At 0 they arrive together and read as one rigid object rather than two machines.
+     */
+    entryStaggerMs?: number | null;
+    /**
+     * Idle float, in orb radii. The two orbs bob out of phase deliberately.
+     */
+    bobAmp?: number | null;
+    bobMs?: number | null;
+    /**
+     * Puffs per second PER PORT, across the four afterburners. CONTINUOUS — the orbs emit from the moment they appear until the room closes.
+     */
+    thrustRate?: number | null;
+    thrustSpread?: number | null;
+    /**
+     * How far each plume leans away from the orb’s axis, as a multiple of that nozzle’s own offset. At 0 all four jets are parallel and read as one flame rather than four afterburners.
+     */
+    plumeOut?: number | null;
+    /**
+     * How hard the plume is driven along the orb’s own Y, in radii per second. Negative vents out of the underside.
+     */
+    plumeY?: number | null;
+    /**
+     * In orb radii, so it holds its proportion at every viewport.
+     */
+    puffSize?: number | null;
+    /**
+     * How long a puff lasts. Lifetimes vary up to 1.25x around this, so no two are identical. Longer means a denser trail, since the emission is continuous.
+     */
+    puffLifeMs?: number | null;
+    /**
+     * Warm grey steam — deliberately not the gold of SAMSARA’s own bursts.
+     */
+    puffColor?: string | null;
+    puffOpacity?: number | null;
+  };
+  /**
+   * The two brass tubes on SAMSARA’s upper rear. One port is configured and MIRRORED across the centreline, because the tubes are symmetric on the model — a second set of coordinates could only drift out of line with them. The plume turns with the body, so parking or dragging SAMSARA carries it along.
+   */
+  exhaust?: {
+    /**
+     * Off leaves SAMSARA’s own golden burst untouched — they are separate systems.
+     */
+    enabled?: boolean | null;
+    /**
+     * Right-hand tube, in body radii from the centre. Mirrored to the left.
+     */
+    portX?: number | null;
+    /**
+     * Height. The tubes sit high on the hull.
+     */
+    portY?: number | null;
+    /**
+     * Depth. NEGATIVE is behind — the face is +Z, so a positive value puts smoke on SAMSARA’s face.
+     */
+    portZ?: number | null;
+    /**
+     * Outward lean of the plume. Mirrors with the port.
+     */
+    dirX?: number | null;
+    /**
+     * Rise. Keep positive, or the plume pools under a hovering body.
+     */
+    dirY?: number | null;
+    /**
+     * Backward push, away from the face.
+     */
+    dirZ?: number | null;
+    /**
+     * Puffs per second PER TUBE. Continuous, not a repeating burst — an engine idles.
+     */
+    rate?: number | null;
+    spread?: number | null;
+    /**
+     * Pixels at the body’s depth, the same units as the golden burst’s size.
+     */
+    puffSize?: number | null;
+    puffLifeMs?: number | null;
+    /**
+     * Warm grey steam, matching the orbs rather than the golden burst.
+     */
+    puffColor?: string | null;
+    puffOpacity?: number | null;
+  };
+  /**
+   * The screen the two orbs project. It will later carry subtitles and option buttons as real DOM on top, which is why the flicker below applies to the GLASS ONLY — flickering text would defeat the accessibility feature it exists to provide.
+   */
+  hologram?: {
+    wFrac?: number | null;
+    /**
+     * The artwork’s width over its height. The panel’s height follows from this and its width, so the drawing never stretches — it must MATCH public/hud/panel.png, and scripts/build-hud-sdf.mjs prints the source aspect on every run.
+     */
+    panelAspect?: number | null;
+    /**
+     * Landscape. Keep the screen clear of SAMSARA, which parks at 0.75.
+     */
+    xFrac?: number | null;
+    yFrac?: number | null;
+    mobileWFrac?: number | null;
+    mobileXFrac?: number | null;
+    /**
+     * Portrait. The screen goes BELOW SAMSARA, which parks at 0.3.
+     */
+    mobileYFrac?: number | null;
+    /**
+     * The screen flickers first and then resolves — an unstable ramp, not a clean fade.
+     */
+    formMs?: number | null;
+    /**
+     * The permanent flicker interval once the screen is live.
+     */
+    flickerMs?: number | null;
+    /**
+     * Keep well below the interval, or the screen reads as broken rather than as a projection.
+     */
+    flickerDurMs?: number | null;
+    /**
+     * How far the glass dips. Never 1 — a screen that fully extinguishes reads as a fault rather than a hologram.
+     */
+    flickerDepth?: number | null;
+    /**
+     * A MULTIPLY over the artwork, which carries its own amber. White leaves it exactly as drawn; anything else shifts it.
+     */
+    glassColor?: string | null;
+    glassOpacity?: number | null;
+    /**
+     * The light shafts from each lens. Usually the same amber as the glass.
+     */
+    shaftColor?: string | null;
+    /**
+     * The shafts are additive geometry, not fog — fog is banned in this room because it shares its scene with the hero orbit and would tint SAMSARA mid-flight.
+     */
+    shaftOpacity?: number | null;
+    /**
+     * Brightness distribution INSIDE the fan — use shaftHalfDeg to set how wide it opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.
+     */
+    shaftSpread?: number | null;
+    /**
+     * Half-angle of the fan — where it actually ends. Not the same as shaft spread, which only shapes brightness inside it: a cosine falloff reaches zero at exactly 90 degrees whatever it is set to, so without this the fan always throws a tail out sideways.
+     */
+    shaftHalfDeg?: number | null;
+    /**
+     * TUNING AID — leave off for visitors. Draws the fan’s two edges in green so the half-angle is visible while it is being set.
+     */
+    shaftGuide?: boolean | null;
+    /**
+     * How far the rays travel, as a multiple of the frame’s diagonal at the orb’s own depth. At 1 or above the fan always runs off the frame; below 1 you will see where it ends.
+     */
+    shaftReach?: number | null;
+    /**
+     * Ray density. They are banded on the angle, so spacing is naturally wide near the fan’s axis and tight at its edges.
+     */
+    shaftRays?: number | null;
+    /**
+     * Shimmer speed. 0 freezes the fan.
+     */
+    shaftSpeed?: number | null;
+    /**
+     * Falloff shape along a ray, not a distance — the reach sets where a ray ends. 1 is a straight ramp; below 1 it stays bright most of the way.
+     */
+    shaftFade?: number | null;
+    /**
+     * How dark it gets between rays. At 1 the fan is a soft wash; raise it until the streaks separate.
+     */
+    shaftContrast?: number | null;
+    /**
+     * How strongly the screen’s own left and right edges hold the light in. 1 keeps the fan inside the panel; 0 lets it run across the room.
+     */
+    shaftBound?: number | null;
+    /**
+     * A hot bloom where the rays leave the lens.
+     */
+    shaftCore?: number | null;
+    /**
+     * How sharply each ray closes to a point. 1 leaves the natural wedge, which ends blunt because a wedge is widest at its far end.
+     */
+    shaftTip?: number | null;
+    /**
+     * The colour at the throat of the beam, before it cools to the shaft colour.
+     */
+    shaftCoreColor?: string | null;
+    /**
+     * How far the hot colour carries before the ray is fully amber.
+     */
+    shaftCoreSpan?: number | null;
+    /**
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread and reach multiply the global half-angle and reach for this fan alone — 1 leaves them be.
+     */
+    nearShaft?: {
+      dx?: number | null;
+      dy?: number | null;
+      angleDeg?: number | null;
+      spread?: number | null;
+      reach?: number | null;
+    };
+    /**
+     * Where this orb’s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen’s centre, so 0 leaves it exactly where it was. Spread and reach multiply the global half-angle and reach for this fan alone — 1 leaves them be.
+     */
+    farShaft?: {
+      dx?: number | null;
+      dy?: number | null;
+      angleDeg?: number | null;
+      spread?: number | null;
+      reach?: number | null;
+    };
+  };
+  /**
+   * Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker, and keep flickering until the pointer lifts. The whole sequence is skipped under prefers-reduced-motion, which is where the photosensitivity guard lives.
+   */
+  poke?: {
+    enabled?: boolean | null;
+    shakeMs?: number | null;
+    shakeAmp?: number | null;
+    shakeHz?: number | null;
+    releaseMs?: number | null;
+    /**
+     * The flicker’s PERIOD, not its duration — it runs for as long as the press does. Lower is faster.
+     */
+    flickerMs?: number | null;
+    flickerDepth?: number | null;
+    /**
+     * Extra pixels around each orb that still count as a press. Not optional on touch — the orbs are small and a finger is not a pixel.
+     */
+    hitSlop?: number | null;
   };
   /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
@@ -2107,6 +2396,7 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         fogDensity?: T;
         cameraFovDeg?: T;
         depth?: T;
+        extent?: T;
         mascotTintColor?: T;
         mascotTintStrength?: T;
         mascotRoughnessBoost?: T;
@@ -2169,11 +2459,151 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         color?: T;
         coreColor?: T;
       };
-  chatbox?:
+  emitters?:
     | T
     | {
-        delayMs?: T;
-        enterMs?: T;
+        sizeFrac?: T;
+        mobileSizeFrac?: T;
+        near?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        far?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        mobileNear?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        mobileFar?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        portX?: T;
+        portY?: T;
+        portZ?: T;
+        lensX?: T;
+        lensY?: T;
+        lensZ?: T;
+        showPorts?: T;
+        nearRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
+            };
+        farRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
+            };
+        entryMs?: T;
+        entryStaggerMs?: T;
+        bobAmp?: T;
+        bobMs?: T;
+        thrustRate?: T;
+        thrustSpread?: T;
+        plumeOut?: T;
+        plumeY?: T;
+        puffSize?: T;
+        puffLifeMs?: T;
+        puffColor?: T;
+        puffOpacity?: T;
+      };
+  exhaust?:
+    | T
+    | {
+        enabled?: T;
+        portX?: T;
+        portY?: T;
+        portZ?: T;
+        dirX?: T;
+        dirY?: T;
+        dirZ?: T;
+        rate?: T;
+        spread?: T;
+        puffSize?: T;
+        puffLifeMs?: T;
+        puffColor?: T;
+        puffOpacity?: T;
+      };
+  hologram?:
+    | T
+    | {
+        wFrac?: T;
+        panelAspect?: T;
+        xFrac?: T;
+        yFrac?: T;
+        mobileWFrac?: T;
+        mobileXFrac?: T;
+        mobileYFrac?: T;
+        formMs?: T;
+        flickerMs?: T;
+        flickerDurMs?: T;
+        flickerDepth?: T;
+        glassColor?: T;
+        glassOpacity?: T;
+        shaftColor?: T;
+        shaftOpacity?: T;
+        shaftSpread?: T;
+        shaftHalfDeg?: T;
+        shaftGuide?: T;
+        shaftReach?: T;
+        shaftRays?: T;
+        shaftSpeed?: T;
+        shaftFade?: T;
+        shaftContrast?: T;
+        shaftBound?: T;
+        shaftCore?: T;
+        shaftTip?: T;
+        shaftCoreColor?: T;
+        shaftCoreSpan?: T;
+        nearShaft?:
+          | T
+          | {
+              dx?: T;
+              dy?: T;
+              angleDeg?: T;
+              spread?: T;
+              reach?: T;
+            };
+        farShaft?:
+          | T
+          | {
+              dx?: T;
+              dy?: T;
+              angleDeg?: T;
+              spread?: T;
+              reach?: T;
+            };
+      };
+  poke?:
+    | T
+    | {
+        enabled?: T;
+        shakeMs?: T;
+        shakeAmp?: T;
+        shakeHz?: T;
+        releaseMs?: T;
+        flickerMs?: T;
+        flickerDepth?: T;
+        hitSlop?: T;
       };
   exitMs?: T;
   updatedAt?: T;

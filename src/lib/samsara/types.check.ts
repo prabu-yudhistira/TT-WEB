@@ -6,7 +6,7 @@
  * later edit has to be deliberate and has to come back through the owner.
  * Run: npm run verify:config
  */
-import { DEFAULT_SEQUENCE } from './types'
+import { DEFAULT_SEQUENCE, portOffsets, portDirs } from './types'
 import { EXPRESSION_ORDER } from '../mascot/eyes'
 
 let failures = 0
@@ -99,9 +99,7 @@ check('desktop lands right of centre', DEFAULT_SEQUENCE.LANDING.X_FRAC > 0.5)
 check('mobile lands in the upper area', DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC < 0.5)
 check('hover bob is a gentle float', DEFAULT_SEQUENCE.LANDING.HOVER_BOB_PX > 0 && DEFAULT_SEQUENCE.LANDING.HOVER_BOB_PX < 40)
 
-// ── chatbox and exit ────────────────────────────────────────────────
-check('chatbox enters after the bounces begin', DEFAULT_SEQUENCE.CHATBOX.DELAY_MS > DEFAULT_SEQUENCE.TRANSIT.FALL_MS)
-check('chatbox entrance is positive', DEFAULT_SEQUENCE.CHATBOX.ENTER_MS > 0)
+// ── exit ────────────────────────────────────────────────────────────
 check('exit is quicker than the fall', DEFAULT_SEQUENCE.EXIT_MS < DEFAULT_SEQUENCE.TRANSIT.FALL_MS)
 
 // ── room ────────────────────────────────────────────────────────────
@@ -143,7 +141,12 @@ check(
 // bleeding sideways. The body simply IS ~4.7% wider than tall, and STRETCH is
 // the owner overriding that on purpose rather than the engine distorting it.
 check('approved body stretch', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_X === 1)
-check('approved body stretch Y', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y === 1.12)
+// Revised 2026-09-04: 1.12 -> 1.01, i.e. the owner has pulled the deliberate
+// vertical stretch almost all the way out. The measurement above still stands —
+// the mesh really is ~4.7% wider than tall — so this is the owner choosing to
+// let the body render close to as modelled rather than a correction being
+// undone by accident.
+check('approved body stretch Y', DEFAULT_SEQUENCE.ROOM.MASCOT_STRETCH_Y === 1.01)
 // A stretch of 0 collapses the body to a plane and a negative one turns it
 // inside out; neither is a look anyone is reaching for with a slider.
 check(
@@ -240,6 +243,131 @@ check(
 )
 
 check('kill switch defaults on', DEFAULT_SEQUENCE.ENABLED === true)
+
+// Below 1 the surfaces would end INSIDE the framed volume and their edges
+// would be visible in shot, which is the opposite of what this control is for.
+check('room extent never crops inside the frame', DEFAULT_SEQUENCE.ROOM.EXTENT >= 1)
+
+// ── emitters ────────────────────────────────────────────────────────
+//
+// ⚠️ RELATIONSHIPS ONLY, never magnitudes — unlike everything above, which
+// pins owner-approved decisions. EMITTERS and HOLOGRAM are STARTING VALUES
+// (spec §9): the owner tunes them at /dev/samsara and freezes them there.
+// Pinning a number here would misrepresent a guess as a decision.
+check('orb size is a sane fraction of the viewport',
+  DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC > 0 && DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC < 0.5)
+check('mobile orb is not larger than desktop',
+  DEFAULT_SEQUENCE.EMITTERS.MOBILE_SIZE_FRAC <= DEFAULT_SEQUENCE.EMITTERS.SIZE_FRAC)
+check('the near orb is nearer the camera than the far orb',
+  DEFAULT_SEQUENCE.EMITTERS.NEAR.DEPTH_FRAC < DEFAULT_SEQUENCE.EMITTERS.FAR.DEPTH_FRAC)
+check('entry has a positive duration', DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS > 0)
+check('the stagger is shorter than the entry it offsets',
+  DEFAULT_SEQUENCE.EMITTERS.ENTRY_STAGGER_MS < DEFAULT_SEQUENCE.EMITTERS.ENTRY_MS)
+// The emission is continuous now, so there is no interval for a puff to
+// outlive — only that it lasts long enough to be seen and short enough that the
+// pool is not permanently saturated by an ever-growing cloud.
+check('a puff lives long enough to read, and expires',
+  DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS > 200 &&
+    DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS < 12000)
+check('thrust emits at a positive rate', DEFAULT_SEQUENCE.EMITTERS.THRUST_RATE > 0)
+{
+  const ports = portOffsets(DEFAULT_SEQUENCE.EMITTERS)
+  check('there are four ports', ports.length === 4)
+  // Mirroring is what keeps them square; four loose coordinates could not.
+  check('all four sit below the orb centre', ports.every((q) => q[1] < 0))
+  check('and they are four DISTINCT points',
+    new Set(ports.map((q) => q.join(','))).size === 4)
+  check('the projector lens is above the centre', DEFAULT_SEQUENCE.EMITTERS.LENS_Y > 0)
+  // A debug aid left on would ship four markers into the room.
+  check('the port markers ship off', DEFAULT_SEQUENCE.EMITTERS.SHOW_PORTS === false)
+}
+// Degrees, not radians — a value past a full turn is a unit mistake, not a look.
+for (const [label, r] of [['near', DEFAULT_SEQUENCE.EMITTERS.NEAR_ROT], ['far', DEFAULT_SEQUENCE.EMITTERS.FAR_ROT]] as const) {
+  check(`${label} orb rotation is in degrees`,
+    [r.X_DEG, r.Y_DEG, r.Z_DEG].every((v) => Number.isFinite(v) && Math.abs(v) <= 360))
+}
+
+// ── SAMSARA's exhausts ──────────────────────────────────────────────
+{
+  const x = DEFAULT_SEQUENCE.EXHAUST
+  // Upper REAR: the tubes sit high and behind, and the face is +Z in model
+  // space. A positive Z would put them on SAMSARA's face.
+  check('the exhausts are above the body centre', x.PORT_Y > 0)
+  check('and behind it, not on the face', x.PORT_Z < 0)
+  check('the port is off the centreline so mirroring gives two', x.PORT_X > 0)
+  // A plume that fell would pool under a body that is already hovering.
+  check('the plume leaves upward', x.DIR_Y > 0)
+  check('and away from the face', x.DIR_Z < 0)
+  check('it emits at a positive rate', x.RATE > 0)
+  check('a puff outlives a single frame', x.PUFF_LIFE_MS > 100)
+}
+
+// ── hologram ────────────────────────────────────────────────────────
+check('the screen has positive extent',
+  DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC > 0 && DEFAULT_SEQUENCE.HOLOGRAM.PANEL_ASPECT > 0)
+check('forming has a positive duration', DEFAULT_SEQUENCE.HOLOGRAM.FORM_MS > 0)
+check('the flicker is briefer than its own interval',
+  DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DUR_MS < DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_MS)
+check('the flicker dips rather than extinguishing',
+  DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DEPTH > 0 && DEFAULT_SEQUENCE.HOLOGRAM.FLICKER_DEPTH < 1)
+// Landscape: the screen sits LEFT of SAMSARA, which parks at X_FRAC 0.75.
+check('the screen clears SAMSARA horizontally in landscape',
+  DEFAULT_SEQUENCE.HOLOGRAM.X_FRAC + DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC / 2
+    < DEFAULT_SEQUENCE.LANDING.X_FRAC)
+/**
+ * Portrait: the screen sits BELOW SAMSARA, which parks at MOBILE_Y_FRAC 0.3.
+ *
+ * ⚠️ The height is DERIVED now — width over the artwork's aspect — so the
+ * panel's height as a fraction of the viewport depends on the VIEWPORT's own
+ * aspect: short on a narrow phone, tall on a wide one. There is no MOBILE_H_FRAC
+ * to read, and picking a representative portrait viewport is the honest way to
+ * assert the clearance rather than pretending the coupling is not there.
+ */
+{
+  const va = 390 / 844
+  const hFracEff =
+    (DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_W_FRAC * va) / DEFAULT_SEQUENCE.HOLOGRAM.PANEL_ASPECT
+  check('the screen clears SAMSARA vertically in portrait',
+    DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_Y_FRAC - hFracEff / 2 >
+      DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC)
+}
+
+// ── the orb plume splays, and that is the whole point ───────────────
+{
+  const e = DEFAULT_SEQUENCE.EMITTERS
+  const dirs = portDirs(e)
+  check('one direction per nozzle', dirs.length === portOffsets(e).length)
+
+  // ⚠️ THE BUG THIS REPLACED. The lean was hardcoded, and small enough against
+  // the axial term that all four jets left within about 13 degrees of straight
+  // down — four afterburners reading as one flame. Asserting the four are
+  // DISTINCT is what stops a future tune quietly collapsing them again.
+  const keys = new Set(dirs.map((d) => `${d[0].toFixed(4)},${d[2].toFixed(4)}`))
+  check('all four plumes point somewhere different', keys.size === 4)
+
+  // Mirrored on x and z, like the nozzles they leave from.
+  const sx = dirs.map((d) => Math.sign(d[0])).sort().join('')
+  const sz = dirs.map((d) => Math.sign(d[2])).sort().join('')
+  check('and they mirror on both axes', sx === '-1-111' && sz === '-1-111')
+
+  check('they all vent the same way along Y', dirs.every((d) => d[1] === e.PLUME_Y))
+
+  // At 0 they collapse to one jet — the failure mode, made reachable so the
+  // assertion above is measuring something real.
+  const flat = portDirs({ ...e, PLUME_OUT: 0 })
+  check('PLUME_OUT 0 collapses them, which is why it is a slider',
+    new Set(flat.map((d) => `${d[0]},${d[2]}`)).size === 1)
+
+  // ⚠️ The rate slider must not run past what a pool can hold. Above that the
+  // pool recycles live puffs and the slider's remaining travel does nothing.
+  // POOL is 2048 per orb; see emitterScene.
+  const standing = 200 * portOffsets(e).length * (e.PUFF_LIFE_MS / 1000)
+  check('the rate slider stays inside the puff pool', standing <= 2048)
+
+  const wide = portDirs({ ...e, PLUME_OUT: e.PLUME_OUT * 2 })
+  check('and doubling it doubles the lean',
+    Math.abs(wide[0][0] - dirs[0][0] * 2) < 1e-9)
+}
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll sequence config checks passed.')
 process.exit(failures ? 1 : 0)

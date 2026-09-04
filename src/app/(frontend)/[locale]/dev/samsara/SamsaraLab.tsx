@@ -134,8 +134,9 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'color', path: 'ROOM.KEY_LIGHT_COLOR', label: 'Key light' },
       { kind: 'num', path: 'ROOM.KEY_LIGHT_INTENSITY', label: 'Key intensity', min: 0, max: 12, step: 0.05 },
       { kind: 'num', path: 'ROOM.AMBIENT_INTENSITY', label: 'Ambient', min: 0, max: 3, step: 0.01 },
-      { kind: 'num', path: 'ROOM.CAMERA_FOV_DEG', label: 'Camera FOV °', min: 15, max: 100, step: 1 },
-      { kind: 'num', path: 'ROOM.DEPTH', label: 'Room depth', min: 6, max: 90, step: 1 },
+      { kind: 'num', path: 'ROOM.CAMERA_FOV_DEG', label: 'Camera FOV °', min: 8, max: 100, step: 1 },
+      { kind: 'num', path: 'ROOM.DEPTH', label: 'Room depth', min: 6, max: 200, step: 1 },
+      { kind: 'num', path: 'ROOM.EXTENT', label: 'Surface extent', min: 1, max: 32, step: 0.25 },
     ],
   },
   {
@@ -199,10 +200,135 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
-    title: 'chatbox + exit',
+    title: 'emitter orbs — near',
     rows: [
-      { kind: 'num', path: 'CHATBOX.DELAY_MS', label: 'Chatbox delay ms', min: 0, max: 8000, step: 50 },
-      { kind: 'num', path: 'CHATBOX.ENTER_MS', label: 'Chatbox enter ms', min: 60, max: 2500, step: 20 },
+      { kind: 'num', path: 'EMITTERS.SIZE_FRAC', label: 'Orb size (vh)', min: 0.02, max: 0.45, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.NEAR.X_FRAC', label: 'Near x', min: -0.4, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.NEAR.Y_FRAC', label: 'Near y', min: -0.4, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.NEAR.DEPTH_FRAC', label: 'Near depth', min: 0.02, max: 2.5, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.FAR.X_FRAC', label: 'Far x', min: -0.4, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.FAR.Y_FRAC', label: 'Far y', min: -0.4, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.FAR.DEPTH_FRAC', label: 'Far depth', min: 0.02, max: 2.5, step: 0.01 },
+    ],
+  },
+  {
+    // ⚠️ The marker toggle is not a row here — the panel has no boolean kind.
+    // Reach it with ?EMITTERS.SHOW_PORTS=1 on the bench URL, which the query
+    // parser already handles, or from the checkbox in /admin.
+    title: 'emitter orbs — nozzles and lens  (?EMITTERS.SHOW_PORTS=1)',
+    rows: [
+      { kind: 'num', path: 'EMITTERS.PORT_X', label: 'Nozzle x (±)', min: 0, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.PORT_Y', label: 'Nozzle y (down)', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.PORT_Z', label: 'Nozzle z (±)', min: 0, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_X', label: 'Lens x', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_Y', label: 'Lens y', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_Z', label: 'Lens z', min: -2, max: 2, step: 0.005 },
+    ],
+  },
+  {
+    title: 'emitter orbs — parked orientation',
+    rows: [
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.X_DEG', label: 'Near pitch °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.Y_DEG', label: 'Near yaw °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.Z_DEG', label: 'Near roll °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.X_DEG', label: 'Far pitch °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.Y_DEG', label: 'Far yaw °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.Z_DEG', label: 'Far roll °', min: -180, max: 180, step: 1 },
+    ],
+  },
+  {
+    title: 'emitter orbs — entry, float, smoke',
+    rows: [
+      { kind: 'num', path: 'EMITTERS.ENTRY_MS', label: 'Entry ms', min: 200, max: 6000, step: 50 },
+      { kind: 'num', path: 'EMITTERS.ENTRY_STAGGER_MS', label: 'Far orb lag ms', min: 0, max: 3000, step: 20 },
+      { kind: 'num', path: 'EMITTERS.BOB_AMP', label: 'Float amp (radii)', min: 0, max: 0.6, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.BOB_MS', label: 'Float ms', min: 400, max: 12000, step: 50 },
+      { kind: 'num', path: 'EMITTERS.THRUST_RATE', label: 'Puffs /s /port', min: 0, max: 200, step: 1 },
+      { kind: 'num', path: 'EMITTERS.THRUST_SPREAD', label: 'Thrust spread', min: 0, max: 3, step: 0.02 },
+      { kind: 'num', path: 'EMITTERS.PLUME_OUT', label: 'Plume splay', min: 0, max: 4, step: 0.02 },
+      { kind: 'num', path: 'EMITTERS.PLUME_Y', label: 'Plume along Y (− = down)', min: -4, max: 4, step: 0.02 },
+      { kind: 'num', path: 'EMITTERS.PUFF_SIZE', label: 'Puff size (radii)', min: 0.02, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.PUFF_LIFE_MS', label: 'Puff life ms', min: 100, max: 8000, step: 25 },
+      { kind: 'num', path: 'EMITTERS.PUFF_OPACITY', label: 'Puff opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'color', path: 'EMITTERS.PUFF_COLOR', label: 'Puff colour' },
+    ],
+  },
+  {
+    title: 'SAMSARA — exhaust smoke',
+    rows: [
+      { kind: 'num', path: 'EXHAUST.PORT_X', label: 'Tube x (mirrored)', min: 0, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PORT_Y', label: 'Tube y', min: -2, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PORT_Z', label: 'Tube z (− is behind)', min: -2, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_X', label: 'Plume out', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_Y', label: 'Plume up', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_Z', label: 'Plume back', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.RATE', label: 'Puffs /s /tube', min: 0, max: 120, step: 1 },
+      { kind: 'num', path: 'EXHAUST.SPREAD', label: 'Scatter', min: 0, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PUFF_SIZE', label: 'Puff size px', min: 2, max: 400, step: 1 },
+      { kind: 'num', path: 'EXHAUST.PUFF_LIFE_MS', label: 'Puff life ms', min: 100, max: 9000, step: 25 },
+      { kind: 'num', path: 'EXHAUST.PUFF_OPACITY', label: 'Puff opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'color', path: 'EXHAUST.PUFF_COLOR', label: 'Puff colour' },
+    ],
+  },
+  {
+    title: 'hologram — placement',
+    rows: [
+      { kind: 'num', path: 'HOLOGRAM.X_FRAC', label: 'Screen x', min: -0.2, max: 1.2, step: 0.005 },
+      { kind: 'num', path: 'HOLOGRAM.Y_FRAC', label: 'Screen y', min: -0.2, max: 1.2, step: 0.005 },
+      { kind: 'num', path: 'HOLOGRAM.W_FRAC', label: 'Screen width', min: 0.05, max: 1.2, step: 0.005 },
+      { kind: 'num', path: 'HOLOGRAM.PANEL_ASPECT', label: 'Art aspect (w/h)', min: 0.4, max: 4, step: 0.001 },
+    ],
+  },
+  {
+    title: 'hologram — look and flicker',
+    rows: [
+      { kind: 'num', path: 'HOLOGRAM.FORM_MS', label: 'Form ms', min: 100, max: 8000, step: 25 },
+      { kind: 'num', path: 'HOLOGRAM.FLICKER_MS', label: 'Flicker every ms', min: 500, max: 30000, step: 100 },
+      { kind: 'num', path: 'HOLOGRAM.FLICKER_DUR_MS', label: 'Flicker ms', min: 20, max: 2000, step: 10 },
+      { kind: 'num', path: 'HOLOGRAM.FLICKER_DEPTH', label: 'Flicker depth', min: 0, max: 0.95, step: 0.01 },
+      { kind: 'num', path: 'HOLOGRAM.GLASS_OPACITY', label: 'Glass opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'color', path: 'HOLOGRAM.GLASS_COLOR', label: 'Glass colour' },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_OPACITY', label: 'Shaft opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_REACH', label: 'Ray reach  (?HOLOGRAM.SHAFT_GUIDE=1)', min: 0.2, max: 6, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_RAYS', label: 'Ray density', min: 0.1, max: 6, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_SPEED', label: 'Ray shimmer', min: 0, max: 6, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_FADE', label: 'Ray falloff', min: 0.05, max: 4, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_CONTRAST', label: 'Ray contrast', min: 0.2, max: 8, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_BOUND', label: 'Held by screen', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_CORE', label: 'Lens core glow', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_TIP', label: 'Ray tip sharpness', min: 1, max: 10, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_CORE_SPAN', label: 'Hot colour span', min: 0.02, max: 1, step: 0.01 },
+      { kind: 'color', path: 'HOLOGRAM.SHAFT_CORE_COLOR', label: 'Ray core colour' },
+    ],
+  },
+  {
+    title: 'press and hold an orb  (?POKE.ENABLED=0 to disable)',
+    rows: [
+      { kind: 'num', path: 'POKE.SHAKE_MS', label: 'Hold to fire, ms', min: 100, max: 4000, step: 25 },
+      { kind: 'num', path: 'POKE.SHAKE_AMP', label: 'Shake amp (radii)', min: 0, max: 1, step: 0.005 },
+      { kind: 'num', path: 'POKE.SHAKE_HZ', label: 'Shake Hz', min: 1, max: 60, step: 0.5 },
+      { kind: 'num', path: 'POKE.RELEASE_MS', label: 'Settle ms', min: 0, max: 3000, step: 10 },
+      { kind: 'num', path: 'POKE.FLICKER_MS', label: 'Flicker period ms', min: 50, max: 4000, step: 10 },
+      { kind: 'num', path: 'POKE.FLICKER_DEPTH', label: 'Poke flicker depth', min: 0, max: 1, step: 0.01 },
+      { kind: 'num', path: 'POKE.HIT_SLOP', label: 'Hit slop px', min: 0, max: 120, step: 1 },
+      { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.DX', label: 'Near fan x', min: -8, max: 8, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.DY', label: 'Near fan y', min: -8, max: 8, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.ANGLE_DEG', label: 'Near fan aim °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.SPREAD', label: 'Near half-angle ×', min: 0.05, max: 4, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.NEAR_SHAFT.REACH', label: 'Near reach ×', min: 0.1, max: 4, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.DX', label: 'Far fan x', min: -8, max: 8, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.DY', label: 'Far fan y', min: -8, max: 8, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.ANGLE_DEG', label: 'Far fan aim °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.SPREAD', label: 'Far half-angle ×', min: 0.05, max: 4, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.REACH', label: 'Far reach ×', min: 0.1, max: 4, step: 0.05 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_HALF_DEG', label: 'Fan half-angle °  (?HOLOGRAM.SHAFT_GUIDE=1)', min: 1, max: 90, step: 1 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_SPREAD', label: 'Ray fill (inside the fan)', min: 0.02, max: 6, step: 0.01 },
+      { kind: 'color', path: 'HOLOGRAM.SHAFT_COLOR', label: 'Shaft colour' },
+    ],
+  },
+  {
+    title: 'exit',
+    rows: [
       { kind: 'num', path: 'EXIT_MS', label: 'Exit ms', min: 100, max: 4000, step: 25 },
     ],
   },
@@ -289,6 +415,35 @@ export default function SamsaraLab({
   const [holdEnabled, setHoldEnabled] = useState(true)
   const [copied, setCopied] = useState(false)
   const [showLogo, setShowLogo] = useState(true)
+  /**
+   * Which edge the panel is docked to.
+   *
+   * Wherever it sits it covers something: the orbs and the holographic screen
+   * are on the LEFT, and SAMSARA parks at LANDING.X_FRAC on the RIGHT. So this
+   * is a toggle rather than a fixed position — the owner flips it depending on
+   * which half is being tuned.
+   *
+   * Defaults to RIGHT, because the emitters and the screen are the surfaces
+   * currently being tuned and they were sitting underneath it.
+   */
+  const [dockRight, setDockRight] = useState(true)
+
+  /**
+   * ⚠️ Read in an EFFECT, not in the useState initialiser above.
+   *
+   * There is no localStorage during SSR, so an initialiser would render one
+   * value on the server and another on the client — a hydration mismatch. The
+   * hero's once-per-session flag was written this way for the same reason
+   * before it was reverted.
+   */
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('tt-bench-dock')
+      if (saved === 'left' || saved === 'right') setDockRight(saved === 'right')
+    } catch {
+      // Private windows and blocked site data throw on access, not on read.
+    }
+  }, [])
   const [showSats, setShowSats] = useState(true)
   const [parkSpin, setParkSpin] = useState(true)
   const [active, setActive] = useState(false)
@@ -331,10 +486,10 @@ export default function SamsaraLab({
   }, [])
 
   /**
-   * ⚠️ ROOM.DEPTH is GEOMETRY. `setRoomConfig` reaches colours and light
-   * intensities, which are uniforms and update live; the floor, walls and
-   * backdrop are all SIZED from DEPTH at build time and cannot be. So a depth
-   * change throws the room away and lets the next reveal build a fresh one.
+   * ⚠️ ROOM.DEPTH and ROOM.EXTENT are GEOMETRY. `setRoomConfig` reaches colours
+   * and light intensities, which are uniforms and update live; the floor, walls
+   * and backdrop are all SIZED at build time and cannot be. So a change to
+   * either throws the room away and lets the next reveal build a fresh one.
    *
    * The camera needs no equivalent: the sequence re-solves it every frame while
    * promoted, which is also what keeps a mid-fall resize from stranding it.
@@ -349,7 +504,7 @@ export default function SamsaraLab({
     // one control needs it, because everything else is a uniform.
     const t = setTimeout(() => engine.rebuildRoom(), 220)
     return () => clearTimeout(t)
-  }, [engine, cfg.ROOM.DEPTH])
+  }, [engine, cfg.ROOM.DEPTH, cfg.ROOM.EXTENT])
 
   /**
    * Parking the spin, per plan Task 12.
@@ -556,7 +711,7 @@ export default function SamsaraLab({
         style={{
           position: 'fixed',
           top: 16,
-          left: 16,
+          ...(dockRight ? { right: 16 } : { left: 16 }),
           zIndex: 100,
           width: 310,
           padding: '14px 16px',
@@ -570,7 +725,44 @@ export default function SamsaraLab({
           overscrollBehavior: 'contain',
         }}
       >
-        <strong style={{ display: 'block', marginBottom: 8 }}>SAMSARA — transition bench</strong>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <strong>SAMSARA — transition bench</strong>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !dockRight
+              setDockRight(next)
+              try {
+                window.localStorage.setItem('tt-bench-dock', next ? 'right' : 'left')
+              } catch {
+                // Not being able to remember the choice is not worth throwing over.
+              }
+            }}
+            title={
+              dockRight
+                ? 'Move the panel left — uncovers SAMSARA, covers the orbs and screen'
+                : 'Move the panel right — uncovers the orbs and screen, covers SAMSARA'
+            }
+            style={{
+              font: 'inherit',
+              padding: '2px 8px',
+              cursor: 'pointer',
+              background: 'rgba(43,42,39,0.08)',
+              border: '1px solid rgba(43,42,39,0.25)',
+              borderRadius: 3,
+              color: 'inherit',
+            }}
+          >
+            {dockRight ? '\u2190 dock left' : 'dock right \u2192'}
+          </button>
+        </div>
         <div style={{ marginBottom: 8, opacity: 0.75 }}>{status}</div>
 
         <div

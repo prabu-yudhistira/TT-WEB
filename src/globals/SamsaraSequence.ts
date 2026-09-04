@@ -27,6 +27,86 @@ const colour = (name: string, defaultValue: string, description?: string): Field
 })
 
 /**
+ * One emitter orb's parked position.
+ *
+ * Four of these exist — near/far x landscape/portrait — and writing them out
+ * longhand would be ~80 lines of near-identical field definitions in which a
+ * single wrong default would be invisible.
+ */
+const orbSlot = (
+  name: string,
+  label: string,
+  d0: { X_FRAC: number; Y_FRAC: number; DEPTH_FRAC: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  fields: [
+    { name: 'xFrac', type: 'number', defaultValue: d0.X_FRAC, min: -0.5, max: 1.5 },
+    { name: 'yFrac', type: 'number', defaultValue: d0.Y_FRAC, min: -0.5, max: 1.5 },
+    {
+      name: 'depthFrac',
+      type: 'number',
+      defaultValue: d0.DEPTH_FRAC,
+      min: 0.02,
+      // Raised from 1.4 on 2026-09-04: the owner's far orb ran out of slider
+      // at exactly the ceiling, which is how a range says it is too small.
+      max: 2.5,
+      admin: {
+        description:
+          '0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.',
+      },
+    },
+  ],
+})
+
+/**
+ * One emitter orb's parked orientation.
+ *
+ * Shared between landscape and portrait: which way a machine faces is a
+ * property of the machine, not of the viewport.
+ */
+const shaftSlotGroup = (
+  name: string,
+  label: string,
+  d0: { DX: number; DY: number; ANGLE_DEG: number; SPREAD: number; REACH: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  admin: {
+    description:
+      'Where this orb\u2019s fan sits and which way it points, ON SCREEN. The nudge is in orb radii from the lens; the angle turns the fan anticlockwise from its aim at the screen\u2019s centre, so 0 leaves it exactly where it was. Spread and reach multiply the global half-angle and reach for this fan alone \u2014 1 leaves them be.',
+  },
+  fields: [
+    { name: 'dx', type: 'number', defaultValue: d0.DX, min: -8, max: 8 },
+    { name: 'dy', type: 'number', defaultValue: d0.DY, min: -8, max: 8 },
+    { name: 'angleDeg', type: 'number', defaultValue: d0.ANGLE_DEG, min: -180, max: 180 },
+    { name: 'spread', type: 'number', defaultValue: d0.SPREAD, min: 0.05, max: 4 },
+    { name: 'reach', type: 'number', defaultValue: d0.REACH, min: 0.1, max: 4 },
+  ],
+})
+
+const orbRotGroup = (
+  name: string,
+  label: string,
+  d0: { X_DEG: number; Y_DEG: number; Z_DEG: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  admin: {
+    description:
+      'Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.',
+  },
+  fields: [
+    { name: 'xDeg', type: 'number', defaultValue: d0.X_DEG, min: -180, max: 180 },
+    { name: 'yDeg', type: 'number', defaultValue: d0.Y_DEG, min: -180, max: 180 },
+    { name: 'zDeg', type: 'number', defaultValue: d0.Z_DEG, min: -180, max: 180 },
+  ],
+})
+
+/**
  * A list of numbers, one row per beat or per bounce.
  *
  * ⚠️ Rows are how Payload stores a list, and an editor can delete one. The
@@ -251,7 +331,7 @@ export const SamsaraSequence: GlobalConfig = {
       label: 'Landing — where SAMSARA ends up',
       admin: {
         description:
-          'Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because the chatbox moves from beside SAMSARA to below it.',
+          'Fractions of the viewport, so the composition holds at every size. Desktop and portrait are set separately because SAMSARA sits beside Section 2’s content on wide screens and above it in portrait.',
       },
       fields: [
         {
@@ -292,7 +372,7 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.LANDING.MOBILE_X_FRAC,
           min: 0,
           max: 1,
-          admin: { description: 'Portrait: centred, with the chatbox below.' },
+          admin: { description: 'Portrait: centred, sitting high in the frame.' },
         },
         {
           name: 'mobileYFrac',
@@ -302,7 +382,7 @@ export const SamsaraSequence: GlobalConfig = {
           max: 1,
           admin: {
             description:
-              'Portrait height. Lowering this pushes SAMSARA down into the chatbox — the check at docs/superpowers/verification/samsara-room-chatbox.mjs measures the real gap.',
+              'Portrait height. Lowering this pushes SAMSARA down into whatever Section 2 renders below it.',
           },
         },
         {
@@ -394,7 +474,7 @@ export const SamsaraSequence: GlobalConfig = {
           name: 'cameraFovDeg',
           type: 'number',
           defaultValue: d.ROOM.CAMERA_FOV_DEG,
-          min: 20,
+          min: 8,
           max: 100,
           admin: {
             description:
@@ -407,7 +487,21 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.ROOM.DEPTH,
           min: 10,
           max: 140,
-          admin: { description: 'How far back the room runs. SAMSARA enters at the far wall.' },
+          admin: {
+            description:
+              'The room’s world-unit SCALE, not its apparent size. The camera is solved from it, so changing this pulls the camera back by the same factor and the picture does not change. To push the floor and walls out of shot, use Surface extent below.',
+          },
+        },
+        {
+          name: 'extent',
+          type: 'number',
+          defaultValue: d.ROOM.EXTENT,
+          min: 1,
+          max: 32,
+          admin: {
+            description:
+              'How far the floor and walls run past the frame. 1 ends them exactly at the frame edge, which is where their edges are visible. Raise it until the side walls and the wall tops leave shot and the space reads as unbounded — the key light does not reach further, so the surfaces fall off into darkness on their own. The floor stays put at any value, so SAMSARA’s bounce keeps its contact shadow.',
+          },
         },
         colour(
           'mascotTintColor',
@@ -576,7 +670,7 @@ export const SamsaraSequence: GlobalConfig = {
           max: 20000,
           admin: {
             description:
-              'Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the chatbox.',
+              'Between bursts. The first one waits a full interval after landing, so it does not arrive under the bounce and the settle.',
           },
         },
         {
@@ -698,36 +792,496 @@ export const SamsaraSequence: GlobalConfig = {
     },
 
     {
-      name: 'chatbox',
+      name: 'emitters',
       type: 'group',
-      label: 'Chatbox — the stub in Section 2',
+      label: 'Emitter orbs — the two projectors',
       admin: {
         description:
-          'Its wording lives on the SAMSARA room block, in Pages. These are only its timings.',
+          'Two instances of ONE model, sharing one download. They differ by DEPTH, not by size, which is why there is a single size control and four positions.',
       },
       fields: [
         {
-          name: 'delayMs',
+          name: 'sizeFrac',
           type: 'number',
-          defaultValue: d.CHATBOX.DELAY_MS,
-          min: 0,
-          max: 9000,
+          defaultValue: d.EMITTERS.SIZE_FRAC,
+          min: 0.02,
+          max: 0.45,
           admin: {
             description:
-              'From the moment SAMSARA leaves the hero. It should overlap the settle, so the box arrives as the body stops moving rather than after it.',
+              'On-screen height as a fraction of viewport height — the same units as SAMSARA’s own landing size. Both orbs share it.',
           },
         },
         {
-          name: 'enterMs',
+          name: 'mobileSizeFrac',
           type: 'number',
-          defaultValue: d.CHATBOX.ENTER_MS,
-          min: 60,
+          defaultValue: d.EMITTERS.MOBILE_SIZE_FRAC,
+          min: 0.02,
+          max: 0.4,
+          admin: { description: 'Portrait, where the orbs flank the screen below SAMSARA.' },
+        },
+        orbSlot('near', 'Near orb — landscape', d.EMITTERS.NEAR),
+        orbSlot('far', 'Far orb — landscape', d.EMITTERS.FAR),
+        orbSlot('mobileNear', 'Near orb — portrait', d.EMITTERS.MOBILE_NEAR),
+        orbSlot('mobileFar', 'Far orb — portrait', d.EMITTERS.MOBILE_FAR),
+        {
+          name: 'portX',
+          type: 'number',
+          defaultValue: d.EMITTERS.PORT_X,
+          min: 0,
+          max: 2,
+          admin: {
+            description:
+              'The four steam nozzles, in orb radii. ONE set of coordinates, mirrored on X and Z — the nozzles sit in a square on the underside, so four loose values could only drift out of it. Turn on the port markers below to place them by eye.',
+          },
+        },
+        { name: 'portY', type: 'number', defaultValue: d.EMITTERS.PORT_Y, min: -2, max: 2, admin: { description: 'Height. Negative, since the nozzles are underneath.' } },
+        { name: 'portZ', type: 'number', defaultValue: d.EMITTERS.PORT_Z, min: 0, max: 2 },
+        { name: 'lensX', type: 'number', defaultValue: d.EMITTERS.LENS_X, min: -2, max: 2 },
+        { name: 'lensY', type: 'number', defaultValue: d.EMITTERS.LENS_Y, min: -2, max: 2, admin: { description: 'The domed projector lens on top. The light shafts start here.' } },
+        { name: 'lensZ', type: 'number', defaultValue: d.EMITTERS.LENS_Z, min: -2, max: 2 },
+        {
+          name: 'showPorts',
+          type: 'checkbox',
+          defaultValue: d.EMITTERS.SHOW_PORTS,
+          admin: {
+            description:
+              'TUNING AID — leave off for visitors. Draws a green marker at each nozzle and a pink one at the lens. Without it a port is invisible until smoke happens to come out of it, which is a slow way to find out where it actually is.',
+          },
+        },
+        orbRotGroup('nearRot', 'Near orb — parked orientation', d.EMITTERS.NEAR_ROT),
+        orbRotGroup('farRot', 'Far orb — parked orientation', d.EMITTERS.FAR_ROT),
+        {
+          name: 'entryMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.ENTRY_MS,
+          min: 200,
+          max: 6000,
+          admin: { description: 'How long one orb takes to fly in from behind the camera.' },
+        },
+        {
+          name: 'entryStaggerMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.ENTRY_STAGGER_MS,
+          min: 0,
           max: 3000,
-          admin: { description: 'The fade and rise.' },
+          admin: {
+            description:
+              'How far the far orb lags the near one. At 0 they arrive together and read as one rigid object rather than two machines.',
+          },
+        },
+        {
+          name: 'bobAmp',
+          type: 'number',
+          defaultValue: d.EMITTERS.BOB_AMP,
+          min: 0,
+          max: 0.6,
+          admin: {
+            description: 'Idle float, in orb radii. The two orbs bob out of phase deliberately.',
+          },
+        },
+        { name: 'bobMs', type: 'number', defaultValue: d.EMITTERS.BOB_MS, min: 400, max: 12000 },
+        {
+          name: 'thrustRate',
+          type: 'number',
+          defaultValue: d.EMITTERS.THRUST_RATE,
+          min: 0,
+          max: 200,
+          admin: {
+            description:
+              'Puffs per second PER PORT, across the four afterburners. CONTINUOUS — the orbs emit from the moment they appear until the room closes.',
+          },
+        },
+        {
+          name: 'thrustSpread',
+          type: 'number',
+          defaultValue: d.EMITTERS.THRUST_SPREAD,
+          min: 0,
+          max: 3,
+        },
+        {
+          name: 'plumeOut',
+          type: 'number',
+          defaultValue: d.EMITTERS.PLUME_OUT,
+          min: 0,
+          max: 4,
+          admin: {
+            description:
+              'How far each plume leans away from the orb’s axis, as a multiple of that nozzle’s own offset. At 0 all four jets are parallel and read as one flame rather than four afterburners.',
+          },
+        },
+        {
+          name: 'plumeY',
+          type: 'number',
+          defaultValue: d.EMITTERS.PLUME_Y,
+          min: -4,
+          max: 4,
+          admin: {
+            description:
+              'How hard the plume is driven along the orb’s own Y, in radii per second. Negative vents out of the underside.',
+          },
+        },
+        {
+          name: 'puffSize',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_SIZE,
+          min: 0.02,
+          max: 2,
+          admin: { description: 'In orb radii, so it holds its proportion at every viewport.' },
+        },
+        {
+          name: 'puffLifeMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_LIFE_MS,
+          min: 100,
+          max: 8000,
+          admin: {
+            description:
+              'How long a puff lasts. Lifetimes vary up to 1.25x around this, so no two are identical. Longer means a denser trail, since the emission is continuous.',
+          },
+        },
+        colour(
+          'puffColor',
+          d.EMITTERS.PUFF_COLOR,
+          'Warm grey steam — deliberately not the gold of SAMSARA’s own bursts.',
+        ),
+        {
+          name: 'puffOpacity',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_OPACITY,
+          min: 0,
+          max: 1,
         },
       ],
     },
 
+    {
+      name: 'exhaust',
+      type: 'group',
+      label: 'SAMSARA — exhaust smoke',
+      admin: {
+        description:
+          'The two brass tubes on SAMSARA\u2019s upper rear. One port is configured and MIRRORED across the centreline, because the tubes are symmetric on the model \u2014 a second set of coordinates could only drift out of line with them. The plume turns with the body, so parking or dragging SAMSARA carries it along.',
+      },
+      fields: [
+        {
+          name: 'enabled',
+          type: 'checkbox',
+          defaultValue: d.EXHAUST.ENABLED,
+          admin: { description: 'Off leaves SAMSARA\u2019s own golden burst untouched \u2014 they are separate systems.' },
+        },
+        {
+          name: 'portX',
+          type: 'number',
+          defaultValue: d.EXHAUST.PORT_X,
+          min: 0,
+          max: 2,
+          admin: { description: 'Right-hand tube, in body radii from the centre. Mirrored to the left.' },
+        },
+        { name: 'portY', type: 'number', defaultValue: d.EXHAUST.PORT_Y, min: -2, max: 2, admin: { description: 'Height. The tubes sit high on the hull.' } },
+        { name: 'portZ', type: 'number', defaultValue: d.EXHAUST.PORT_Z, min: -2, max: 2, admin: { description: 'Depth. NEGATIVE is behind \u2014 the face is +Z, so a positive value puts smoke on SAMSARA\u2019s face.' } },
+        { name: 'dirX', type: 'number', defaultValue: d.EXHAUST.DIR_X, min: -3, max: 3, admin: { description: 'Outward lean of the plume. Mirrors with the port.' } },
+        { name: 'dirY', type: 'number', defaultValue: d.EXHAUST.DIR_Y, min: -3, max: 3, admin: { description: 'Rise. Keep positive, or the plume pools under a hovering body.' } },
+        { name: 'dirZ', type: 'number', defaultValue: d.EXHAUST.DIR_Z, min: -3, max: 3, admin: { description: 'Backward push, away from the face.' } },
+        { name: 'rate', type: 'number', defaultValue: d.EXHAUST.RATE, min: 0, max: 120, admin: { description: 'Puffs per second PER TUBE. Continuous, not a repeating burst \u2014 an engine idles.' } },
+        { name: 'spread', type: 'number', defaultValue: d.EXHAUST.SPREAD, min: 0, max: 3 },
+        { name: 'puffSize', type: 'number', defaultValue: d.EXHAUST.PUFF_SIZE, min: 2, max: 400, admin: { description: 'Pixels at the body\u2019s depth, the same units as the golden burst\u2019s size.' } },
+        { name: 'puffLifeMs', type: 'number', defaultValue: d.EXHAUST.PUFF_LIFE_MS, min: 100, max: 9000 },
+        colour('puffColor', d.EXHAUST.PUFF_COLOR, 'Warm grey steam, matching the orbs rather than the golden burst.'),
+        { name: 'puffOpacity', type: 'number', defaultValue: d.EXHAUST.PUFF_OPACITY, min: 0, max: 1 },
+      ],
+    },
+
+    {
+      name: 'hologram',
+      type: 'group',
+      label: 'Holographic screen',
+      admin: {
+        description:
+          'The screen the two orbs project. It will later carry subtitles and option buttons as real DOM on top, which is why the flicker below applies to the GLASS ONLY — flickering text would defeat the accessibility feature it exists to provide.',
+      },
+      fields: [
+        { name: 'wFrac', type: 'number', defaultValue: d.HOLOGRAM.W_FRAC, min: 0.05, max: 1.2 },
+        {
+          name: 'panelAspect',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.PANEL_ASPECT,
+          min: 0.4,
+          max: 4,
+          admin: {
+            description:
+              'The artwork’s width over its height. The panel’s height follows from this and its width, so the drawing never stretches — it must MATCH public/hud/panel.png, and scripts/build-hud-sdf.mjs prints the source aspect on every run.',
+          },
+        },
+        {
+          name: 'xFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.X_FRAC,
+          min: -0.2,
+          max: 1.2,
+          admin: {
+            description: 'Landscape. Keep the screen clear of SAMSARA, which parks at 0.75.',
+          },
+        },
+        { name: 'yFrac', type: 'number', defaultValue: d.HOLOGRAM.Y_FRAC, min: -0.2, max: 1.2 },
+        {
+          name: 'mobileWFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_W_FRAC,
+          min: 0.05,
+          max: 1.2,
+        },
+        {
+          name: 'mobileXFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_X_FRAC,
+          min: -0.2,
+          max: 1.2,
+        },
+        {
+          name: 'mobileYFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_Y_FRAC,
+          min: -0.2,
+          max: 1.4,
+          admin: { description: 'Portrait. The screen goes BELOW SAMSARA, which parks at 0.3.' },
+        },
+        {
+          name: 'formMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FORM_MS,
+          min: 100,
+          max: 8000,
+          admin: {
+            description:
+              'The screen flickers first and then resolves — an unstable ramp, not a clean fade.',
+          },
+        },
+        {
+          name: 'flickerMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_MS,
+          min: 500,
+          max: 30000,
+          admin: { description: 'The permanent flicker interval once the screen is live.' },
+        },
+        {
+          name: 'flickerDurMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_DUR_MS,
+          min: 20,
+          max: 2000,
+          admin: {
+            description:
+              'Keep well below the interval, or the screen reads as broken rather than as a projection.',
+          },
+        },
+        {
+          name: 'flickerDepth',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_DEPTH,
+          min: 0,
+          max: 0.95,
+          admin: {
+            description:
+              'How far the glass dips. Never 1 — a screen that fully extinguishes reads as a fault rather than a hologram.',
+          },
+        },
+        colour('glassColor', d.HOLOGRAM.GLASS_COLOR, 'A MULTIPLY over the artwork, which carries its own amber. White leaves it exactly as drawn; anything else shifts it.'),
+        {
+          name: 'glassOpacity',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.GLASS_OPACITY,
+          min: 0,
+          max: 1,
+        },
+        colour(
+          'shaftColor',
+          d.HOLOGRAM.SHAFT_COLOR,
+          'The light shafts from each lens. Usually the same amber as the glass.',
+        ),
+        {
+          name: 'shaftOpacity',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_OPACITY,
+          min: 0,
+          max: 1,
+          admin: {
+            description:
+              'The shafts are additive geometry, not fog — fog is banned in this room because it shares its scene with the hero orbit and would tint SAMSARA mid-flight.',
+          },
+        },
+        {
+          name: 'shaftSpread',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_SPREAD,
+          min: 0.02,
+          // Raised from 3 on 2026-09-05: the owner's fill landed on exactly the
+          // ceiling, which is how a range says it is too small.
+          max: 6,
+          admin: {
+            description:
+              'Brightness distribution INSIDE the fan — use shaftHalfDeg to set how wide it opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.',
+          },
+        },
+        {
+          name: 'shaftHalfDeg',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_HALF_DEG,
+          min: 1,
+          max: 90,
+          admin: {
+            description:
+              'Half-angle of the fan — where it actually ends. Not the same as shaft spread, which only shapes brightness inside it: a cosine falloff reaches zero at exactly 90 degrees whatever it is set to, so without this the fan always throws a tail out sideways.',
+          },
+        },
+        {
+          name: 'shaftGuide',
+          type: 'checkbox',
+          defaultValue: d.HOLOGRAM.SHAFT_GUIDE,
+          admin: {
+            description:
+              'TUNING AID — leave off for visitors. Draws the fan\u2019s two edges in green so the half-angle is visible while it is being set.',
+          },
+        },
+        {
+          name: 'shaftReach',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_REACH,
+          min: 0.2,
+          max: 6,
+          admin: {
+            description:
+              'How far the rays travel, as a multiple of the frame’s diagonal at the orb’s own depth. At 1 or above the fan always runs off the frame; below 1 you will see where it ends.',
+          },
+        },
+        {
+          name: 'shaftRays',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_RAYS,
+          min: 0.1,
+          max: 6,
+          admin: {
+            description:
+              'Ray density. They are banded on the angle, so spacing is naturally wide near the fan\u2019s axis and tight at its edges.',
+          },
+        },
+        {
+          name: 'shaftSpeed',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_SPEED,
+          min: 0,
+          max: 6,
+          admin: { description: 'Shimmer speed. 0 freezes the fan.' },
+        },
+        {
+          name: 'shaftFade',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_FADE,
+          min: 0.05,
+          max: 4,
+          admin: {
+            description:
+              'Falloff shape along a ray, not a distance — the reach sets where a ray ends. 1 is a straight ramp; below 1 it stays bright most of the way.',
+          },
+        },
+        {
+          name: 'shaftContrast',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CONTRAST,
+          min: 0.2,
+          max: 8,
+          admin: {
+            description:
+              'How dark it gets between rays. At 1 the fan is a soft wash; raise it until the streaks separate.',
+          },
+        },
+        {
+          name: 'shaftBound',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_BOUND,
+          min: 0,
+          max: 1,
+          admin: {
+            description:
+              'How strongly the screen’s own left and right edges hold the light in. 1 keeps the fan inside the panel; 0 lets it run across the room.',
+          },
+        },
+        {
+          name: 'shaftCore',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CORE,
+          min: 0,
+          max: 1,
+          admin: { description: 'A hot bloom where the rays leave the lens.' },
+        },
+        {
+          name: 'shaftTip',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_TIP,
+          min: 1,
+          max: 10,
+          admin: {
+            description:
+              'How sharply each ray closes to a point. 1 leaves the natural wedge, which ends blunt because a wedge is widest at its far end.',
+          },
+        },
+        colour(
+          'shaftCoreColor',
+          d.HOLOGRAM.SHAFT_CORE_COLOR,
+          'The colour at the throat of the beam, before it cools to the shaft colour.',
+        ),
+        {
+          name: 'shaftCoreSpan',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CORE_SPAN,
+          min: 0.02,
+          max: 1,
+          admin: { description: 'How far the hot colour carries before the ray is fully amber.' },
+        },
+        shaftSlotGroup('nearShaft', 'Near orb — fan placement', d.HOLOGRAM.NEAR_SHAFT),
+        shaftSlotGroup('farShaft', 'Far orb — fan placement', d.HOLOGRAM.FAR_SHAFT),
+      ],
+    },
+
+    {
+      name: 'poke',
+      type: 'group',
+      label: 'Press and hold an orb',
+      admin: {
+        description:
+          'Hold a pointer on either orb and the pair shakes; when the shake reaches full the screen and its rays flicker, and keep flickering until the pointer lifts. The whole sequence is skipped under prefers-reduced-motion, which is where the photosensitivity guard lives.',
+      },
+      fields: [
+        { name: 'enabled', type: 'checkbox', defaultValue: d.POKE.ENABLED },
+        { name: 'shakeMs', type: 'number', defaultValue: d.POKE.SHAKE_MS, min: 100, max: 4000 },
+        { name: 'shakeAmp', type: 'number', defaultValue: d.POKE.SHAKE_AMP, min: 0, max: 1 },
+        { name: 'shakeHz', type: 'number', defaultValue: d.POKE.SHAKE_HZ, min: 1, max: 60 },
+        { name: 'releaseMs', type: 'number', defaultValue: d.POKE.RELEASE_MS, min: 0, max: 3000 },
+        {
+          name: 'flickerMs',
+          type: 'number',
+          defaultValue: d.POKE.FLICKER_MS,
+          min: 50,
+          max: 4000,
+          admin: {
+            description:
+              'The flicker\u2019s PERIOD, not its duration — it runs for as long as the press does. Lower is faster.',
+          },
+        },
+        { name: 'flickerDepth', type: 'number', defaultValue: d.POKE.FLICKER_DEPTH, min: 0, max: 1 },
+        {
+          name: 'hitSlop',
+          type: 'number',
+          defaultValue: d.POKE.HIT_SLOP,
+          min: 0,
+          max: 120,
+          admin: {
+            description:
+              'Extra pixels around each orb that still count as a press. Not optional on touch — the orbs are small and a finger is not a pixel.',
+          },
+        },
+      ],
+    },
     {
       name: 'exitMs',
       type: 'number',

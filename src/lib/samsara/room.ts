@@ -92,6 +92,27 @@ export function buildRoom(cfg: RoomConfig): Room {
   const W = D * 1.6
   const H = D * ROOM_HEIGHT_FACTOR
 
+  /**
+   * ⚠️ EXTENT scales the SURFACES, never the framing.
+   *
+   * `H` above stays the camera's reference — `roomCameraFor` solves distance
+   * from it — so the composition is untouched at any extent. What grows is how
+   * far the floor and walls run before they end.
+   *
+   * ⚠️ And they grow UPWARD from the floor, not about their own centre. The
+   * ground plane's height is where SAMSARA's bounce makes contact and where its
+   * shadow lands; scaling the walls symmetrically would drag the floor down
+   * with them and the landing would read as hovering.
+   */
+  const E = Math.max(1, cfg.EXTENT)
+  const WE = W * E
+  const HE = H * E
+  const DE = D * 2 * E
+  /** Unscaled, deliberately — see above. */
+  const floorY = -H / 2
+  /** Walls rise from the floor rather than straddling the origin. */
+  const wallY = floorY + HE / 2
+
   const floorMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(cfg.FLOOR_COLOR),
     roughness: 0.92,
@@ -104,22 +125,24 @@ export function buildRoom(cfg: RoomConfig): Room {
     side: THREE.FrontSide,
   })
 
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D * 2), floorMat)
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(WE, DE), floorMat)
   floor.rotation.x = -Math.PI / 2
-  floor.position.set(0, -H / 2, -D / 2)
+  floor.position.set(0, floorY, -D / 2)
   floor.receiveShadow = true
 
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat)
-  back.position.set(0, 0, -D)
+  // The back wall stays at -D. Its DEPTH is the fall's own reference (see the
+  // clearance solve in SamsaraSequence), so only its extent grows.
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(WE, HE), wallMat)
+  back.position.set(0, wallY, -D)
   back.receiveShadow = true
 
-  const left = new THREE.Mesh(new THREE.PlaneGeometry(D * 2, H), wallMat)
+  const left = new THREE.Mesh(new THREE.PlaneGeometry(DE, HE), wallMat)
   left.rotation.y = Math.PI / 2
-  left.position.set(-W / 2, 0, -D / 2)
+  left.position.set(-WE / 2, wallY, -D / 2)
 
-  const right = new THREE.Mesh(new THREE.PlaneGeometry(D * 2, H), wallMat)
+  const right = new THREE.Mesh(new THREE.PlaneGeometry(DE, HE), wallMat)
   right.rotation.y = -Math.PI / 2
-  right.position.set(W / 2, 0, -D / 2)
+  right.position.set(WE / 2, wallY, -D / 2)
 
   // Distance-decaying key, so the walls fall off into darkness at their edges
   // without any fog and without hard-edged geometry.
@@ -149,8 +172,12 @@ export function buildRoom(cfg: RoomConfig): Room {
   // walls leave at the corners — which is what lets the fade-up actually hide
   // the hero (spec §5.7) instead of merely dimming it.
   const bgMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(cfg.BG_COLOR) })
-  const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(D * 20, D * 20), bgMat)
-  backdrop.position.set(0, 0, -D * 1.8)
+  // Scaled and pushed back with the surfaces: at a large extent the side walls
+  // run to -D/2 - D*E, and a backdrop left at -1.8D would sit IN FRONT of their
+  // far ends, leaving the hero visible through the gap the fade-up is supposed
+  // to close.
+  const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(D * 20 * E, D * 20 * E), bgMat)
+  backdrop.position.set(0, 0, -D * 1.8 * E)
 
   group.add(backdrop, floor, back, left, right, key, key.target, ambient)
 

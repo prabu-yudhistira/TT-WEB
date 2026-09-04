@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { lenisRef } from '../providers/SmoothScroll'
 import { MascotEngine } from '../../lib/mascot/MascotEngine'
 import { SequenceController, type Mode } from '../../lib/samsara/SequenceController'
+import { HologramController } from '../../lib/samsara/HologramController'
+import { PokeController } from '@/lib/samsara/orbPoke'
 import {
   createGestureState,
   endTouch,
@@ -192,8 +194,6 @@ export function SamsaraSequence({
     // ── state that lives for one run of the sequence ──────────────────
     let promoted = false
     let promotedAtMs = 0
-    /** Only written on change: this runs every frame. */
-    let lastChatIn = false
     let startSizePx = 0
     let sweepFrom = 0
     let sweepBy = 0
@@ -202,6 +202,17 @@ export function SamsaraSequence({
     let lastShake = -1
     let lastHoldAllowed = true
     let lastMode: Mode | null = null
+    /**
+     * The hologram's own clock, running INSIDE `landed`.
+     *
+     * A separate machine from SequenceController on purpose — that one's modes
+     * are asserted by name in six gates and the bench.
+     */
+    const holo = new HologramController()
+    let holoStarted = false
+    const poke = new PokeController()
+    let lastHoloAttr: string | null = null
+    let orbsRequested = false
     let cameraDistance = 0
     let zBack = 0
     let raf = 0
@@ -391,6 +402,36 @@ export function SamsaraSequence({
       endTouch(gest)
     }
 
+    /**
+     * Press and hold an orb.
+     *
+     * ⚠️ On WINDOW, not on the hero element, and pointerUP especially. A press
+     * that starts on an orb and lifts anywhere else — over the DOM that will
+     * sit on this screen, outside the window entirely — must still release, or
+     * the orbs shake forever with nothing holding them.
+     *
+     * ⚠️ Does NOT fight the drag-to-turn. That is gated on hitsMascot(), and
+     * SAMSARA parks well clear of the orbs, so the two hit tests never both
+     * pass on the same press.
+     */
+    const onOrbDown = (e: PointerEvent) => {
+      const c = cfgRef.current
+      if (!c.POKE.ENABLED) return
+      // Only once the screen exists — the flicker is the payoff, and there is
+      // nothing to flicker while the orbs are still flying in.
+      if (holo.phase !== 'emitting' && holo.phase !== 'forming' && holo.phase !== 'live') return
+      const eng = engineRef.current
+      if (!eng || !eng.hitsOrb(e.clientX, e.clientY, c.POKE.HIT_SLOP)) return
+      poke.press()
+    }
+    const onOrbUp = () => poke.release()
+
+    window.addEventListener('pointerdown', onOrbDown)
+    window.addEventListener('pointerup', onOrbUp)
+    window.addEventListener('pointercancel', onOrbUp)
+    // A press whose release lands in another window would otherwise never end.
+    window.addEventListener('blur', onOrbUp)
+
     heroEl.addEventListener('wheel', onWheel, { passive: false })
     heroEl.addEventListener('touchstart', onTouchStart, { passive: true })
     heroEl.addEventListener('touchmove', onTouchMove, { passive: false })
@@ -484,29 +525,29 @@ export function SamsaraSequence({
       const tMs = ctrl.transit01 * total
 
       /**
-       * The chatbox stub's reveal — spec §6.6, `CHATBOX.DELAY_MS` / `ENTER_MS`.
+       * ⚠️ Section 2 has no sequence-driven DOM as of 2026-09-03.
        *
-       * Published as an ATTRIBUTE on the document rather than through a ref,
-       * because the box is not ours: it belongs to the `samsaraRoom` block, which
-       * RenderBlocks mounts as a sibling of the hero. Reaching across for its
-       * element would couple two blocks that the owner can reorder in /admin, and
-       * would break the moment Section 2 is moved or removed. An attribute is a
-       * one-way contract that simply goes unread if nothing is listening.
+       * The chatbox stub used to be revealed from here: this block computed a
+       * boolean from `CHATBOX.DELAY_MS` and published `data-tt-chatbox` on
+       * `<html>`, which the `samsaraRoom` block styled itself off. Both the box
+       * and its config are gone; a holographic screen projected by two emitter
+       * orbs replaces it.
        *
-       * ⚠️ The attribute's PRESENCE is what lifts the box onto the fixed layer
-       * above the promoted canvas; its VALUE is what fades it in. That split is
-       * deliberate and it is what makes the block fail OPEN: with no sequence
-       * running — disabled, reduced motion, WebGL unavailable — the attribute is
-       * never written, and the chatbox stays ordinary in-flow content in a section
-       * the visitor can still scroll to and read. Gating on the value alone would
-       * leave a blank black panel in every one of those cases.
+       * The technique is worth keeping when that lands. It was published as an
+       * ATTRIBUTE on the document rather than through a ref, because the DOM is
+       * not the hero's: it belongs to the `samsaraRoom` block, which RenderBlocks
+       * mounts as a SIBLING the owner can reorder in /admin. Reaching across for
+       * its element couples two blocks and breaks the moment Section 2 is moved
+       * or removed; an attribute is a one-way contract that simply goes unread if
+       * nothing is listening.
+       *
+       * And the PRESENCE/VALUE split is what made it fail open — presence lifted
+       * the box onto the fixed layer above the promoted canvas, value faded it in
+       * — so with no sequence running the attribute was never written and Section
+       * 2 stayed ordinary readable content. Anything that floats DOM over the
+       * room again needs that same split, or every degraded path gets a blank
+       * black panel.
        */
-      const chatIn =
-        (mode === 'committed' || mode === 'landed') && tMs >= cfg.CHATBOX.DELAY_MS
-      if (chatIn !== lastChatIn) {
-        lastChatIn = chatIn
-        document.documentElement.dataset.ttChatbox = chatIn ? 'in' : 'out'
-      }
 
       // The charge the BELT sees, which is not the same as the controller's.
       //
@@ -682,6 +723,93 @@ export function SamsaraSequence({
         eng.setRoomReveal(clamp01((tMs - promotedAtMs) / Math.max(1, cfg.TRANSIT.FALL_MS)))
       }
 
+      // ── the hologram ────────────────────────────────────────────
+      //
+      // Fetched only once the room is actually committed to, so a hero-only
+      // visit never pays 590 KB for two orbs it will not see.
+      if ((mode === 'committed' || mode === 'landed') && !orbsRequested) {
+        orbsRequested = true
+        void eng.loadEmitters('/models/emitter-orb.draco.glb')
+      }
+
+      if (mode === 'landed') {
+        if (!holoStarted) {
+          holoStarted = true
+          holo.start()
+        }
+        holo.update(cfg, dt)
+        poke.update(cfg.POKE, dt)
+      } else if (holoStarted) {
+        // Leaving the room stands the whole thing down, so a replay starts
+        // from the entry beat rather than mid-flicker.
+        holoStarted = false
+        holo.reset()
+        // Leaving the room drops any press with it, or a hold that survived the
+        // exit would still be shaking orbs nobody can see on the next entry.
+        poke.reset()
+      }
+
+      const holoPhase = holo.phase
+      if (eng.hasEmitters() && holoPhase !== 'dormant') {
+        eng.setHologram({
+          cfg,
+          ctx: {
+            W: window.innerWidth,
+            H: window.innerHeight,
+            mobile: window.innerWidth < 640,
+            roomDepth: cfg.ROOM.DEPTH,
+            camZ: cfg.ROOM.DEPTH / 2,
+          },
+          phase: holoPhase,
+          entry01: holo.entry01(cfg),
+          form01: holo.form01(cfg),
+          parkedMs: holo.parkedMs(),
+          smokeMs: holo.totalMs,
+          shake01: poke.shake01(cfg.POKE),
+          pokeDip: poke.dip(cfg.POKE),
+          dtMs: dt,
+          reveal: eng.getRoomReveal(),
+        })
+      } else {
+        eng.setHologram(null)
+      }
+
+      /**
+       * The screen's DOM contract — spec §5.7.
+       *
+       * ⚠️ PRESENCE lifts, VALUE animates, and that split is load-bearing.
+       * With no sequence running — reduced motion, no WebGL, sequenceEnabled
+       * false — the attribute is never written, so a future subtitle/button
+       * layer stays ordinary in-flow content. Gating on the value alone would
+       * hand every degraded visitor a blank panel, which is exactly the bug
+       * the removed chatbox's Task 14 comment recorded.
+       *
+       * It matters more here than it did for the chatbox: this screen will
+       * carry SUBTITLES and OPTION BUTTONS. If those were reachable only
+       * through a working hologram, the visitors who most need them would be
+       * the ones who cannot get them.
+       */
+      const holoAttr = holoPhase === 'forming' || holoPhase === 'live' ? holoPhase : null
+      if (holoAttr !== lastHoloAttr) {
+        lastHoloAttr = holoAttr
+        if (holoAttr) document.documentElement.dataset.ttHologram = holoAttr
+        else delete document.documentElement.dataset.ttHologram
+      }
+
+      // ⚠️ From the engine's RENDERED snapshot, never read live — see the note
+      // in MascotEngine.place(). A live read would be this frame's geometry
+      // labelled with next frame's state.
+      if (holoAttr) {
+        const r = eng.rendered.holoRect
+        if (r) {
+          const st = document.documentElement.style
+          st.setProperty('--tt-holo-x', `${r.x.toFixed(1)}px`)
+          st.setProperty('--tt-holo-y', `${r.y.toFixed(1)}px`)
+          st.setProperty('--tt-holo-w', `${r.w.toFixed(1)}px`)
+          st.setProperty('--tt-holo-h', `${r.h.toFixed(1)}px`)
+        }
+      }
+
       raf = requestAnimationFrame(frame)
     }
 
@@ -692,6 +820,18 @@ export function SamsaraSequence({
     // synthesise a trackpad. Reading state is the other half — samsara-seam.mjs
     // needs the exact frame the promotion happens on.
     const w = window as unknown as Record<string, unknown>
+    w.__ttHologram = () => ({
+      phase: holo.phase,
+      rect: engineRef.current?.rendered.holoRect ?? null,
+      attr: document.documentElement.dataset.ttHologram ?? null,
+      // The press-and-hold state. A gate cannot see a shake in a screenshot,
+      // and the flicker it fires lasts about half a second.
+      poke: {
+        phase: poke.phase,
+        shake: poke.shake01(cfgRef.current.POKE),
+        dip: poke.dip(cfgRef.current.POKE),
+      },
+    })
     w.__ttSamsara = () => ({
       mode: ctrl.mode,
       transit01: ctrl.transit01,
@@ -723,19 +863,12 @@ export function SamsaraSequence({
       controlsRef.current = { beat: applyBeat, reset, mode: () => ctrl.mode }
     }
 
-    // The entrance duration is owner-tuned, so the block cannot hardcode it. A
-    // custom property is the only channel that reaches a stylesheet.
-    document.documentElement.style.setProperty(
-      '--tt-chatbox-enter',
-      `${cfgRef.current.CHATBOX.ENTER_MS}ms`,
-    )
-
     return () => {
       cancelAnimationFrame(raf)
-      // Both removed, not left at 'out': a torn-down sequence must leave the
-      // chatbox exactly as a page without one, which is in-flow and visible.
-      delete document.documentElement.dataset.ttChatbox
-      document.documentElement.style.removeProperty('--tt-chatbox-enter')
+      window.removeEventListener('pointerdown', onOrbDown)
+      window.removeEventListener('pointerup', onOrbUp)
+      window.removeEventListener('pointercancel', onOrbUp)
+      window.removeEventListener('blur', onOrbUp)
       heroEl.removeEventListener('wheel', onWheel)
       heroEl.removeEventListener('touchstart', onTouchStart)
       heroEl.removeEventListener('touchmove', onTouchMove)
@@ -755,6 +888,13 @@ export function SamsaraSequence({
       holdCbRef.current(true)
       ctrlRef.current = null
       if (controlsRef) controlsRef.current = null
+      // Removed, not left at a value: a torn-down sequence must leave the page
+      // exactly as one that never had a hologram, which is no attribute at all.
+      delete document.documentElement.dataset.ttHologram
+      for (const k of ['x', 'y', 'w', 'h']) {
+        document.documentElement.style.removeProperty(`--tt-holo-${k}`)
+      }
+      delete w.__ttHologram
       delete w.__ttSamsara
       delete w.__ttSamsaraBeat
       delete w.__ttSamsaraReset
@@ -773,8 +913,12 @@ export function SamsaraSequence({
       z: config.LANDING.ROT_Z_DEG,
     })
     engine?.setDragConfig(config.DRAG)
+    // Same number the press uses, so the cursor never promises a target the
+    // press would miss, nor misses one the press would take.
+    engine?.setOrbHitSlop(config.POKE.ENABLED ? config.POKE.HIT_SLOP : -1e6)
     engine?.setIdleEyes(config.IDLE_EYES)
     engine?.setBurstConfig(config.BURST)
+    engine?.setExhaustConfig(config.EXHAUST)
   }, [config, engine])
 
   return null

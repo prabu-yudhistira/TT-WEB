@@ -109,21 +109,21 @@ const run = async (label, setup) => {
     el.scrollIntoView({ block: 'start' })
     await new Promise((r) => setTimeout(r, 900))
     const r = el.getBoundingClientRect()
-    const h = el.querySelector('h2')
-    const input = el.querySelector('input')
-    const hb = h?.getBoundingClientRect()
-    const cs = h ? getComputedStyle(h) : null
-    const chat = el.querySelector('.tt-room-chat')
+    // The temporary in-flow note. It is what stands between a degraded
+    // visitor and a blank black panel, so it is measured the same way the
+    // chatbox's heading was before it: on screen, opaque, and IN FLOW.
+    const n = el.querySelector('.tt-room-note')
+    const nb = n?.getBoundingClientRect()
+    const cs = n ? getComputedStyle(n) : null
     return {
       present: true,
       sectionInView: r.top < window.innerHeight && r.bottom > 0,
-      heading: h?.textContent ?? null,
-      headingInViewport:
-        !!hb && hb.top >= 0 && hb.bottom <= window.innerHeight && hb.width > 0 && hb.height > 0,
-      headingOpacity: cs ? Number(cs.opacity) : null,
-      chatPosition: chat ? getComputedStyle(chat).position : null,
-      placeholder: input?.placeholder ?? null,
-      inputDisabled: input ? input.disabled : null,
+      note: n?.textContent ?? null,
+      noteInViewport:
+        !!nb && nb.top >= 0 && nb.bottom <= window.innerHeight && nb.width > 0 && nb.height > 0,
+      noteOpacity: cs ? Number(cs.opacity) : null,
+      notePosition: cs ? cs.position : null,
+      accessibleName: el.getAttribute('aria-label'),
     }
   })
 
@@ -144,15 +144,19 @@ const run = async (label, setup) => {
     `scrollY ${r.scroll.before} -> ${r.scroll.after}`)
   check('[reduced motion] Section 2 exists', r.room.present === true)
   check('[reduced motion] and can be scrolled to', r.room.sectionInView === true)
-  // ⚠️ The chatbox must be IN FLOW here. It is lifted onto a fixed layer only
-  // when the sequence writes data-tt-chatbox, and with no sequence running that
-  // never happens — which is exactly the fail-open behaviour, and why the block
-  // starts from in-flow rather than from hidden.
-  check('[reduced motion] the chatbox is ordinary in-flow content',
-    r.room.chatPosition === 'relative', `position: ${r.room.chatPosition}`)
-  check('[reduced motion] its heading is actually on screen', r.room.headingInViewport === true)
-  check('[reduced motion] and fully opaque', r.room.headingOpacity === 1, `${r.room.headingOpacity}`)
-  check('[reduced motion] the stub input is present and disabled', r.room.inputDisabled === true)
+  // ⚠️ This is the fail-open promise, and it is the whole reason the note
+  // exists. No sequence runs here, so no WebGL room is ever drawn — without
+  // in-flow DOM Section 2 is a blank black panel a viewport tall. The note is
+  // never lifted onto a fixed layer by anything, so `relative`/`static` is the
+  // only correct answer; a `fixed` reading means something started managing it.
+  check('[reduced motion] Section 2 has readable in-flow content',
+    r.room.notePosition === 'relative' || r.room.notePosition === 'static',
+    `note position: ${r.room.notePosition}`)
+  check('[reduced motion] the note is actually on screen', r.room.noteInViewport === true,
+    r.room.note ? `"${r.room.note}"` : 'no .tt-room-note found')
+  check('[reduced motion] and fully opaque', r.room.noteOpacity === 1, `${r.room.noteOpacity}`)
+  check('[reduced motion] the section is still a named landmark',
+    !!r.room.accessibleName, `aria-label: ${r.room.accessibleName}`)
   check('[reduced motion] no page errors', r.errors.length === 0, r.errors.slice(0, 2).join(' | '))
 }
 
@@ -182,10 +186,12 @@ const run = async (label, setup) => {
     `scrollY ${r.scroll.before} -> ${r.scroll.after}`)
   check('[no webgl] Section 2 exists', r.room.present === true)
   check('[no webgl] and can be scrolled to', r.room.sectionInView === true)
-  check('[no webgl] its heading is actually on screen', r.room.headingInViewport === true)
-  check('[no webgl] the chatbox is ordinary in-flow content',
-    r.room.chatPosition === 'relative', `position: ${r.room.chatPosition}`)
-  check('[no webgl] the stub input is present and disabled', r.room.inputDisabled === true)
+  check('[no webgl] the note is actually on screen', r.room.noteInViewport === true,
+    r.room.note ? `"${r.room.note}"` : 'no .tt-room-note found')
+  check('[no webgl] Section 2 has readable in-flow content',
+    r.room.notePosition === 'relative' || r.room.notePosition === 'static',
+    `note position: ${r.room.notePosition}`)
+  check('[no webgl] and fully opaque', r.room.noteOpacity === 1, `${r.room.noteOpacity}`)
 }
 
 await browser.close()

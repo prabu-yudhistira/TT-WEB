@@ -10,6 +10,7 @@ import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
 import { makeMotePool, TrailState } from './mascotTrail'
 import { BurstState, makeBurstPool } from '../samsara/roomBurst'
+import { SmokeState, makeSmokePool, type PortSpec } from '../samsara/orbSmoke'
 import {
   EXPRESSIONS,
   EYES_FRAGMENT_CHUNK,
@@ -23,12 +24,17 @@ import {
 } from './eyes'
 import { DEFAULT_MASCOT_EYES, type MascotEyesConfig } from './eyeTypes'
 import { buildRoom, roomCameraFor, type Room } from '../samsara/room'
+import { orbHit } from '../samsara/orbPoke'
+import { createEmitterScene, type EmitterScene, type EmitterUpdateArgs } from '../samsara/emitterScene'
+import { projectQuad, type Rect, type Vec3 } from '../samsara/hologramGeometry'
 import {
   DEFAULT_SEQUENCE,
   type BurstConfig,
   type DragConfig,
   type IdleEyesConfig,
+  type ExhaustConfig,
   type RoomConfig,
+  type SequenceConfig,
 } from '../samsara/types'
 
 /**
@@ -142,6 +148,17 @@ export class MascotEngine {
   private burstSize!: Float32Array
   private burstSeed!: Float32Array
   private burstPoints!: THREE.Points
+  private exhaust!: SmokeState
+  private exhaustGeo!: THREE.BufferGeometry
+  private exhaustMat!: THREE.ShaderMaterial
+  private exhaustPoints!: THREE.Points
+  private exhaustPos!: Float32Array
+  private exhaustAlpha!: Float32Array
+  private exhaustSize!: Float32Array
+  private exhaustCfg: ExhaustConfig = DEFAULT_SEQUENCE.EXHAUST
+  private exhaustMs = 0
+  private exhaustQuat = new THREE.Quaternion()
+  private exhaustVec = new THREE.Vector3()
   private burstCfg: BurstConfig = DEFAULT_SEQUENCE.BURST
 
   private cfg: MascotConfig = { ...DEFAULT_MASCOT }
@@ -189,6 +206,17 @@ export class MascotEngine {
   private ptrSeen = false
   private overMascot = false
   private overListeners = new Set<(over: boolean) => void>()
+  private overOrb = false
+  private orbOverListeners = new Set<(over: boolean) => void>()
+  /**
+   * How much slop the hover test allows, in px.
+   *
+   * ⚠️ THE SAME NUMBER THE PRESS USES. If the cursor changed over a smaller
+   * area than the press accepts, the affordance would lie in one direction; if
+   * larger, it would lie in the other. Pushed in by the sequence rather than
+   * read here, because the config lives there.
+   */
+  private orbHitSlop = 0
   /**
    * World Z the scripted pose sits on while the perspective camera is live.
    * 0 is the plane through the room's origin; negative is deeper into it.
@@ -211,6 +239,15 @@ export class MascotEngine {
     orbitAngle: 0,
     camera: 'ortho' as 'ortho' | 'perspective',
     mode: 'orbit' as 'orbit' | 'transit' | 'room',
+    /**
+     * The holographic screen's projected rect in CSS px, or null when no
+     * screen exists.
+     *
+     * Lives in THIS snapshot, beside the pose, for the same reason the pose
+     * does: three rAF callbacks run per browser frame, so a rect read from a
+     * later callback is this frame's render labelled with next frame's state.
+     */
+    holoRect: null as Rect | null,
   }
   private spin = 0
   private elapsed = 0
@@ -245,6 +282,20 @@ export class MascotEngine {
    * pays nothing — no geometry, no shadow map, no extra draw calls.
    */
   private room: Room | null = null
+  private roomReveal = 0
+  private emitters: EmitterScene | null = null
+  private orbModel: THREE.Object3D | null = null
+  private orbLoading = false
+  private holoArgs: EmitterUpdateArgs | null = null
+  /**
+   * Identity of the last config pushed into the emitter scene.
+   *
+   * The engine holds `roomCfg`, not the whole SequenceConfig, so the emitter
+   * colours arrive with the per-frame args. Pushing them every frame would
+   * call `Color.set()` five times a frame for values that change when an
+   * editor moves a slider; comparing the reference is enough.
+   */
+  private holoCfgApplied: SequenceConfig | null = null
   private roomCfg: RoomConfig = DEFAULT_SEQUENCE.ROOM
   /** The room's warm environment, and the config it was built from. */
   private roomEnvRT: THREE.WebGLRenderTarget | null = null
@@ -306,6 +357,7 @@ export class MascotEngine {
 
     this.buildTrail()
     this.buildBurst()
+    this.buildExhaust()
 
     ;(window as unknown as Record<string, unknown>).__ttMascot = () => ({
       cx: this.cx,
@@ -427,7 +479,7 @@ export class MascotEngine {
     // ⚠️ On WINDOW, not on the canvas, and that is not laziness.
     //
     // The mascot layer is `pointer-events: none` so the room stays clickable
-    // through it — the chatbox lands on top of this canvas. A `pointerdown`
+    // through it — Section 2's DOM lands on top of this canvas. A `pointerdown`
     // bound to the canvas would therefore never fire at all. Listening on the
     // window and hit-testing the circle ourselves keeps the layer transparent
     // to every pointer that is not actually on SAMSARA, which is the behaviour
@@ -798,6 +850,149 @@ export class MascotEngine {
    * method infers: the sequence owns what 'parked' means and the bench needs to
    * be able to force it.
    */
+  /**
+   * SAMSARA's two exhausts — the brass tubes on its upper rear.
+   *
+   * A THIRD particle system, and the split earns its keep the same way the
+   * others did. `roomBurst` sheds dust off the whole silhouette on a slow
+   * cadence; this idles continuously out of two fixed nozzles. Same
+   * bookkeeping module as the orbs (`orbSmoke`), whose port list is a
+   * parameter for exactly this reason — two exhausts here, four afterburners
+   * there, one implementation.
+   */
+  private buildExhaust() {
+    const MAX = 260
+    this.exhaustPos = new Float32Array(MAX * 3)
+    this.exhaustAlpha = new Float32Array(MAX)
+    this.exhaustSize = new Float32Array(MAX)
+    this.exhaust = new SmokeState(makeSmokePool(MAX), this.exhaustPorts(), Math.random)
+
+    this.exhaustGeo = new THREE.BufferGeometry()
+    this.exhaustGeo.setAttribute('position', new THREE.BufferAttribute(this.exhaustPos, 3))
+    this.exhaustGeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.exhaustAlpha, 1))
+    this.exhaustGeo.setAttribute('aSize', new THREE.BufferAttribute(this.exhaustSize, 1))
+
+    this.exhaustMat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color('#C9B896') } },
+      vertexShader: `
+        attribute float aAlpha;
+        attribute float aSize;
+        varying float vAlpha;
+        void main() {
+          vAlpha = aAlpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = aSize / max(0.001, -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        uniform vec3 uColor;
+        void main() {
+          vec2 d = gl_PointCoord - vec2(0.5);
+          float r = length(d) * 2.0;
+          if (r > 1.0) discard;
+          float a = vAlpha * (1.0 - r) * (1.0 - r);
+          gl_FragColor = vec4(uColor, a);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+    })
+
+    this.exhaustPoints = new THREE.Points(this.exhaustGeo, this.exhaustMat)
+    this.exhaustPoints.frustumCulled = false
+    this.exhaustPoints.visible = false
+    this.scene.add(this.exhaustPoints)
+  }
+
+  /**
+   * The two ports, in BODY RADII, mirrored across X.
+   *
+   * ⚠️ One config, two ports. The tubes are symmetric on the mesh, so a second
+   * set of coordinates could only ever drift out of symmetry.
+   */
+  private exhaustPorts(): PortSpec[] {
+    const c = this.exhaustCfg
+    return [
+      { at: [c.PORT_X, c.PORT_Y, c.PORT_Z], dir: [c.DIR_X, c.DIR_Y, c.DIR_Z] },
+      { at: [-c.PORT_X, c.PORT_Y, c.PORT_Z], dir: [-c.DIR_X, c.DIR_Y, c.DIR_Z] },
+    ]
+  }
+
+  /** Live from the bench: a moved port takes effect on the next puff. */
+  setExhaustConfig(cfg: ExhaustConfig) {
+    this.exhaustCfg = cfg
+    this.exhaust?.setPorts(this.exhaustPorts())
+  }
+
+  private updateExhaust(dtSec: number, active: boolean) {
+    const c = this.exhaustCfg
+    const live = active && c.ENABLED && this.cameraMode === 'perspective'
+    this.exhaustMs += dtSec * 1000
+
+    // orbSmoke reads its rate and puff look off EmittersConfig, so the exhaust
+    // is handed a shim carrying its OWN values in those slots. Cheaper and
+    // clearer than a second bookkeeping module that differs only in field
+    // names — and the shim is local, so the two cannot drift.
+    const shim = {
+      THRUST_RATE: c.RATE,
+      THRUST_SPREAD: c.SPREAD,
+      PUFF_SIZE: c.PUFF_SIZE,
+      PUFF_LIFE_MS: c.PUFF_LIFE_MS,
+      PUFF_OPACITY: c.PUFF_OPACITY,
+    } as unknown as typeof DEFAULT_SEQUENCE.EMITTERS
+
+    this.exhaust.update(shim, live ? 'on' : 'off', this.exhaustMs, dtSec * 1000)
+    const samples = this.exhaust.sample(this.exhaustMs, shim)
+
+    const cx = this.placer.position.x
+    const cy = this.placer.position.y
+    const cz = this.placer.position.z
+    // scale.Z for the same reason recordProjection uses it: Z is the one axis
+    // MASCOT_STRETCH never touches, so the plume does not inherit the body's
+    // vertical stretch and read as an ellipse.
+    const radius = this.placer.scale.z / 2
+
+    /**
+     * ⚠️ The plume RIDES THE BODY'S ROTATION, which the golden burst does not.
+     *
+     * `roomBurst` spawns on a disc in world space behind the silhouette, so it
+     * is rotation-agnostic and correct without this. The exhausts are two fixed
+     * points ON the hull: park SAMSARA at its ROT_*_DEG pose, or drag it, and
+     * an unrotated plume would leave from empty air beside the tubes while the
+     * tubes themselves point somewhere else entirely.
+     */
+    this.spinner.getWorldQuaternion(this.exhaustQuat)
+    const v = this.exhaustVec
+
+    let anyLit = false
+    for (const m of samples) {
+      v.set(m.x, m.y, m.z).applyQuaternion(this.exhaustQuat)
+      this.exhaustPos[m.i * 3] = cx + v.x * radius
+      this.exhaustPos[m.i * 3 + 1] = cy + v.y * radius
+      this.exhaustPos[m.i * 3 + 2] = cz + v.z * radius
+      this.exhaustAlpha[m.i] = m.alpha
+      // PUFF_SIZE is pixels at the body's depth, matching BURST.SIZE's units,
+      // so the shader's divide by -mv.z reproduces it at any camera distance.
+      this.exhaustSize[m.i] = m.size * this.dpr * Math.max(0.001, this.persp.position.z - cz)
+      if (m.alpha > 0) anyLit = true
+    }
+    // Dead slots keep their last alpha otherwise, so a stopped exhaust leaves a
+    // frozen cloud hanging beside the body.
+    for (let i = 0; i < this.exhaustAlpha.length; i++) {
+      if (!samples.some((m) => m.i === i)) this.exhaustAlpha[i] = 0
+    }
+
+    this.exhaustPoints.visible = anyLit
+    if (!anyLit) return
+    ;(this.exhaustMat.uniforms.uColor.value as THREE.Color).set(c.PUFF_COLOR)
+    this.exhaustGeo.attributes.position.needsUpdate = true
+    this.exhaustGeo.attributes.aAlpha.needsUpdate = true
+    this.exhaustGeo.attributes.aSize.needsUpdate = true
+  }
+
   private updateBurst(dtSec: number, alpha: number, active: boolean) {
     const c = this.burstCfg
     const live = active && c.ENABLED && this.cameraMode === 'perspective'
@@ -1228,7 +1423,32 @@ export class MascotEngine {
 
   /** 0 = room invisible, 1 = fully present. See Room.setReveal. */
   setRoomReveal(v: number) {
+    this.roomReveal = v
     this.room?.setReveal(v)
+  }
+
+  /**
+   * The reveal the room was last given.
+   *
+   * Exposed so the hologram can fade in WITH the room rather than tracking its
+   * own copy of the ramp — two ramps would drift the first time either was
+   * retimed, and the orbs would arrive through a half-transparent floor.
+   */
+  getRoomReveal(): number {
+    return this.roomReveal
+  }
+
+  /**
+   * The engine's ONE snapshot per rendered frame — pose, camera, mode and the
+   * hologram rect together.
+   *
+   * ⚠️ Read THIS, never the live fields. Three rAF callbacks run per browser
+   * frame, so a live read is this frame's render labelled with next frame's
+   * state. Previously reachable only through window.__ttMascot(), which is a
+   * verification handle rather than an API.
+   */
+  get rendered() {
+    return this.lastRendered
   }
 
   // ── the room pose, and turning it by hand ───────────────────────────
@@ -1275,6 +1495,26 @@ export class MascotEngine {
       // for.
       diameterPx: this.lastDiameterPx * this.stretchY(),
     }
+  }
+
+  /**
+   * Fires when the pointer moves onto or off either emitter orb.
+   *
+   * A sibling of onMascotHover and deliberately separate: the two targets are
+   * different objects with different affordances, and folding them into one
+   * flag would make it impossible to say WHICH is under the pointer.
+   */
+  onOrbHover(cb: ((over: boolean) => void) | null) {
+    this.orbOverListeners.clear()
+    if (cb) {
+      this.orbOverListeners.add(cb)
+      cb(this.overOrb)
+    }
+  }
+
+  /** The press's hit slop, so the hover test can agree with it exactly. */
+  setOrbHitSlop(px: number) {
+    this.orbHitSlop = px
   }
 
   /** Fires when the pointer moves onto or off SAMSARA's disc. */
@@ -1428,10 +1668,15 @@ export class MascotEngine {
       this.dragIdleMs = -1
       this.releaseSmile()
       this.setOver(false)
+      this.setOverOrb(false)
       return
     }
 
     this.setOver(this.ptrSeen && this.hitsMascot(this.ptrX, this.ptrY))
+    // ⚠️ Evaluated per FRAME, not on pointermove. The orbs bob and drift in on
+    // their own schedule, so one can arrive under a stationary cursor — a
+    // move-driven test would leave the arrow sitting on a pressable orb.
+    this.setOverOrb(this.ptrSeen && this.hitsOrb(this.ptrX, this.ptrY, this.orbHitSlop))
 
     if (this.dragging) return
 
@@ -1490,6 +1735,18 @@ export class MascotEngine {
     })
   }
 
+  private setOverOrb(v: boolean) {
+    if (v === this.overOrb) return
+    this.overOrb = v
+    this.orbOverListeners.forEach((cb) => {
+      try {
+        cb(v)
+      } catch (err) {
+        console.error('MascotEngine: orb hover listener threw', err)
+      }
+    })
+  }
+
   /**
    * Stop the spin and turn the face to the viewer.
    *
@@ -1539,6 +1796,101 @@ export class MascotEngine {
    * Leaving shadowMap.enabled on for the orbit would pay a shadow pass on every
    * hero frame for a scene that casts none.
    */
+  /**
+   * Lazily fetch the emitter orb model and build the hologram scene.
+   *
+   * ⚠️ LAZY on purpose. A hero-only visit must never pay 590 KB for a model it
+   * will not draw, exactly as the room's own high-detail LOD is deferred.
+   *
+   * Resolves false rather than throwing when the fetch fails: a missing orb
+   * must degrade to a room with no hologram, never to a broken room. That is
+   * the same fail-open rule the sequence itself follows for a missing GL
+   * context.
+   */
+  async loadEmitters(url: string): Promise<boolean> {
+    if (this.disposed || this.emitters || this.orbLoading) return !!this.emitters
+    this.orbLoading = true
+    try {
+      const draco = new DRACOLoader()
+      draco.setDecoderPath('/draco/')
+      const loader = new GLTFLoader()
+      loader.setDRACOLoader(draco)
+      const gltf = await loader.loadAsync(url)
+      if (this.disposed) return false
+
+      // Normalise to a unit radius so `pose.radius` is the only scale that
+      // matters downstream, whatever units the file happens to carry.
+      const model = gltf.scene
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const centre = box.getCenter(new THREE.Vector3())
+      const maxDim = Math.max(size.x, size.y, size.z) || 1
+      model.position.sub(centre)
+      const norm = new THREE.Group()
+      norm.add(model)
+      norm.scale.setScalar(2 / maxDim)
+
+      this.orbModel = norm
+      this.emitters = createEmitterScene(norm)
+      this.scene.add(this.emitters.group)
+      return true
+    } catch {
+      return false
+    } finally {
+      this.orbLoading = false
+    }
+  }
+
+  /**
+   * Is a pointer over one of the emitter orbs?
+   *
+   * ⚠️ Discs in SCREEN PIXELS, not a raycast against the meshes. The orb is a
+   * spiky ball: raycasting reads its actual silhouette, so the gaps between the
+   * nozzles become dead spots and the press "does not work" perhaps half the
+   * time. A disc is what the visitor thinks they are pressing.
+   *
+   * ⚠️ From the RENDERED poses, so the target agrees with what is on screen.
+   * The orbs bob, and a pose recomputed at pointer time is a different pose.
+   */
+  hitsOrb(clientX: number, clientY: number, slopPx: number): boolean {
+    if (!this.emitters || !this.emitters.group.visible) return false
+    const cam = this.activeCamera()
+    const spheres = this.emitters.orbSpheres()
+    const v = new THREE.Vector3()
+    const discs = spheres.map((s) => {
+      v.set(s.x, s.y, s.z).project(cam)
+      const cx = ((v.x + 1) / 2) * this.W
+      const cy = ((1 - v.y) / 2) * this.H
+      // The radius in pixels, measured by projecting a point one radius to the
+      // camera's right. Scaling a world radius by a constant would be wrong at
+      // two different depths, which is exactly what these two orbs are at.
+      v.set(s.x, s.y, s.z).add(this.camRightScratch(cam).multiplyScalar(s.r)).project(cam)
+      const rx = ((v.x + 1) / 2) * this.W
+      return { cx, cy, r: Math.abs(rx - cx) }
+    })
+    return orbHit(clientX, clientY, discs, slopPx) >= 0
+  }
+
+  private camRightScratch(cam: THREE.Camera): THREE.Vector3 {
+    return new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0)
+  }
+
+  /** True once the orbs are loaded and their scene is in the graph. */
+  hasEmitters(): boolean {
+    return !!this.emitters
+  }
+
+  /**
+   * The hologram's per-frame state, or null to stand it down.
+   *
+   * Stored rather than applied here: the scene must be updated from inside the
+   * render loop so its rect lands in the SAME snapshot as the pose.
+   */
+  setHologram(a: EmitterUpdateArgs | null) {
+    this.holoArgs = a
+    if (!a && this.emitters) this.emitters.group.visible = false
+  }
+
   setRoomVisible(v: boolean) {
     if (v && !this.room) {
       this.room = buildRoom(this.roomCfg)
@@ -2096,6 +2448,7 @@ export class MascotEngine {
     // Parked is the same condition the pose easing uses just above, so the dust
     // starts exactly when the body stops turning rather than on a second rule.
     this.updateBurst(dtSec, alpha, parked)
+    this.updateExhaust(dtSec, parked)
     this.updateEyes(dtSec, charge, diameterPx, alpha)
     this.placeLabel(q, radiusPx, alpha)
 
@@ -2195,6 +2548,49 @@ export class MascotEngine {
     this.lastRendered.diameterPx = Math.abs(toPxY(top.y) - y) * 2
     this.lastRendered.camera = this.cameraMode
     this.lastRendered.mode = this.mode
+
+    // ── the hologram, drawn and measured in the SAME frame ──────────
+    //
+    // ⚠️ Both halves happen HERE, next to the pose, and that placement is the
+    // whole point rather than convenience.
+    //
+    // Three rAF callbacks run per browser frame in registration order: the
+    // engine's loop, the sequence's loop, then any sampler. A rect computed in
+    // a later callback describes THIS frame's render but carries NEXT frame's
+    // camera and phase. samsara-seam.mjs cost three separate false readings
+    // learning that — a 6px seam and a 2,332px jump that did not exist.
+    const holo = this.holoArgs
+    if (this.emitters && holo) {
+      if (this.holoCfgApplied !== holo.cfg) {
+        this.emitters.setConfig(holo.cfg)
+        this.holoCfgApplied = holo.cfg
+      }
+      this.emitters.update(holo, cam)
+
+      const pts = this.emitters.screenCorners()
+      if (pts.length === 4 && this.emitters.group.visible) {
+        // ⚠️ The bounding box of the four PROJECTED corners — never a
+        // projection of the centre plus the world size. Under perspective
+        // those differ, and the difference is what would put future subtitles
+        // subtly out of place with nothing looking broken.
+        //
+        // ⚠️ this.W / this.H are the CSS size. The canvas ATTRIBUTES are
+        // cssSize x devicePixelRatio, and using them here would reproduce the
+        // 25%-too-large presentation bug at dpr 1.25.
+        const v = new THREE.Vector3()
+        this.lastRendered.holoRect = projectQuad(
+          { corners: pts as [Vec3, Vec3, Vec3, Vec3], centre: [0, 0, 0], w: 0, h: 0 },
+          (pt) => {
+            v.set(pt[0], pt[1], pt[2]).project(cam)
+            return [((v.x + 1) / 2) * this.W, ((1 - v.y) / 2) * this.H]
+          },
+        )
+      } else {
+        this.lastRendered.holoRect = null
+      }
+    } else {
+      this.lastRendered.holoRect = null
+    }
   }
 
   getLabelBox(): LabelBox | null {
@@ -2485,6 +2881,25 @@ export class MascotEngine {
     this.stop()
     this.roomEnvRT?.dispose()
     this.roomEnvRT = null
+    if (this.emitters) {
+      this.scene.remove(this.emitters.group)
+      this.emitters.dispose()
+      this.emitters = null
+    }
+    // The orb model is the emitters' source, so it is retired here rather than
+    // in emitterScene.dispose(), which only owns the clones.
+    if (this.orbModel) {
+      this.orbModel.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!m.isMesh) return
+        m.geometry?.dispose()
+        const mat = m.material as THREE.Material | THREE.Material[]
+        for (const one of Array.isArray(mat) ? mat : [mat]) one?.dispose()
+      })
+      this.orbModel = null
+    }
+    this.holoArgs = null
+    this.holoCfgApplied = null
     window.removeEventListener('scroll', this.onScroll)
     window.removeEventListener('pointerdown', this.onPointerDown)
     window.removeEventListener('pointermove', this.onPointerMove)
@@ -2492,6 +2907,7 @@ export class MascotEngine {
     window.removeEventListener('pointercancel', this.onPointerUp)
     window.removeEventListener('blur', this.onBlur)
     this.overListeners.clear()
+    this.orbOverListeners.clear()
     this.depthCb = null
     // Before the generic scene traversal below, so the room's own lights and
     // shadow map are released explicitly rather than left to the mesh sweep,

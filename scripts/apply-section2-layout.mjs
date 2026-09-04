@@ -75,11 +75,8 @@ const kept = (home.layout || []).filter((b) => KEEP.includes(b.blockType))
 if (!kept.some((b) => b.blockType === 'hero')) throw new Error('refusing to run: no hero block')
 
 if (!kept.some((b) => b.blockType === 'samsaraRoom')) {
-  kept.push({
-    blockType: 'samsaraRoom',
-    chatHeading: 'Ask SAMSARA',
-    chatPlaceholder: 'Coming soon…',
-  })
+  // No fields: the chatbox stub that owned them was removed 2026-09-03.
+  kept.push({ blockType: 'samsaraRoom' })
 }
 // hero first, then the room.
 kept.sort((a, b) => KEEP.indexOf(a.blockType) - KEEP.indexOf(b.blockType))
@@ -101,21 +98,38 @@ await payload.update({
  * desain…" — a silent translation loss that nothing else in the project would
  * have caught.
  */
-const idDoc = await payload.findByID({ collection: 'pages', id: home.id, locale: 'id', depth: 0 })
 const idValues = {
-  samsaraRoom: { chatHeading: 'Tanya SAMSARA', chatPlaceholder: 'Segera hadir…' },
+  // Empty since 2026-09-03: `samsaraRoom` was the only entry here and it no
+  // longer has any fields. `hero` is not listed because its Indonesian values
+  // are already stored and this pass must not overwrite them.
 }
-await payload.update({
-  collection: 'pages',
-  id: home.id,
-  locale: 'id',
-  data: {
-    layout: (idDoc.layout || []).map((b) => ({
-      ...stripRowIds(b),
-      ...(idValues[b.blockType] || {}),
-    })),
-  },
-})
+
+/**
+ * ⚠️ Skipped entirely when there is nothing locale-specific to write, and that
+ * is not an optimisation.
+ *
+ * The `en` write above has already set the block STRUCTURE for both locales, so
+ * with an empty map this pass would rewrite the array to produce exactly what is
+ * already there. Payload updates an array by DELETING its rows and re-inserting
+ * them, so a pointless rewrite is a real chance to hit the UNIQUE-constraint
+ * failure documented above for no benefit at all.
+ */
+if (Object.keys(idValues).length > 0) {
+  const idDoc = await payload.findByID({ collection: 'pages', id: home.id, locale: 'id', depth: 0 })
+  await payload.update({
+    collection: 'pages',
+    id: home.id,
+    locale: 'id',
+    data: {
+      layout: (idDoc.layout || []).map((b) => ({
+        ...stripRowIds(b),
+        ...(idValues[b.blockType] || {}),
+      })),
+    },
+  })
+} else {
+  console.log('id locale : nothing block-specific to write, skipped')
+}
 
 await payload.updateGlobal({
   slug: 'samsara-sequence',
