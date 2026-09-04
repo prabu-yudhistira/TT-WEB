@@ -960,7 +960,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   HOLOGRAM: {
     W_FRAC: 0.615,
-    PANEL_ASPECT: 1.651,
+    PANEL_ASPECT: 1.7768,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
     MOBILE_W_FRAC: 0.78,
