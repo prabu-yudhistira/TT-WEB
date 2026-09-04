@@ -1,4 +1,9 @@
-import { DEFAULT_SEQUENCE, type OrbSlotConfig, type SequenceConfig } from './types'
+import {
+  DEFAULT_SEQUENCE,
+  type OrbRotConfig,
+  type OrbSlotConfig,
+  type SequenceConfig,
+} from './types'
 
 /**
  * The `samsara-sequence` global's shape, written by hand rather than imported
@@ -111,6 +116,8 @@ export type SamsaraSequenceInput = {
     far?: OrbSlotCms
     mobileNear?: OrbSlotCms
     mobileFar?: OrbSlotCms
+    nearRot?: OrbRotCms
+    farRot?: OrbRotCms
     entryMs?: number | null
     entryStaggerMs?: number | null
     bobAmp?: number | null
@@ -145,6 +152,8 @@ export type SamsaraSequenceInput = {
   } | null
   exitMs?: number | null
 }
+
+type OrbRotCms = { xDeg?: number | null; yDeg?: number | null; zDeg?: number | null } | null
 
 type OrbSlotCms = {
   xFrac?: number | null
@@ -200,6 +209,13 @@ export function resolveSamsara(
     X_FRAC: num(v?.xFrac, d0.X_FRAC),
     Y_FRAC: num(v?.yFrac, d0.Y_FRAC),
     DEPTH_FRAC: num(v?.depthFrac, d0.DEPTH_FRAC),
+  })
+
+  /** One orb's parked orientation. Degrees, falling back field by field. */
+  const rot = (v: OrbRotCms | undefined, d0: OrbRotConfig): OrbRotConfig => ({
+    X_DEG: num(v?.xDeg, d0.X_DEG),
+    Y_DEG: num(v?.yDeg, d0.Y_DEG),
+    Z_DEG: num(v?.zDeg, d0.Z_DEG),
   })
 
   // A missing weight falls back to its default rather than to 0 — 0 would
@@ -322,6 +338,8 @@ export function resolveSamsara(
       FAR: slot(em.far, d.EMITTERS.FAR),
       MOBILE_NEAR: slot(em.mobileNear, d.EMITTERS.MOBILE_NEAR),
       MOBILE_FAR: slot(em.mobileFar, d.EMITTERS.MOBILE_FAR),
+      NEAR_ROT: rot(em.nearRot, d.EMITTERS.NEAR_ROT),
+      FAR_ROT: rot(em.farRot, d.EMITTERS.FAR_ROT),
       ENTRY_MS: num(em.entryMs, d.EMITTERS.ENTRY_MS),
       ENTRY_STAGGER_MS: num(em.entryStaggerMs, d.EMITTERS.ENTRY_STAGGER_MS),
       BOB_AMP: num(em.bobAmp, d.EMITTERS.BOB_AMP),
@@ -455,6 +473,8 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       far: { xFrac: c.EMITTERS.FAR.X_FRAC, yFrac: c.EMITTERS.FAR.Y_FRAC, depthFrac: c.EMITTERS.FAR.DEPTH_FRAC },
       mobileNear: { xFrac: c.EMITTERS.MOBILE_NEAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_NEAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_NEAR.DEPTH_FRAC },
       mobileFar: { xFrac: c.EMITTERS.MOBILE_FAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_FAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_FAR.DEPTH_FRAC },
+      nearRot: { xDeg: c.EMITTERS.NEAR_ROT.X_DEG, yDeg: c.EMITTERS.NEAR_ROT.Y_DEG, zDeg: c.EMITTERS.NEAR_ROT.Z_DEG },
+      farRot: { xDeg: c.EMITTERS.FAR_ROT.X_DEG, yDeg: c.EMITTERS.FAR_ROT.Y_DEG, zDeg: c.EMITTERS.FAR_ROT.Z_DEG },
       entryMs: c.EMITTERS.ENTRY_MS,
       entryStaggerMs: c.EMITTERS.ENTRY_STAGGER_MS,
       bobAmp: c.EMITTERS.BOB_AMP,

@@ -1711,6 +1711,22 @@ export interface SamsaraSequence {
       depthFrac?: number | null;
     };
     /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    nearRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    farRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
      * How long one orb takes to fly in from behind the camera.
      */
     entryMs?: number | null;
@@ -2316,6 +2332,20 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               xFrac?: T;
               yFrac?: T;
               depthFrac?: T;
+            };
+        nearRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
+            };
+        farRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
             };
         entryMs?: T;
         entryStaggerMs?: T;

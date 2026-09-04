@@ -197,6 +197,8 @@ check(
       FAR: { X_FRAC: 0.51, Y_FRAC: 0.66, DEPTH_FRAC: 0.81 },
       MOBILE_NEAR: { X_FRAC: 0.19, Y_FRAC: 0.88, DEPTH_FRAC: 0.34 },
       MOBILE_FAR: { X_FRAC: 0.81, Y_FRAC: 0.88, DEPTH_FRAC: 0.35 },
+      NEAR_ROT: { X_DEG: 7, Y_DEG: -23, Z_DEG: 4 },
+      FAR_ROT: { X_DEG: -11, Y_DEG: 31, Z_DEG: -6 },
       ENTRY_MS: 1850,
       ENTRY_STAGGER_MS: 410,
       BOB_AMP: 0.11,

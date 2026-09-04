@@ -1,4 +1,10 @@
-import { PORT_OFFSETS, LENS_OFFSET, type EmittersConfig, type OrbSlotConfig } from './types'
+import {
+  PORT_OFFSETS,
+  LENS_OFFSET,
+  type EmittersConfig,
+  type OrbRotConfig,
+  type OrbSlotConfig,
+} from './types'
 
 /**
  * Where the two emitter orbs are, in the room's world units.
@@ -128,9 +134,73 @@ export function orbBobY(slot: OrbSlot, tMs: number, cfg: EmittersConfig): number
   return Math.sin((tMs / cfg.BOB_MS) * Math.PI * 2 + phase) * cfg.BOB_AMP
 }
 
-/** Port `i`'s world position for a given pose. Offsets are in orb radii. */
-export function portWorld(pose: OrbPose, i: number): [number, number, number] {
-  const o = PORT_OFFSETS[i]
+/** The parked orientation for a slot. Shared across landscape and portrait. */
+export function orbRot(slot: OrbSlot, cfg: EmittersConfig): OrbRotConfig {
+  return slot === 'near' ? cfg.NEAR_ROT : cfg.FAR_ROT
+}
+
+const D2R = Math.PI / 180
+
+/**
+ * Rotate a local offset by an XYZ Euler, in degrees.
+ *
+ * ⚠️ This reproduces THREE's `Matrix4.makeRotationFromEuler` for order 'XYZ'
+ * EXACTLY, term for term, and that is the whole point of writing it out rather
+ * than reaching for something more readable.
+ *
+ * The orb MESH is rotated by three.js from the same three numbers. If this
+ * function disagreed with three's convention by so much as an axis order, the
+ * body would face one way while its afterburners emitted from another — smoke
+ * appearing out of empty space beside the orb. Nothing would throw, and at
+ * 0/0/0 (the default) the two agree perfectly, so it would look correct until
+ * the first time anyone touched a rotation slider.
+ */
+export function rotateLocal(
+  v: readonly [number, number, number],
+  r: OrbRotConfig,
+): [number, number, number] {
+  const a = Math.cos(r.X_DEG * D2R)
+  const b = Math.sin(r.X_DEG * D2R)
+  const c = Math.cos(r.Y_DEG * D2R)
+  const d = Math.sin(r.Y_DEG * D2R)
+  const e = Math.cos(r.Z_DEG * D2R)
+  const f = Math.sin(r.Z_DEG * D2R)
+
+  const ae = a * e
+  const af = a * f
+  const be = b * e
+  const bf = b * f
+
+  const m00 = c * e
+  const m01 = -c * f
+  const m02 = d
+  const m10 = af + be * d
+  const m11 = ae - bf * d
+  const m12 = -b * c
+  const m20 = bf - ae * d
+  const m21 = be + af * d
+  const m22 = a * c
+
+  return [
+    m00 * v[0] + m01 * v[1] + m02 * v[2],
+    m10 * v[0] + m11 * v[1] + m12 * v[2],
+    m20 * v[0] + m21 * v[1] + m22 * v[2],
+  ]
+}
+
+/**
+ * Port `i`'s world position. Offsets are in orb radii, in LOCAL space.
+ *
+ * ⚠️ `rot` is not optional in spirit even though it defaults. The afterburners
+ * are part of the body: rotate the mesh without rotating these and the plume
+ * detaches from the machine it is supposed to be coming out of.
+ */
+export function portWorld(
+  pose: OrbPose,
+  i: number,
+  rot: OrbRotConfig = ZERO_ROT,
+): [number, number, number] {
+  const o = rotateLocal(PORT_OFFSETS[i], rot)
   return [
     pose.x + o[0] * pose.radius,
     pose.y + o[1] * pose.radius,
@@ -139,10 +209,16 @@ export function portWorld(pose: OrbPose, i: number): [number, number, number] {
 }
 
 /** The hologram lens's world position — where the shafts originate. */
-export function lensWorld(pose: OrbPose): [number, number, number] {
+export function lensWorld(
+  pose: OrbPose,
+  rot: OrbRotConfig = ZERO_ROT,
+): [number, number, number] {
+  const o = rotateLocal(LENS_OFFSET, rot)
   return [
-    pose.x + LENS_OFFSET[0] * pose.radius,
-    pose.y + LENS_OFFSET[1] * pose.radius,
-    pose.z + LENS_OFFSET[2] * pose.radius,
+    pose.x + o[0] * pose.radius,
+    pose.y + o[1] * pose.radius,
+    pose.z + o[2] * pose.radius,
   ]
 }
+
+const ZERO_ROT: OrbRotConfig = { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 }

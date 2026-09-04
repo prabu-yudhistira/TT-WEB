@@ -4,6 +4,8 @@ import {
   orbParkedPose,
   orbPoseAt,
   orbBobY,
+  orbRot,
+  rotateLocal,
   lensWorld,
   type OrbCtx,
   type OrbPose,
@@ -442,7 +444,14 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   const mid = new THREE.Vector3()
   const quat = new THREE.Quaternion()
 
-  const writeSmoke = (i: number, pose: OrbPose, bob: number, clock: number, cfg: SequenceConfig) => {
+  const writeSmoke = (
+    i: number,
+    slot: OrbSlot,
+    pose: OrbPose,
+    bob: number,
+    clock: number,
+    cfg: SequenceConfig,
+  ) => {
     const puffs = smoke[i].sample(clock, cfg.EMITTERS)
     const pos = smokeGeo[i].getAttribute('position') as THREE.BufferAttribute
     const al = smokeGeo[i].getAttribute('aAlpha') as THREE.BufferAttribute
@@ -453,13 +462,21 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         al.setX(k, 0)
         continue
       }
-      // Puffs are in ORB RADII with the port offset already baked in by
-      // `spawn`, so this is the only place they become world units.
+      /**
+       * Puffs are in ORB RADII with the port offset already baked in by
+       * `spawn`, so this is the only place they become world units — and the
+       * only place the body's orientation reaches them.
+       *
+       * ⚠️ Rotated by the SAME function that positions the ports and the same
+       * three numbers the mesh is given. A plume that did not rotate with the
+       * body would pour out of empty space beside it.
+       */
+      const q = rotateLocal([p.x, p.y, p.z], orbRot(slot, cfg.EMITTERS))
       pos.setXYZ(
         k,
-        pose.x + p.x * pose.radius,
-        pose.y + bob + p.y * pose.radius,
-        pose.z + p.z * pose.radius,
+        pose.x + q[0] * pose.radius,
+        pose.y + bob + q[1] * pose.radius,
+        pose.z + q[2] * pose.radius,
       )
       al.setX(k, p.alpha)
       sz.setX(k, p.size * pose.radius)
@@ -514,15 +531,23 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         // BOB_AMP is in orb radii; no bob during entry, or the arrival wobbles.
         const bob = phase === 'entering' ? 0 : orbBobY(slot, a.parkedMs, cfg.EMITTERS) * pose.radius
 
+        const rot = orbRot(slot, cfg.EMITTERS)
         orbs[i].position.set(pose.x, pose.y + bob, pose.z)
+        // ⚠️ Default XYZ Euler order, which is what `rotateLocal` reproduces
+        // term for term. Changing one without the other detaches the plume.
+        orbs[i].rotation.set(
+          (rot.X_DEG * Math.PI) / 180,
+          (rot.Y_DEG * Math.PI) / 180,
+          (rot.Z_DEG * Math.PI) / 180,
+        )
         orbs[i].scale.setScalar(pose.radius)
 
         smoke[i].update(cfg.EMITTERS, mode, clock, a.dtMs)
-        writeSmoke(i, pose, bob, clock, cfg)
+        writeSmoke(i, slot, pose, bob, clock, cfg)
 
         shafts[i].visible = lit
         if (lit) {
-          const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }), quad, cfg.HOLOGRAM)
+          const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }, rot), quad, cfg.HOLOGRAM)
           mid.set(
             (s.origin[0] + s.target[0]) / 2,
             (s.origin[1] + s.target[1]) / 2,

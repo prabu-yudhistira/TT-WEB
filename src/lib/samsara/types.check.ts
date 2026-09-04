@@ -270,6 +270,11 @@ check('a cadenced puff dies before the next burst',
   DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS * 1.25 < DEFAULT_SEQUENCE.EMITTERS.CADENCE_MS)
 check('thrust emits at a positive rate', DEFAULT_SEQUENCE.EMITTERS.THRUST_RATE > 0)
 check('there are four ports', PORT_OFFSETS.length === 4)
+// Degrees, not radians — a value past a full turn is a unit mistake, not a look.
+for (const [label, r] of [['near', DEFAULT_SEQUENCE.EMITTERS.NEAR_ROT], ['far', DEFAULT_SEQUENCE.EMITTERS.FAR_ROT]] as const) {
+  check(`${label} orb rotation is in degrees`,
+    [r.X_DEG, r.Y_DEG, r.Z_DEG].every((v) => Number.isFinite(v) && Math.abs(v) <= 360))
+}
 
 // ── hologram ────────────────────────────────────────────────────────
 check('the screen has positive extent',

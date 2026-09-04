@@ -205,10 +205,21 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'EMITTERS.SIZE_FRAC', label: 'Orb size (vh)', min: 0.02, max: 0.45, step: 0.005 },
       { kind: 'num', path: 'EMITTERS.NEAR.X_FRAC', label: 'Near x', min: -0.4, max: 1.4, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.NEAR.Y_FRAC', label: 'Near y', min: -0.4, max: 1.4, step: 0.01 },
-      { kind: 'num', path: 'EMITTERS.NEAR.DEPTH_FRAC', label: 'Near depth', min: 0.05, max: 0.95, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.NEAR.DEPTH_FRAC', label: 'Near depth', min: 0.05, max: 1.4, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.FAR.X_FRAC', label: 'Far x', min: -0.4, max: 1.4, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.FAR.Y_FRAC', label: 'Far y', min: -0.4, max: 1.4, step: 0.01 },
-      { kind: 'num', path: 'EMITTERS.FAR.DEPTH_FRAC', label: 'Far depth', min: 0.05, max: 0.95, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.FAR.DEPTH_FRAC', label: 'Far depth', min: 0.05, max: 1.4, step: 0.01 },
+    ],
+  },
+  {
+    title: 'emitter orbs — parked orientation',
+    rows: [
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.X_DEG', label: 'Near pitch °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.Y_DEG', label: 'Near yaw °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.NEAR_ROT.Z_DEG', label: 'Near roll °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.X_DEG', label: 'Far pitch °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.Y_DEG', label: 'Far yaw °', min: -180, max: 180, step: 1 },
+      { kind: 'num', path: 'EMITTERS.FAR_ROT.Z_DEG', label: 'Far roll °', min: -180, max: 180, step: 1 },
     ],
   },
   {

@@ -49,12 +49,37 @@ const orbSlot = (
       type: 'number',
       defaultValue: d0.DEPTH_FRAC,
       min: 0.05,
-      max: 0.95,
+      max: 1.4,
       admin: {
         description:
           '0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.',
       },
     },
+  ],
+})
+
+/**
+ * One emitter orb's parked orientation.
+ *
+ * Shared between landscape and portrait: which way a machine faces is a
+ * property of the machine, not of the viewport.
+ */
+const orbRotGroup = (
+  name: string,
+  label: string,
+  d0: { X_DEG: number; Y_DEG: number; Z_DEG: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  admin: {
+    description:
+      'Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.',
+  },
+  fields: [
+    { name: 'xDeg', type: 'number', defaultValue: d0.X_DEG, min: -180, max: 180 },
+    { name: 'yDeg', type: 'number', defaultValue: d0.Y_DEG, min: -180, max: 180 },
+    { name: 'zDeg', type: 'number', defaultValue: d0.Z_DEG, min: -180, max: 180 },
   ],
 })
 
@@ -775,6 +800,8 @@ export const SamsaraSequence: GlobalConfig = {
         orbSlot('far', 'Far orb — landscape', d.EMITTERS.FAR),
         orbSlot('mobileNear', 'Near orb — portrait', d.EMITTERS.MOBILE_NEAR),
         orbSlot('mobileFar', 'Far orb — portrait', d.EMITTERS.MOBILE_FAR),
+        orbRotGroup('nearRot', 'Near orb — parked orientation', d.EMITTERS.NEAR_ROT),
+        orbRotGroup('farRot', 'Far orb — parked orientation', d.EMITTERS.FAR_ROT),
         {
           name: 'entryMs',
           type: 'number',

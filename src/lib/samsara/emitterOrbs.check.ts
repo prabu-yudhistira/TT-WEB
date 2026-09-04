@@ -6,7 +6,15 @@
  * leaves the magnitudes to the owner's bench pass.
  */
 import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
-import { orbParkedPose, orbPoseAt, orbBobY, portWorld, lensWorld, type OrbCtx } from './emitterOrbs'
+import {
+  orbParkedPose,
+  orbPoseAt,
+  orbBobY,
+  orbRot,
+  portWorld,
+  lensWorld,
+  type OrbCtx,
+} from './emitterOrbs'
 
 let failures = 0
 const check = (label: string, cond: boolean, note = '') => {
@@ -106,6 +114,38 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
   check('the four ports are distinct',
     new Set(ports.map((p) => p.map((v) => v.toFixed(4)).join(','))).size === 4)
   check('the lens is above the orb centre', lensWorld(pose)[1] > pose.y)
+}
+
+// ── parked orientation ──────────────────────────────────────────────
+{
+  const pose = orbParkedPose('near', cfg, land)
+  const zero = { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 }
+  check('zero rotation is the identity',
+    portWorld(pose, 0, zero).every((v, i) => Math.abs(v - portWorld(pose, 0)[i]) < 1e-12))
+
+  // ⚠️ The ports must MOVE with the body. Rotating the mesh while the ports
+  // stayed put would emit smoke from empty space beside the orb, and at the
+  // 0/0/0 default the two agree perfectly — so it would look right until the
+  // first time anyone touched the slider.
+  const spun = portWorld(pose, 0, { X_DEG: 0, Y_DEG: 90, Z_DEG: 0 })
+  check('a yaw moves the afterburners', Math.hypot(
+    spun[0] - portWorld(pose, 0)[0], spun[2] - portWorld(pose, 0)[2]) > 1e-3)
+
+  // A pure yaw is about the Y axis, so height is untouched.
+  check('and a pure yaw leaves their height alone',
+    Math.abs(spun[1] - portWorld(pose, 0)[1]) < 1e-9)
+
+  // Distance from the orb centre is a property of the body, not of its pose.
+  const dist = (q: number[]) => Math.hypot(q[0] - pose.x, q[1] - pose.y, q[2] - pose.z)
+  check('rotation is rigid — the ports keep their distance',
+    Math.abs(dist(spun) - dist(portWorld(pose, 0))) < 1e-9)
+
+  const lensSpun = lensWorld(pose, { X_DEG: 180, Y_DEG: 0, Z_DEG: 0 })
+  check('a 180 pitch puts the lens below the centre', lensSpun[1] < pose.y)
+
+  check('the two orbs can be oriented independently',
+    orbRot('near', cfg) !== orbRot('far', cfg) ||
+      JSON.stringify(cfg.NEAR_ROT) === JSON.stringify(cfg.FAR_ROT))
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll emitterOrbs checks passed.')

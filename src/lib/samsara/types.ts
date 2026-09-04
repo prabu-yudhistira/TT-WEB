@@ -334,6 +334,13 @@ export type BurstConfig = {
   CORE_COLOR: string
 }
 
+/** One orb's parked orientation, in degrees. Applied in THREE's XYZ order. */
+export type OrbRotConfig = {
+  X_DEG: number
+  Y_DEG: number
+  Z_DEG: number
+}
+
 /** One orb's parked position. Fractions of the viewport and of room depth. */
 export type OrbSlotConfig = {
   X_FRAC: number
@@ -364,6 +371,21 @@ export type EmittersConfig = {
   ENTRY_MS: number
   /** The far orb lags the near one by this, so they do not read as one body. */
   ENTRY_STAGGER_MS: number
+
+  /**
+   * Parked orientation per orb, in degrees — pitch, yaw, roll.
+   *
+   * Shared between landscape and portrait deliberately: which way a machine
+   * faces is a property of the machine, not of the viewport, and doubling this
+   * to four groups would put twelve sliders on the bench for a distinction
+   * nobody makes.
+   *
+   * ⚠️ This rotates the AFTERBURNERS with the body. PORT_OFFSETS and
+   * LENS_OFFSET are in orb LOCAL space, so anything reading them must apply the
+   * same rotation the mesh gets — see the warning on portWorld().
+   */
+  NEAR_ROT: OrbRotConfig
+  FAR_ROT: OrbRotConfig
 
   /** Idle float once parked, in ORB RADII. */
   BOB_AMP: number
@@ -488,7 +510,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // value for the bench like every other number here.
     FALL_MS: 950,
     BOUNCE_COUNT: 3,
-    RESTITUTION: 0.71,
+    RESTITUTION: 0.81,
     BOUNCE_MS: [520, 430, 360],
     SETTLE_MS: 300,
   },
@@ -651,17 +673,19 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
    * owner tunes them at /dev/samsara and presses `copy json`.
    */
   EMITTERS: {
-    SIZE_FRAC: 0.175,
+    SIZE_FRAC: 0.14,
     MOBILE_SIZE_FRAC: 0.13,
     NEAR: { X_FRAC: 0.12, Y_FRAC: 0.82, DEPTH_FRAC: 0.28 },
-    FAR: { X_FRAC: 0.46, Y_FRAC: 0.7, DEPTH_FRAC: 0.74 },
+    FAR: { X_FRAC: 0.45, Y_FRAC: 0.74, DEPTH_FRAC: 0.95 },
     MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
+    NEAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
+    FAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
     ENTRY_MS: 1600,
-    ENTRY_STAGGER_MS: 320,
+    ENTRY_STAGGER_MS: 200,
     BOB_AMP: 0.08,
     BOB_MS: 3400,
-    THRUST_RATE: 42,
+    THRUST_RATE: 26,
     THRUST_SPREAD: 0.5,
     CADENCE_MS: 3000,
     CADENCE_PUFFS: 3,
@@ -672,18 +696,18 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   },
 
   HOLOGRAM: {
-    W_FRAC: 0.52,
-    H_FRAC: 0.46,
-    X_FRAC: 0.3,
-    Y_FRAC: 0.42,
+    W_FRAC: 0.63,
+    H_FRAC: 0.7,
+    X_FRAC: 0.275,
+    Y_FRAC: 0.33,
     MOBILE_W_FRAC: 0.78,
     MOBILE_H_FRAC: 0.3,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.66,
-    FORM_MS: 1400,
+    FORM_MS: 1525,
     FLICKER_MS: 5000,
-    FLICKER_DUR_MS: 260,
-    FLICKER_DEPTH: 0.45,
+    FLICKER_DUR_MS: 220,
+    FLICKER_DEPTH: 0.35,
     GLASS_COLOR: '#F5C542',
     GLASS_OPACITY: 0.3,
     SHAFT_COLOR: '#F5C542',
