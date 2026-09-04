@@ -257,6 +257,7 @@ export class MascotEngine {
    * pays nothing — no geometry, no shadow map, no extra draw calls.
    */
   private room: Room | null = null
+  private roomReveal = 0
   private emitters: EmitterScene | null = null
   private orbModel: THREE.Object3D | null = null
   private orbLoading = false
@@ -1253,7 +1254,32 @@ export class MascotEngine {
 
   /** 0 = room invisible, 1 = fully present. See Room.setReveal. */
   setRoomReveal(v: number) {
+    this.roomReveal = v
     this.room?.setReveal(v)
+  }
+
+  /**
+   * The reveal the room was last given.
+   *
+   * Exposed so the hologram can fade in WITH the room rather than tracking its
+   * own copy of the ramp — two ramps would drift the first time either was
+   * retimed, and the orbs would arrive through a half-transparent floor.
+   */
+  getRoomReveal(): number {
+    return this.roomReveal
+  }
+
+  /**
+   * The engine's ONE snapshot per rendered frame — pose, camera, mode and the
+   * hologram rect together.
+   *
+   * ⚠️ Read THIS, never the live fields. Three rAF callbacks run per browser
+   * frame, so a live read is this frame's render labelled with next frame's
+   * state. Previously reachable only through window.__ttMascot(), which is a
+   * verification handle rather than an API.
+   */
+  get rendered() {
+    return this.lastRendered
   }
 
   // ── the room pose, and turning it by hand ───────────────────────────

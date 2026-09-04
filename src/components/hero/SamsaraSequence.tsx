@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { lenisRef } from '../providers/SmoothScroll'
 import { MascotEngine } from '../../lib/mascot/MascotEngine'
 import { SequenceController, type Mode } from '../../lib/samsara/SequenceController'
+import { HologramController } from '../../lib/samsara/HologramController'
 import {
   createGestureState,
   endTouch,
@@ -200,6 +201,16 @@ export function SamsaraSequence({
     let lastShake = -1
     let lastHoldAllowed = true
     let lastMode: Mode | null = null
+    /**
+     * The hologram's own clock, running INSIDE `landed`.
+     *
+     * A separate machine from SequenceController on purpose — that one's modes
+     * are asserted by name in six gates and the bench.
+     */
+    const holo = new HologramController()
+    let holoStarted = false
+    let lastHoloAttr: string | null = null
+    let orbsRequested = false
     let cameraDistance = 0
     let zBack = 0
     let raf = 0
@@ -680,6 +691,86 @@ export function SamsaraSequence({
         eng.setRoomReveal(clamp01((tMs - promotedAtMs) / Math.max(1, cfg.TRANSIT.FALL_MS)))
       }
 
+      // ── the hologram ────────────────────────────────────────────
+      //
+      // Fetched only once the room is actually committed to, so a hero-only
+      // visit never pays 590 KB for two orbs it will not see.
+      if ((mode === 'committed' || mode === 'landed') && !orbsRequested) {
+        orbsRequested = true
+        void eng.loadEmitters('/models/emitter-orb.draco.glb')
+      }
+
+      if (mode === 'landed') {
+        if (!holoStarted) {
+          holoStarted = true
+          holo.start()
+        }
+        holo.update(cfg, dt)
+      } else if (holoStarted) {
+        // Leaving the room stands the whole thing down, so a replay starts
+        // from the entry beat rather than mid-flicker.
+        holoStarted = false
+        holo.reset()
+      }
+
+      const holoPhase = holo.phase
+      if (eng.hasEmitters() && holoPhase !== 'dormant') {
+        eng.setHologram({
+          cfg,
+          ctx: {
+            W: window.innerWidth,
+            H: window.innerHeight,
+            mobile: window.innerWidth < 640,
+            roomDepth: cfg.ROOM.DEPTH,
+            camZ: cfg.ROOM.DEPTH / 2,
+          },
+          phase: holoPhase,
+          entry01: holo.entry01(cfg),
+          form01: holo.form01(cfg),
+          parkedMs: holo.parkedMs(),
+          dtMs: dt,
+          reveal: eng.getRoomReveal(),
+        })
+      } else {
+        eng.setHologram(null)
+      }
+
+      /**
+       * The screen's DOM contract — spec §5.7.
+       *
+       * ⚠️ PRESENCE lifts, VALUE animates, and that split is load-bearing.
+       * With no sequence running — reduced motion, no WebGL, sequenceEnabled
+       * false — the attribute is never written, so a future subtitle/button
+       * layer stays ordinary in-flow content. Gating on the value alone would
+       * hand every degraded visitor a blank panel, which is exactly the bug
+       * the removed chatbox's Task 14 comment recorded.
+       *
+       * It matters more here than it did for the chatbox: this screen will
+       * carry SUBTITLES and OPTION BUTTONS. If those were reachable only
+       * through a working hologram, the visitors who most need them would be
+       * the ones who cannot get them.
+       */
+      const holoAttr = holoPhase === 'forming' || holoPhase === 'live' ? holoPhase : null
+      if (holoAttr !== lastHoloAttr) {
+        lastHoloAttr = holoAttr
+        if (holoAttr) document.documentElement.dataset.ttHologram = holoAttr
+        else delete document.documentElement.dataset.ttHologram
+      }
+
+      // ⚠️ From the engine's RENDERED snapshot, never read live — see the note
+      // in MascotEngine.place(). A live read would be this frame's geometry
+      // labelled with next frame's state.
+      if (holoAttr) {
+        const r = eng.rendered.holoRect
+        if (r) {
+          const st = document.documentElement.style
+          st.setProperty('--tt-holo-x', `${r.x.toFixed(1)}px`)
+          st.setProperty('--tt-holo-y', `${r.y.toFixed(1)}px`)
+          st.setProperty('--tt-holo-w', `${r.w.toFixed(1)}px`)
+          st.setProperty('--tt-holo-h', `${r.h.toFixed(1)}px`)
+        }
+      }
+
       raf = requestAnimationFrame(frame)
     }
 
@@ -690,6 +781,11 @@ export function SamsaraSequence({
     // synthesise a trackpad. Reading state is the other half — samsara-seam.mjs
     // needs the exact frame the promotion happens on.
     const w = window as unknown as Record<string, unknown>
+    w.__ttHologram = () => ({
+      phase: holo.phase,
+      rect: engineRef.current?.rendered.holoRect ?? null,
+      attr: document.documentElement.dataset.ttHologram ?? null,
+    })
     w.__ttSamsara = () => ({
       mode: ctrl.mode,
       transit01: ctrl.transit01,
@@ -742,6 +838,13 @@ export function SamsaraSequence({
       holdCbRef.current(true)
       ctrlRef.current = null
       if (controlsRef) controlsRef.current = null
+      // Removed, not left at a value: a torn-down sequence must leave the page
+      // exactly as one that never had a hologram, which is no attribute at all.
+      delete document.documentElement.dataset.ttHologram
+      for (const k of ['x', 'y', 'w', 'h']) {
+        document.documentElement.style.removeProperty(`--tt-holo-${k}`)
+      }
+      delete w.__ttHologram
       delete w.__ttSamsara
       delete w.__ttSamsaraBeat
       delete w.__ttSamsaraReset
