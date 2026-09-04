@@ -322,7 +322,7 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.SPREAD', label: 'Far half-angle ×', min: 0.05, max: 4, step: 0.05 },
       { kind: 'num', path: 'HOLOGRAM.FAR_SHAFT.REACH', label: 'Far reach ×', min: 0.1, max: 4, step: 0.05 },
       { kind: 'num', path: 'HOLOGRAM.SHAFT_HALF_DEG', label: 'Fan half-angle °  (?HOLOGRAM.SHAFT_GUIDE=1)', min: 1, max: 90, step: 1 },
-      { kind: 'num', path: 'HOLOGRAM.SHAFT_SPREAD', label: 'Ray fill (inside the fan)', min: 0.02, max: 3, step: 0.01 },
+      { kind: 'num', path: 'HOLOGRAM.SHAFT_SPREAD', label: 'Ray fill (inside the fan)', min: 0.02, max: 6, step: 0.01 },
       { kind: 'color', path: 'HOLOGRAM.SHAFT_COLOR', label: 'Shaft colour' },
     ],
   },

@@ -1115,7 +1115,9 @@ export const SamsaraSequence: GlobalConfig = {
           type: 'number',
           defaultValue: d.HOLOGRAM.SHAFT_SPREAD,
           min: 0.02,
-          max: 3,
+          // Raised from 3 on 2026-09-05: the owner's fill landed on exactly the
+          // ceiling, which is how a range says it is too small.
+          max: 6,
           admin: {
             description:
               'Brightness distribution INSIDE the fan — use shaftHalfDeg to set how wide it opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.',

@@ -963,7 +963,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   },
 
   HOLOGRAM: {
-    W_FRAC: 0.615,
+    W_FRAC: 0.665,
     PANEL_ASPECT: 1.7768,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
@@ -988,9 +988,9 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // multiplies this by the striation and the cone falloff, so the same
     // number reads as almost nothing.
     SHAFT_OPACITY: 0.46,
-    SHAFT_SPREAD: 2.52,
+    SHAFT_SPREAD: 3,
     // The owner's annotated target: edges up and out, not out sideways.
-    SHAFT_HALF_DEG: 64,
+    SHAFT_HALF_DEG: 62,
     SHAFT_GUIDE: false,
     SHAFT_REACH: 0.4,
     SHAFT_RAYS: 3.3,
@@ -1003,18 +1003,18 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.5,
     // Both zero, so the slot config changes nothing until a slider moves.
-    NEAR_SHAFT: { DX: 0.05, DY: -0.2, ANGLE_DEG: 11, SPREAD: 0.85, REACH: 0.75 },
+    NEAR_SHAFT: { DX: 0, DY: -0.2, ANGLE_DEG: 11, SPREAD: 0.85, REACH: 0.9 },
     FAR_SHAFT: { DX: 0.1, DY: -0.6, ANGLE_DEG: -20, SPREAD: 0.75, REACH: 0.65 },
   },
 
   POKE: {
     ENABLED: true,
-    SHAKE_MS: 700,
-    SHAKE_AMP: 0.09,
-    SHAKE_HZ: 19,
+    SHAKE_MS: 475,
+    SHAKE_AMP: 0.085,
+    SHAKE_HZ: 31,
     RELEASE_MS: 420,
-    FLICKER_MS: 620,
-    FLICKER_DEPTH: 0.8,
+    FLICKER_MS: 400,
+    FLICKER_DEPTH: 0.83,
     HIT_SLOP: 18,
   },
 
