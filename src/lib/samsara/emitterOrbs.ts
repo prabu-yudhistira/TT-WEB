@@ -1,6 +1,6 @@
 import {
-  PORT_OFFSETS,
-  LENS_OFFSET,
+  portOffsets,
+  lensOffset,
   type EmittersConfig,
   type OrbRotConfig,
   type OrbSlotConfig,
@@ -198,9 +198,10 @@ export function rotateLocal(
 export function portWorld(
   pose: OrbPose,
   i: number,
+  cfg: EmittersConfig,
   rot: OrbRotConfig = ZERO_ROT,
 ): [number, number, number] {
-  const o = rotateLocal(PORT_OFFSETS[i], rot)
+  const o = rotateLocal(portOffsets(cfg)[i], rot)
   return [
     pose.x + o[0] * pose.radius,
     pose.y + o[1] * pose.radius,
@@ -211,9 +212,10 @@ export function portWorld(
 /** The hologram lens's world position — where the shafts originate. */
 export function lensWorld(
   pose: OrbPose,
+  cfg: EmittersConfig,
   rot: OrbRotConfig = ZERO_ROT,
 ): [number, number, number] {
-  const o = rotateLocal(LENS_OFFSET, rot)
+  const o = rotateLocal(lensOffset(cfg), rot)
   return [
     pose.x + o[0] * pose.radius,
     pose.y + o[1] * pose.radius,

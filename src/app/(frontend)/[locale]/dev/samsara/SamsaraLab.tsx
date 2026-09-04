@@ -212,6 +212,20 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
+    // ⚠️ The marker toggle is not a row here — the panel has no boolean kind.
+    // Reach it with ?EMITTERS.SHOW_PORTS=1 on the bench URL, which the query
+    // parser already handles, or from the checkbox in /admin.
+    title: 'emitter orbs — nozzles and lens  (?EMITTERS.SHOW_PORTS=1)',
+    rows: [
+      { kind: 'num', path: 'EMITTERS.PORT_X', label: 'Nozzle x (±)', min: 0, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.PORT_Y', label: 'Nozzle y (down)', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.PORT_Z', label: 'Nozzle z (±)', min: 0, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_X', label: 'Lens x', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_Y', label: 'Lens y', min: -2, max: 2, step: 0.005 },
+      { kind: 'num', path: 'EMITTERS.LENS_Z', label: 'Lens z', min: -2, max: 2, step: 0.005 },
+    ],
+  },
+  {
     title: 'emitter orbs — parked orientation',
     rows: [
       { kind: 'num', path: 'EMITTERS.NEAR_ROT.X_DEG', label: 'Near pitch °', min: -180, max: 180, step: 1 },

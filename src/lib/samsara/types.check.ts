@@ -6,7 +6,7 @@
  * later edit has to be deliberate and has to come back through the owner.
  * Run: npm run verify:config
  */
-import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
+import { DEFAULT_SEQUENCE, portOffsets } from './types'
 import { EXPRESSION_ORDER } from '../mascot/eyes'
 
 let failures = 0
@@ -269,7 +269,17 @@ check('the stagger is shorter than the entry it offsets',
 check('a cadenced puff dies before the next burst',
   DEFAULT_SEQUENCE.EMITTERS.PUFF_LIFE_MS * 1.25 < DEFAULT_SEQUENCE.EMITTERS.CADENCE_MS)
 check('thrust emits at a positive rate', DEFAULT_SEQUENCE.EMITTERS.THRUST_RATE > 0)
-check('there are four ports', PORT_OFFSETS.length === 4)
+{
+  const ports = portOffsets(DEFAULT_SEQUENCE.EMITTERS)
+  check('there are four ports', ports.length === 4)
+  // Mirroring is what keeps them square; four loose coordinates could not.
+  check('all four sit below the orb centre', ports.every((q) => q[1] < 0))
+  check('and they are four DISTINCT points',
+    new Set(ports.map((q) => q.join(','))).size === 4)
+  check('the projector lens is above the centre', DEFAULT_SEQUENCE.EMITTERS.LENS_Y > 0)
+  // A debug aid left on would ship four markers into the room.
+  check('the port markers ship off', DEFAULT_SEQUENCE.EMITTERS.SHOW_PORTS === false)
+}
 // Degrees, not radians — a value past a full turn is a unit mistake, not a look.
 for (const [label, r] of [['near', DEFAULT_SEQUENCE.EMITTERS.NEAR_ROT], ['far', DEFAULT_SEQUENCE.EMITTERS.FAR_ROT]] as const) {
   check(`${label} orb rotation is in degrees`,

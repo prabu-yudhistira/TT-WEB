@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { PORT_OFFSETS, type SequenceConfig } from './types'
+import { portOffsets, type EmittersConfig, type SequenceConfig } from './types'
 import {
   orbParkedPose,
   orbPoseAt,
@@ -14,6 +14,9 @@ import {
 import { makeSmokePool, SmokeState, type PortSpec, type SmokeMode } from './orbSmoke'
 import { screenQuad, shaftFor, flickerAt, type Vec3 } from './hologramGeometry'
 import type { HoloPhase } from './HologramController'
+import { DEFAULT_SEQUENCE } from './types'
+
+const DEFAULT_EMITTERS = DEFAULT_SEQUENCE.EMITTERS
 
 /**
  * The GL half of the emitter orbs and the holographic screen.
@@ -362,16 +365,17 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
   // ── smoke: one pool and one draw call per orb ─────────────────────
   /** The four afterburners, pointing down and biased outward by their own offset. */
-  const ORB_PORTS: PortSpec[] = PORT_OFFSETS.map((o) => ({
-    at: o,
-    dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
-  }))
+  const orbPorts = (e: EmittersConfig): PortSpec[] =>
+    portOffsets(e).map((o) => ({
+      at: o as unknown as readonly [number, number, number],
+      dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
+    }))
 
   const smoke = SLOTS.map(() => {
     // Seeded per orb, and differently, so the two plumes are not identical.
     let s = 987654321
     const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
-    return new SmokeState(makeSmokePool(POOL), ORB_PORTS, rnd)
+    return new SmokeState(makeSmokePool(POOL), orbPorts(DEFAULT_EMITTERS), rnd)
   })
 
   const smokeMat = new THREE.ShaderMaterial({
@@ -444,6 +448,33 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   glass.visible = false
   group.add(glass)
 
+  /**
+   * A marker at each port and at the lens, for placing them by eye.
+   *
+   * The ports are recessed nozzles on the underside, so an outlier search over
+   * the mesh cannot find them the way it finds SAMSARA's protruding exhausts —
+   * it returns one bulb. Without a marker a port is invisible until smoke
+   * happens to come out of it, which makes "the plume is a bit off" a slow way
+   * to discover where a point actually is.
+   *
+   * Five per orb: four ports and the lens, in two colours so they cannot be
+   * confused. Hidden unless EMITTERS.SHOW_PORTS.
+   */
+  const markerGeo = new THREE.SphereGeometry(0.09, 12, 8)
+  const portMarkerMat = new THREE.MeshBasicMaterial({ color: 0x33ff88, depthTest: false })
+  const lensMarkerMat = new THREE.MeshBasicMaterial({ color: 0xff4488, depthTest: false })
+  const markers: THREE.Mesh[] = []
+  for (let i = 0; i < SLOTS.length * 5; i++) {
+    const isLens = i % 5 === 4
+    const m = new THREE.Mesh(markerGeo, isLens ? lensMarkerMat : portMarkerMat)
+    m.visible = false
+    // Over everything, or a marker inside the hull is exactly as invisible as
+    // the port it is standing in for.
+    m.renderOrder = 999
+    group.add(m)
+    markers.push(m)
+  }
+
   let corners: Vec3[] = []
   const up = new THREE.Vector3(0, 1, 0)
   const dir = new THREE.Vector3()
@@ -498,6 +529,11 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
     setConfig(cfg) {
       ;(smokeMat.uniforms.uColor.value as THREE.Color).set(cfg.EMITTERS.PUFF_COLOR)
+      // ⚠️ The ports are CONFIG now, so a moved slider has to reach the
+      // emitters. Pushed here rather than per frame: setConfig runs on config
+      // identity change, which is exactly when a port can have moved.
+      for (const st of smoke) st.setPorts(orbPorts(cfg.EMITTERS))
+      for (let i = 0; i < markers.length; i++) markers[i].visible = cfg.EMITTERS.SHOW_PORTS
       ;(shaftMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_COLOR)
       ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
     },
@@ -551,9 +587,25 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         smoke[i].update(cfg.EMITTERS, mode, clock, a.dtMs)
         writeSmoke(i, slot, pose, bob, clock, cfg)
 
+        if (cfg.EMITTERS.SHOW_PORTS) {
+          const locals = portOffsets(cfg.EMITTERS)
+          for (let k = 0; k < 4; k++) {
+            const q = rotateLocal(locals[k] as unknown as readonly [number, number, number], rot)
+            markers[i * 5 + k].position.set(
+              pose.x + q[0] * pose.radius,
+              pose.y + bob + q[1] * pose.radius,
+              pose.z + q[2] * pose.radius,
+            )
+            markers[i * 5 + k].scale.setScalar(pose.radius)
+          }
+          const l = lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot)
+          markers[i * 5 + 4].position.set(l[0], l[1], l[2])
+          markers[i * 5 + 4].scale.setScalar(pose.radius)
+        }
+
         shafts[i].visible = lit
         if (lit) {
-          const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }, rot), quad, cfg.HOLOGRAM)
+          const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot), quad, cfg.HOLOGRAM)
           mid.set(
             (s.origin[0] + s.target[0]) / 2,
             (s.origin[1] + s.target[1]) / 2,
@@ -606,6 +658,9 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
     screenCorners: () => corners,
 
     dispose() {
+      markerGeo.dispose()
+      portMarkerMat.dispose()
+      lensMarkerMat.dispose()
       smokeGeo.forEach((g) => g.dispose())
       smokeMat.dispose()
       shafts.forEach((s) => s.geometry.dispose())

@@ -6,17 +6,26 @@
  * semantically. Clustering those outliers separates the two tubes from each
  * other and from any other bump.
  *
- * Reports in BODY RADII, the units EXHAUST.PORT_* uses: the engine normalises
- * the model to maxDim 1 and then treats scale.z / 2 as the radius, so a local
- * coordinate is worth twice its value in body radii.
+ * ⚠️ The two models are normalised DIFFERENTLY by the engine, so the conversion
+ * to radii is not the same for both — get it wrong and every coordinate is out
+ * by a factor of two, which reads as "the ports are roughly right but the smoke
+ * is inside the body".
  *
- *   node --import tsx scripts/_find-exhausts.mjs
+ *   SAMSARA  loadDetail   scales to maxDim 1, then radius = scale.z / 2,
+ *                         so local 0.5 is one radius  ->  RADII = local * 2
+ *   the orb  loadEmitters scales to maxDim 2, then applies radius directly,
+ *                         so local 1.0 is one radius  ->  RADII = local * 1
+ *
+ *   node --import tsx scripts/_find-exhausts.mjs                                  # SAMSARA
+ *   node --import tsx scripts/_find-exhausts.mjs public/models/emitter-orb.draco.glb 1
  */
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import draco3d from 'draco3dgltf'
 
 const SRC = process.argv[2] ?? 'public/models/mascot.room.draco.glb'
+/** Radii per normalised unit — see the header. 2 for SAMSARA, 1 for the orb. */
+const RADII = Number(process.argv[3] ?? 2)
 /** Outliers only. The hull sits near r = 0.5 once normalised. */
 const OUTLIER_Q = 0.9995
 /** Two points closer than this are the same protrusion. */
@@ -79,16 +88,16 @@ for (const o of outliers) {
 }
 clusters.sort((a, b) => b.n - a.n)
 
-console.log('protrusions, in BODY RADII (x2 the normalised local), face is +Z:')
+console.log(`protrusions, in RADII (x${RADII} the normalised local), face is +Z:`)
 console.log('  #   verts      x       y       z     |r|   note')
 clusters.slice(0, 10).forEach((c, i) => {
-  const b = c.peak.map((v) => v * 2)
+  const b = c.peak.map((v) => v * RADII)
   const note =
     b[1] > 0.5 && b[2] < 0 ? 'upper rear — exhaust candidate' : b[1] > 0.8 ? 'top' : ''
   console.log(
     `  ${String(i).padStart(2)}  ${String(c.n).padStart(6)}  ` +
       b.map((v) => v.toFixed(3).padStart(6)).join('  ') +
-      `  ${(c.r * 2).toFixed(3)}  ${note}`,
+      `  ${(c.r * RADII).toFixed(3)}  ${note}`,
   )
 })
 
@@ -96,8 +105,8 @@ clusters.slice(0, 10).forEach((c, i) => {
 console.log('\nsymmetric pairs (|Δx| large, Δy and Δz small):')
 for (let i = 0; i < clusters.length; i++) {
   for (let j = i + 1; j < clusters.length; j++) {
-    const a = clusters[i].peak.map((v) => v * 2)
-    const b = clusters[j].peak.map((v) => v * 2)
+    const a = clusters[i].peak.map((v) => v * RADII)
+    const b = clusters[j].peak.map((v) => v * RADII)
     if (
       Math.abs(a[0] + b[0]) < 0.12 &&
       Math.abs(a[1] - b[1]) < 0.12 &&

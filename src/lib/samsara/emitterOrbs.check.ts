@@ -5,7 +5,7 @@
  * §9), so this file asserts the relationships the composition depends on and
  * leaves the magnitudes to the owner's bench pass.
  */
-import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
+import { DEFAULT_SEQUENCE, portOffsets } from './types'
 import {
   orbParkedPose,
   orbPoseAt,
@@ -101,19 +101,20 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
 // ── ports and lens ──────────────────────────────────────────────────
 {
   const pose = orbParkedPose('near', cfg, land)
-  check('there are four ports', PORT_OFFSETS.length === 4)
-  const ports = PORT_OFFSETS.map((_, i) => portWorld(pose, i))
+  const local = portOffsets(cfg)
+  check('there are four ports', local.length === 4)
+  const ports = local.map((_, i) => portWorld(pose, i, cfg))
   check('all four ports are below the orb centre', ports.every((p) => p[1] < pose.y))
   check('ports scale with the orb radius',
     Math.abs(
       Math.hypot(ports[0][0] - pose.x, ports[0][1] - pose.y, ports[0][2] - pose.z) -
-        Math.hypot(...PORT_OFFSETS[0]) * pose.radius,
+        Math.hypot(...local[0]) * pose.radius,
     ) < 1e-6)
   // Four distinct ports, not one repeated — a copy/paste in PORT_OFFSETS would
   // put every plume in the same place and look almost right.
   check('the four ports are distinct',
     new Set(ports.map((p) => p.map((v) => v.toFixed(4)).join(','))).size === 4)
-  check('the lens is above the orb centre', lensWorld(pose)[1] > pose.y)
+  check('the lens is above the orb centre', lensWorld(pose, cfg)[1] > pose.y)
 }
 
 // ── parked orientation ──────────────────────────────────────────────
@@ -121,26 +122,26 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
   const pose = orbParkedPose('near', cfg, land)
   const zero = { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 }
   check('zero rotation is the identity',
-    portWorld(pose, 0, zero).every((v, i) => Math.abs(v - portWorld(pose, 0)[i]) < 1e-12))
+    portWorld(pose, 0, cfg, zero).every((v, i) => Math.abs(v - portWorld(pose, 0, cfg)[i]) < 1e-12))
 
   // ⚠️ The ports must MOVE with the body. Rotating the mesh while the ports
   // stayed put would emit smoke from empty space beside the orb, and at the
   // 0/0/0 default the two agree perfectly — so it would look right until the
   // first time anyone touched the slider.
-  const spun = portWorld(pose, 0, { X_DEG: 0, Y_DEG: 90, Z_DEG: 0 })
+  const spun = portWorld(pose, 0, cfg, { X_DEG: 0, Y_DEG: 90, Z_DEG: 0 })
   check('a yaw moves the afterburners', Math.hypot(
-    spun[0] - portWorld(pose, 0)[0], spun[2] - portWorld(pose, 0)[2]) > 1e-3)
+    spun[0] - portWorld(pose, 0, cfg)[0], spun[2] - portWorld(pose, 0, cfg)[2]) > 1e-3)
 
   // A pure yaw is about the Y axis, so height is untouched.
   check('and a pure yaw leaves their height alone',
-    Math.abs(spun[1] - portWorld(pose, 0)[1]) < 1e-9)
+    Math.abs(spun[1] - portWorld(pose, 0, cfg)[1]) < 1e-9)
 
   // Distance from the orb centre is a property of the body, not of its pose.
   const dist = (q: number[]) => Math.hypot(q[0] - pose.x, q[1] - pose.y, q[2] - pose.z)
   check('rotation is rigid — the ports keep their distance',
-    Math.abs(dist(spun) - dist(portWorld(pose, 0))) < 1e-9)
+    Math.abs(dist(spun) - dist(portWorld(pose, 0, cfg))) < 1e-9)
 
-  const lensSpun = lensWorld(pose, { X_DEG: 180, Y_DEG: 0, Z_DEG: 0 })
+  const lensSpun = lensWorld(pose, cfg, { X_DEG: 180, Y_DEG: 0, Z_DEG: 0 })
   check('a 180 pitch puts the lens below the centre', lensSpun[1] < pose.y)
 
   check('the two orbs can be oriented independently',

@@ -116,6 +116,13 @@ export type SamsaraSequenceInput = {
     far?: OrbSlotCms
     mobileNear?: OrbSlotCms
     mobileFar?: OrbSlotCms
+    portX?: number | null
+    portY?: number | null
+    portZ?: number | null
+    lensX?: number | null
+    lensY?: number | null
+    lensZ?: number | null
+    showPorts?: boolean | null
     nearRot?: OrbRotCms
     farRot?: OrbRotCms
     entryMs?: number | null
@@ -354,6 +361,13 @@ export function resolveSamsara(
       FAR: slot(em.far, d.EMITTERS.FAR),
       MOBILE_NEAR: slot(em.mobileNear, d.EMITTERS.MOBILE_NEAR),
       MOBILE_FAR: slot(em.mobileFar, d.EMITTERS.MOBILE_FAR),
+      PORT_X: num(em.portX, d.EMITTERS.PORT_X),
+      PORT_Y: num(em.portY, d.EMITTERS.PORT_Y),
+      PORT_Z: num(em.portZ, d.EMITTERS.PORT_Z),
+      LENS_X: num(em.lensX, d.EMITTERS.LENS_X),
+      LENS_Y: num(em.lensY, d.EMITTERS.LENS_Y),
+      LENS_Z: num(em.lensZ, d.EMITTERS.LENS_Z),
+      SHOW_PORTS: bool(em.showPorts, d.EMITTERS.SHOW_PORTS),
       NEAR_ROT: rot(em.nearRot, d.EMITTERS.NEAR_ROT),
       FAR_ROT: rot(em.farRot, d.EMITTERS.FAR_ROT),
       ENTRY_MS: num(em.entryMs, d.EMITTERS.ENTRY_MS),
@@ -505,6 +519,13 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       far: { xFrac: c.EMITTERS.FAR.X_FRAC, yFrac: c.EMITTERS.FAR.Y_FRAC, depthFrac: c.EMITTERS.FAR.DEPTH_FRAC },
       mobileNear: { xFrac: c.EMITTERS.MOBILE_NEAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_NEAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_NEAR.DEPTH_FRAC },
       mobileFar: { xFrac: c.EMITTERS.MOBILE_FAR.X_FRAC, yFrac: c.EMITTERS.MOBILE_FAR.Y_FRAC, depthFrac: c.EMITTERS.MOBILE_FAR.DEPTH_FRAC },
+      portX: c.EMITTERS.PORT_X,
+      portY: c.EMITTERS.PORT_Y,
+      portZ: c.EMITTERS.PORT_Z,
+      lensX: c.EMITTERS.LENS_X,
+      lensY: c.EMITTERS.LENS_Y,
+      lensZ: c.EMITTERS.LENS_Z,
+      showPorts: c.EMITTERS.SHOW_PORTS,
       nearRot: { xDeg: c.EMITTERS.NEAR_ROT.X_DEG, yDeg: c.EMITTERS.NEAR_ROT.Y_DEG, zDeg: c.EMITTERS.NEAR_ROT.Z_DEG },
       farRot: { xDeg: c.EMITTERS.FAR_ROT.X_DEG, yDeg: c.EMITTERS.FAR_ROT.Y_DEG, zDeg: c.EMITTERS.FAR_ROT.Z_DEG },
       entryMs: c.EMITTERS.ENTRY_MS,

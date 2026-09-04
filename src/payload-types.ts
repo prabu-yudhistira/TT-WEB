@@ -1711,6 +1711,25 @@ export interface SamsaraSequence {
       depthFrac?: number | null;
     };
     /**
+     * The four steam nozzles, in orb radii. ONE set of coordinates, mirrored on X and Z — the nozzles sit in a square on the underside, so four loose values could only drift out of it. Turn on the port markers below to place them by eye.
+     */
+    portX?: number | null;
+    /**
+     * Height. Negative, since the nozzles are underneath.
+     */
+    portY?: number | null;
+    portZ?: number | null;
+    lensX?: number | null;
+    /**
+     * The domed projector lens on top. The light shafts start here.
+     */
+    lensY?: number | null;
+    lensZ?: number | null;
+    /**
+     * TUNING AID — leave off for visitors. Draws a green marker at each nozzle and a pink one at the lens. Without it a port is invisible until smoke happens to come out of it, which is a slow way to find out where it actually is.
+     */
+    showPorts?: boolean | null;
+    /**
      * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
      */
     nearRot?: {
@@ -2381,6 +2400,13 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               yFrac?: T;
               depthFrac?: T;
             };
+        portX?: T;
+        portY?: T;
+        portZ?: T;
+        lensX?: T;
+        lensY?: T;
+        lensZ?: T;
+        showPorts?: T;
         nearRot?:
           | T
           | {

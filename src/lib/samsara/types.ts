@@ -421,6 +421,32 @@ export type EmittersConfig = {
   NEAR_ROT: OrbRotConfig
   FAR_ROT: OrbRotConfig
 
+  /**
+   * The four steam ports, in ORB RADII. Mirrored on X and Z — see portOffsets.
+   *
+   * ⚠️ Config rather than constants since 2026-09-04. A model re-export used to
+   * invalidate them silently; now it is a slider move, and SHOW_PORTS makes the
+   * placement visible while you do it.
+   */
+  PORT_X: number
+  PORT_Y: number
+  PORT_Z: number
+
+  /** The domed projector lens on top, where the shafts originate. Orb radii. */
+  LENS_X: number
+  LENS_Y: number
+  LENS_Z: number
+
+  /**
+   * Draw a marker at each port and at the lens.
+   *
+   * A tuning aid, and the reason the ports stopped being guesswork: without it
+   * a port is invisible until smoke happens to come out of it, and "the plume
+   * is a bit off" is a slow way to find out where a point actually is. Ships
+   * OFF.
+   */
+  SHOW_PORTS: boolean
+
   /** Idle float once parked, in ORB RADII. */
   BOB_AMP: number
   BOB_MS: number
@@ -480,28 +506,38 @@ export type HologramConfig = {
 }
 
 /**
- * The four steam ports and the hologram lens, in ORB RADII, orb local space.
+ * Builds the four steam ports from config, in ORB RADII, orb local space.
  *
- * ⚠️ HAND-MEASURED, because `emitter_orb.glb` has NO NAMED NODES — it is one
- * welded mesh, one primitive, one unnamed material (`scripts/_inspect-orb.mjs`).
- * The features the owner labelled are not transforms and nothing can be
- * parented to them.
+ * ⚠️ THREE numbers for FOUR ports, mirrored on X and Z. The nozzles sit in a
+ * square on the underside, so four independent coordinates could only ever
+ * drift out of that square — and would put twelve sliders on the bench to
+ * express something the mesh does not offer.
  *
- * ⚠️ RE-EXPORTING THE MODEL SILENTLY INVALIDATES THESE. Nothing throws; the
- * smoke simply starts coming out of the wrong places. `samsara-emitters.mjs`
- * asserts puffs originate within the orb silhouette, which catches gross drift
- * but not a subtle one. The durable fix is a re-export carrying named empties
- * at these five points — worth requesting from the model's author.
+ * ⚠️ These were hand-measured constants until 2026-09-04, which the spec ranked
+ * as this sub-project's first risk: `emitter_orb.glb` has NO NAMED NODES, so a
+ * re-export silently moved every plume and nothing threw. They are config now,
+ * and `EMITTERS.SHOW_PORTS` draws a marker at each one so placing them is a
+ * matter of looking rather than of guessing.
+ *
+ * ⚠️ And they cannot be found by measuring the mesh the way SAMSARA's exhausts
+ * were. Those are TUBES — the furthest protrusions, so an outlier search finds
+ * them exactly. These are RECESSED nozzles, holes in the hull; the same search
+ * run against this model returns one bulb and nothing else.
  */
-export const PORT_OFFSETS: readonly (readonly [number, number, number])[] = [
-  [0.42, -0.78, 0.3],
-  [-0.42, -0.78, 0.3],
-  [0.42, -0.78, -0.3],
-  [-0.42, -0.78, -0.3],
-]
+export function portOffsets(cfg: EmittersConfig): [number, number, number][] {
+  const { PORT_X: x, PORT_Y: y, PORT_Z: z } = cfg
+  return [
+    [x, y, z],
+    [-x, y, z],
+    [x, y, -z],
+    [-x, y, -z],
+  ]
+}
 
 /** The domed lens on top, where the shafts originate. Orb radii. */
-export const LENS_OFFSET: readonly [number, number, number] = [0, 0.86, 0.1]
+export function lensOffset(cfg: EmittersConfig): [number, number, number] {
+  return [cfg.LENS_X, cfg.LENS_Y, cfg.LENS_Z]
+}
 
 export type SequenceConfig = {
   ENABLED: boolean
@@ -714,6 +750,16 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FAR: { X_FRAC: 0.45, Y_FRAC: 0.74, DEPTH_FRAC: 0.95 },
     MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
+    // Starting points read off an underside render, NOT measured — the ports are
+    // recessed, so the outlier search that found SAMSARA's tubes cannot see
+    // them. Turn SHOW_PORTS on and place them properly.
+    PORT_X: 0.55,
+    PORT_Y: -0.6,
+    PORT_Z: 0.45,
+    LENS_X: 0,
+    LENS_Y: 0.9,
+    LENS_Z: 0,
+    SHOW_PORTS: false,
     NEAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
     FAR_ROT: { X_DEG: 0, Y_DEG: 0, Z_DEG: 0 },
     ENTRY_MS: 1600,

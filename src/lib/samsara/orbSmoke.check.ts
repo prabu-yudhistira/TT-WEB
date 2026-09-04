@@ -13,7 +13,7 @@
  *    port, so it passed for any input with four or more puffs. `PuffSample`
  *    now carries `port` so the assertion is real.
  */
-import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
+import { DEFAULT_SEQUENCE, portOffsets } from './types'
 import { makeSmokePool, SmokeState, type PortSpec } from './orbSmoke'
 
 let failures = 0
@@ -28,8 +28,8 @@ const check = (label: string, cond: boolean, note = '') => {
 const cfg = DEFAULT_SEQUENCE.EMITTERS
 
 /** The orb's four afterburners, pointing down and out. */
-const ORB_PORTS: PortSpec[] = PORT_OFFSETS.map((o) => ({
-  at: o,
+const ORB_PORTS: PortSpec[] = portOffsets(cfg).map((o) => ({
+  at: o as unknown as readonly [number, number, number],
   dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
 }))
 /** Deterministic, so any failure is reproducible. */

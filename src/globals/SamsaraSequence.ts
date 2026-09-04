@@ -800,6 +800,31 @@ export const SamsaraSequence: GlobalConfig = {
         orbSlot('far', 'Far orb — landscape', d.EMITTERS.FAR),
         orbSlot('mobileNear', 'Near orb — portrait', d.EMITTERS.MOBILE_NEAR),
         orbSlot('mobileFar', 'Far orb — portrait', d.EMITTERS.MOBILE_FAR),
+        {
+          name: 'portX',
+          type: 'number',
+          defaultValue: d.EMITTERS.PORT_X,
+          min: 0,
+          max: 2,
+          admin: {
+            description:
+              'The four steam nozzles, in orb radii. ONE set of coordinates, mirrored on X and Z — the nozzles sit in a square on the underside, so four loose values could only drift out of it. Turn on the port markers below to place them by eye.',
+          },
+        },
+        { name: 'portY', type: 'number', defaultValue: d.EMITTERS.PORT_Y, min: -2, max: 2, admin: { description: 'Height. Negative, since the nozzles are underneath.' } },
+        { name: 'portZ', type: 'number', defaultValue: d.EMITTERS.PORT_Z, min: 0, max: 2 },
+        { name: 'lensX', type: 'number', defaultValue: d.EMITTERS.LENS_X, min: -2, max: 2 },
+        { name: 'lensY', type: 'number', defaultValue: d.EMITTERS.LENS_Y, min: -2, max: 2, admin: { description: 'The domed projector lens on top. The light shafts start here.' } },
+        { name: 'lensZ', type: 'number', defaultValue: d.EMITTERS.LENS_Z, min: -2, max: 2 },
+        {
+          name: 'showPorts',
+          type: 'checkbox',
+          defaultValue: d.EMITTERS.SHOW_PORTS,
+          admin: {
+            description:
+              'TUNING AID — leave off for visitors. Draws a green marker at each nozzle and a pink one at the lens. Without it a port is invisible until smoke happens to come out of it, which is a slow way to find out where it actually is.',
+          },
+        },
         orbRotGroup('nearRot', 'Near orb — parked orientation', d.EMITTERS.NEAR_ROT),
         orbRotGroup('farRot', 'Far orb — parked orientation', d.EMITTERS.FAR_ROT),
         {
