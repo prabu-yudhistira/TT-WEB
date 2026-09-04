@@ -131,6 +131,21 @@ export type SamsaraSequenceInput = {
     puffColor?: string | null
     puffOpacity?: number | null
   } | null
+  exhaust?: {
+    enabled?: boolean | null
+    portX?: number | null
+    portY?: number | null
+    portZ?: number | null
+    dirX?: number | null
+    dirY?: number | null
+    dirZ?: number | null
+    rate?: number | null
+    spread?: number | null
+    puffSize?: number | null
+    puffLifeMs?: number | null
+    puffColor?: string | null
+    puffOpacity?: number | null
+  } | null
   hologram?: {
     wFrac?: number | null
     hFrac?: number | null
@@ -201,6 +216,7 @@ export function resolveSamsara(
   const ie = cms?.idleEyes ?? {}
   const bu = cms?.burst ?? {}
   const em = cms?.emitters ?? {}
+  const ex = cms?.exhaust ?? {}
   const ho = cms?.hologram ?? {}
   const w = ie?.weights ?? {}
 
@@ -354,6 +370,22 @@ export function resolveSamsara(
       PUFF_OPACITY: num(em.puffOpacity, d.EMITTERS.PUFF_OPACITY),
     },
 
+    EXHAUST: {
+      ENABLED: bool(ex.enabled, d.EXHAUST.ENABLED),
+      PORT_X: num(ex.portX, d.EXHAUST.PORT_X),
+      PORT_Y: num(ex.portY, d.EXHAUST.PORT_Y),
+      PORT_Z: num(ex.portZ, d.EXHAUST.PORT_Z),
+      DIR_X: num(ex.dirX, d.EXHAUST.DIR_X),
+      DIR_Y: num(ex.dirY, d.EXHAUST.DIR_Y),
+      DIR_Z: num(ex.dirZ, d.EXHAUST.DIR_Z),
+      RATE: num(ex.rate, d.EXHAUST.RATE),
+      SPREAD: num(ex.spread, d.EXHAUST.SPREAD),
+      PUFF_SIZE: num(ex.puffSize, d.EXHAUST.PUFF_SIZE),
+      PUFF_LIFE_MS: num(ex.puffLifeMs, d.EXHAUST.PUFF_LIFE_MS),
+      PUFF_COLOR: hex(ex.puffColor, d.EXHAUST.PUFF_COLOR),
+      PUFF_OPACITY: num(ex.puffOpacity, d.EXHAUST.PUFF_OPACITY),
+    },
+
     HOLOGRAM: {
       W_FRAC: num(ho.wFrac, d.HOLOGRAM.W_FRAC),
       H_FRAC: num(ho.hFrac, d.HOLOGRAM.H_FRAC),
@@ -487,6 +519,21 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       puffLifeMs: c.EMITTERS.PUFF_LIFE_MS,
       puffColor: c.EMITTERS.PUFF_COLOR,
       puffOpacity: c.EMITTERS.PUFF_OPACITY,
+    },
+    exhaust: {
+      enabled: c.EXHAUST.ENABLED,
+      portX: c.EXHAUST.PORT_X,
+      portY: c.EXHAUST.PORT_Y,
+      portZ: c.EXHAUST.PORT_Z,
+      dirX: c.EXHAUST.DIR_X,
+      dirY: c.EXHAUST.DIR_Y,
+      dirZ: c.EXHAUST.DIR_Z,
+      rate: c.EXHAUST.RATE,
+      spread: c.EXHAUST.SPREAD,
+      puffSize: c.EXHAUST.PUFF_SIZE,
+      puffLifeMs: c.EXHAUST.PUFF_LIFE_MS,
+      puffColor: c.EXHAUST.PUFF_COLOR,
+      puffOpacity: c.EXHAUST.PUFF_OPACITY,
     },
     hologram: {
       wFrac: c.HOLOGRAM.W_FRAC,

@@ -240,6 +240,23 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: 'SAMSARA — exhaust smoke',
+    rows: [
+      { kind: 'num', path: 'EXHAUST.PORT_X', label: 'Tube x (mirrored)', min: 0, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PORT_Y', label: 'Tube y', min: -2, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PORT_Z', label: 'Tube z (− is behind)', min: -2, max: 2, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_X', label: 'Plume out', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_Y', label: 'Plume up', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.DIR_Z', label: 'Plume back', min: -3, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.RATE', label: 'Puffs /s /tube', min: 0, max: 120, step: 1 },
+      { kind: 'num', path: 'EXHAUST.SPREAD', label: 'Scatter', min: 0, max: 3, step: 0.01 },
+      { kind: 'num', path: 'EXHAUST.PUFF_SIZE', label: 'Puff size px', min: 2, max: 400, step: 1 },
+      { kind: 'num', path: 'EXHAUST.PUFF_LIFE_MS', label: 'Puff life ms', min: 100, max: 9000, step: 25 },
+      { kind: 'num', path: 'EXHAUST.PUFF_OPACITY', label: 'Puff opacity', min: 0, max: 1, step: 0.01 },
+      { kind: 'color', path: 'EXHAUST.PUFF_COLOR', label: 'Puff colour' },
+    ],
+  },
+  {
     title: 'hologram — placement',
     rows: [
       { kind: 'num', path: 'HOLOGRAM.X_FRAC', label: 'Screen x', min: -0.2, max: 1.2, step: 0.005 },

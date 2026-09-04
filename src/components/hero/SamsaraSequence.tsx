@@ -865,6 +865,7 @@ export function SamsaraSequence({
     engine?.setDragConfig(config.DRAG)
     engine?.setIdleEyes(config.IDLE_EYES)
     engine?.setBurstConfig(config.BURST)
+    engine?.setExhaustConfig(config.EXHAUST)
   }, [config, engine])
 
   return null

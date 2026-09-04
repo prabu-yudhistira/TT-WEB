@@ -276,6 +276,21 @@ for (const [label, r] of [['near', DEFAULT_SEQUENCE.EMITTERS.NEAR_ROT], ['far', 
     [r.X_DEG, r.Y_DEG, r.Z_DEG].every((v) => Number.isFinite(v) && Math.abs(v) <= 360))
 }
 
+// ── SAMSARA's exhausts ──────────────────────────────────────────────
+{
+  const x = DEFAULT_SEQUENCE.EXHAUST
+  // Upper REAR: the tubes sit high and behind, and the face is +Z in model
+  // space. A positive Z would put them on SAMSARA's face.
+  check('the exhausts are above the body centre', x.PORT_Y > 0)
+  check('and behind it, not on the face', x.PORT_Z < 0)
+  check('the port is off the centreline so mirroring gives two', x.PORT_X > 0)
+  // A plume that fell would pool under a body that is already hovering.
+  check('the plume leaves upward', x.DIR_Y > 0)
+  check('and away from the face', x.DIR_Z < 0)
+  check('it emits at a positive rate', x.RATE > 0)
+  check('a puff outlives a single frame', x.PUFF_LIFE_MS > 100)
+}
+
 // ── hologram ────────────────────────────────────────────────────────
 check('the screen has positive extent',
   DEFAULT_SEQUENCE.HOLOGRAM.W_FRAC > 0 && DEFAULT_SEQUENCE.HOLOGRAM.H_FRAC > 0)

@@ -10,6 +10,7 @@ import type { SatelliteConfig } from '../satellites/types'
 import { DEFAULT_MASCOT, type MascotConfig } from './types'
 import { makeMotePool, TrailState } from './mascotTrail'
 import { BurstState, makeBurstPool } from '../samsara/roomBurst'
+import { SmokeState, makeSmokePool, type PortSpec } from '../samsara/orbSmoke'
 import {
   EXPRESSIONS,
   EYES_FRAGMENT_CHUNK,
@@ -30,6 +31,7 @@ import {
   type BurstConfig,
   type DragConfig,
   type IdleEyesConfig,
+  type ExhaustConfig,
   type RoomConfig,
   type SequenceConfig,
 } from '../samsara/types'
@@ -145,6 +147,17 @@ export class MascotEngine {
   private burstSize!: Float32Array
   private burstSeed!: Float32Array
   private burstPoints!: THREE.Points
+  private exhaust!: SmokeState
+  private exhaustGeo!: THREE.BufferGeometry
+  private exhaustMat!: THREE.ShaderMaterial
+  private exhaustPoints!: THREE.Points
+  private exhaustPos!: Float32Array
+  private exhaustAlpha!: Float32Array
+  private exhaustSize!: Float32Array
+  private exhaustCfg: ExhaustConfig = DEFAULT_SEQUENCE.EXHAUST
+  private exhaustMs = 0
+  private exhaustQuat = new THREE.Quaternion()
+  private exhaustVec = new THREE.Vector3()
   private burstCfg: BurstConfig = DEFAULT_SEQUENCE.BURST
 
   private cfg: MascotConfig = { ...DEFAULT_MASCOT }
@@ -332,6 +345,7 @@ export class MascotEngine {
 
     this.buildTrail()
     this.buildBurst()
+    this.buildExhaust()
 
     ;(window as unknown as Record<string, unknown>).__ttMascot = () => ({
       cx: this.cx,
@@ -824,6 +838,151 @@ export class MascotEngine {
    * method infers: the sequence owns what 'parked' means and the bench needs to
    * be able to force it.
    */
+  /**
+   * SAMSARA's two exhausts — the brass tubes on its upper rear.
+   *
+   * A THIRD particle system, and the split earns its keep the same way the
+   * others did. `roomBurst` sheds dust off the whole silhouette on a slow
+   * cadence; this idles continuously out of two fixed nozzles. Same
+   * bookkeeping module as the orbs (`orbSmoke`), whose port list is a
+   * parameter for exactly this reason — two exhausts here, four afterburners
+   * there, one implementation.
+   */
+  private buildExhaust() {
+    const MAX = 260
+    this.exhaustPos = new Float32Array(MAX * 3)
+    this.exhaustAlpha = new Float32Array(MAX)
+    this.exhaustSize = new Float32Array(MAX)
+    this.exhaust = new SmokeState(makeSmokePool(MAX), this.exhaustPorts(), Math.random)
+
+    this.exhaustGeo = new THREE.BufferGeometry()
+    this.exhaustGeo.setAttribute('position', new THREE.BufferAttribute(this.exhaustPos, 3))
+    this.exhaustGeo.setAttribute('aAlpha', new THREE.BufferAttribute(this.exhaustAlpha, 1))
+    this.exhaustGeo.setAttribute('aSize', new THREE.BufferAttribute(this.exhaustSize, 1))
+
+    this.exhaustMat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color('#C9B896') } },
+      vertexShader: `
+        attribute float aAlpha;
+        attribute float aSize;
+        varying float vAlpha;
+        void main() {
+          vAlpha = aAlpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = aSize / max(0.001, -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        uniform vec3 uColor;
+        void main() {
+          vec2 d = gl_PointCoord - vec2(0.5);
+          float r = length(d) * 2.0;
+          if (r > 1.0) discard;
+          float a = vAlpha * (1.0 - r) * (1.0 - r);
+          gl_FragColor = vec4(uColor, a);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+    })
+
+    this.exhaustPoints = new THREE.Points(this.exhaustGeo, this.exhaustMat)
+    this.exhaustPoints.frustumCulled = false
+    this.exhaustPoints.visible = false
+    this.scene.add(this.exhaustPoints)
+  }
+
+  /**
+   * The two ports, in BODY RADII, mirrored across X.
+   *
+   * ⚠️ One config, two ports. The tubes are symmetric on the mesh, so a second
+   * set of coordinates could only ever drift out of symmetry.
+   */
+  private exhaustPorts(): PortSpec[] {
+    const c = this.exhaustCfg
+    return [
+      { at: [c.PORT_X, c.PORT_Y, c.PORT_Z], dir: [c.DIR_X, c.DIR_Y, c.DIR_Z] },
+      { at: [-c.PORT_X, c.PORT_Y, c.PORT_Z], dir: [-c.DIR_X, c.DIR_Y, c.DIR_Z] },
+    ]
+  }
+
+  /** Live from the bench: a moved port takes effect on the next puff. */
+  setExhaustConfig(cfg: ExhaustConfig) {
+    this.exhaustCfg = cfg
+    this.exhaust?.setPorts(this.exhaustPorts())
+  }
+
+  private updateExhaust(dtSec: number, active: boolean) {
+    const c = this.exhaustCfg
+    const live = active && c.ENABLED && this.cameraMode === 'perspective'
+    this.exhaustMs += dtSec * 1000
+
+    // orbSmoke reads its rate and puff look off EmittersConfig, so the exhaust
+    // is handed a shim carrying its OWN values in those slots. Cheaper and
+    // clearer than a second bookkeeping module that differs only in field
+    // names — and the shim is local, so the two cannot drift.
+    const shim = {
+      THRUST_RATE: c.RATE,
+      THRUST_SPREAD: c.SPREAD,
+      CADENCE_MS: 1e9,
+      CADENCE_PUFFS: 0,
+      PUFF_SIZE: c.PUFF_SIZE,
+      PUFF_LIFE_MS: c.PUFF_LIFE_MS,
+      PUFF_OPACITY: c.PUFF_OPACITY,
+    } as unknown as typeof DEFAULT_SEQUENCE.EMITTERS
+
+    this.exhaust.update(shim, live ? 'thrust' : 'off', this.exhaustMs, dtSec * 1000)
+    const samples = this.exhaust.sample(this.exhaustMs, shim)
+
+    const cx = this.placer.position.x
+    const cy = this.placer.position.y
+    const cz = this.placer.position.z
+    // scale.Z for the same reason recordProjection uses it: Z is the one axis
+    // MASCOT_STRETCH never touches, so the plume does not inherit the body's
+    // vertical stretch and read as an ellipse.
+    const radius = this.placer.scale.z / 2
+
+    /**
+     * ⚠️ The plume RIDES THE BODY'S ROTATION, which the golden burst does not.
+     *
+     * `roomBurst` spawns on a disc in world space behind the silhouette, so it
+     * is rotation-agnostic and correct without this. The exhausts are two fixed
+     * points ON the hull: park SAMSARA at its ROT_*_DEG pose, or drag it, and
+     * an unrotated plume would leave from empty air beside the tubes while the
+     * tubes themselves point somewhere else entirely.
+     */
+    this.spinner.getWorldQuaternion(this.exhaustQuat)
+    const v = this.exhaustVec
+
+    let anyLit = false
+    for (const m of samples) {
+      v.set(m.x, m.y, m.z).applyQuaternion(this.exhaustQuat)
+      this.exhaustPos[m.i * 3] = cx + v.x * radius
+      this.exhaustPos[m.i * 3 + 1] = cy + v.y * radius
+      this.exhaustPos[m.i * 3 + 2] = cz + v.z * radius
+      this.exhaustAlpha[m.i] = m.alpha
+      // PUFF_SIZE is pixels at the body's depth, matching BURST.SIZE's units,
+      // so the shader's divide by -mv.z reproduces it at any camera distance.
+      this.exhaustSize[m.i] = m.size * this.dpr * Math.max(0.001, this.persp.position.z - cz)
+      if (m.alpha > 0) anyLit = true
+    }
+    // Dead slots keep their last alpha otherwise, so a stopped exhaust leaves a
+    // frozen cloud hanging beside the body.
+    for (let i = 0; i < this.exhaustAlpha.length; i++) {
+      if (!samples.some((m) => m.i === i)) this.exhaustAlpha[i] = 0
+    }
+
+    this.exhaustPoints.visible = anyLit
+    if (!anyLit) return
+    ;(this.exhaustMat.uniforms.uColor.value as THREE.Color).set(c.PUFF_COLOR)
+    this.exhaustGeo.attributes.position.needsUpdate = true
+    this.exhaustGeo.attributes.aAlpha.needsUpdate = true
+    this.exhaustGeo.attributes.aSize.needsUpdate = true
+  }
+
   private updateBurst(dtSec: number, alpha: number, active: boolean) {
     const c = this.burstCfg
     const live = active && c.ENABLED && this.cameraMode === 'perspective'
@@ -2208,6 +2367,7 @@ export class MascotEngine {
     // Parked is the same condition the pose easing uses just above, so the dust
     // starts exactly when the body stops turning rather than on a second rule.
     this.updateBurst(dtSec, alpha, parked)
+    this.updateExhaust(dtSec, parked)
     this.updateEyes(dtSec, charge, diameterPx, alpha)
     this.placeLabel(q, radiusPx, alpha)
 

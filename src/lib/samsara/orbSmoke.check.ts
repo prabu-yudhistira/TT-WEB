@@ -13,8 +13,8 @@
  *    port, so it passed for any input with four or more puffs. `PuffSample`
  *    now carries `port` so the assertion is real.
  */
-import { DEFAULT_SEQUENCE } from './types'
-import { makeSmokePool, SmokeState } from './orbSmoke'
+import { DEFAULT_SEQUENCE, PORT_OFFSETS } from './types'
+import { makeSmokePool, SmokeState, type PortSpec } from './orbSmoke'
 
 let failures = 0
 const check = (label: string, cond: boolean, note = '') => {
@@ -26,6 +26,12 @@ const check = (label: string, cond: boolean, note = '') => {
 }
 
 const cfg = DEFAULT_SEQUENCE.EMITTERS
+
+/** The orb's four afterburners, pointing down and out. */
+const ORB_PORTS: PortSpec[] = PORT_OFFSETS.map((o) => ({
+  at: o,
+  dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
+}))
 /** Deterministic, so any failure is reproducible. */
 const seeded = () => {
   let s = 12345
@@ -34,7 +40,7 @@ const seeded = () => {
 
 // ── off emits nothing ───────────────────────────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(256), seeded())
+  const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
   check('off spawns nothing on the first step', st.update(cfg, 'off', 0, 16) === 0)
   check('off stays empty after a second', st.update(cfg, 'off', 1000, 16) === 0)
   check('and nothing is alive to sample', st.sample(1000, cfg).length === 0)
@@ -42,7 +48,7 @@ const seeded = () => {
 
 // ── thrust is continuous ────────────────────────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(512), seeded())
+  const st = new SmokeState(makeSmokePool(512), ORB_PORTS, seeded())
   let total = 0
   for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'thrust', t, 16)
   const want = cfg.THRUST_RATE * 4
@@ -56,7 +62,7 @@ const seeded = () => {
 
 // ── cadence is discrete, and permanent ──────────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(256), seeded())
+  const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
   // ⚠️ The first cadenced burst waits a FULL interval after parking. Firing on
   // the arrival frame would land it on top of the thrust smoke still
   // dissipating and read as a continuation of it, not as its own event.
@@ -84,7 +90,7 @@ const seeded = () => {
 
 // ── a puff blooms, then dies ────────────────────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(256), seeded())
+  const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
   st.update(cfg, 'cadence', cfg.CADENCE_MS, 16)
   const t0 = cfg.CADENCE_MS
 
@@ -115,7 +121,7 @@ const seeded = () => {
 {
   // Thrust is far denser than the cadence; a pool sized for the cadence alone
   // truncates the entry plume silently.
-  const small = new SmokeState(makeSmokePool(8), seeded())
+  const small = new SmokeState(makeSmokePool(8), ORB_PORTS, seeded())
   let spawned = 0
   for (let t = 0; t < 500; t += 16) spawned += small.update(cfg, 'thrust', t, 16)
   check('a small pool recycles rather than throwing',
@@ -124,13 +130,40 @@ const seeded = () => {
 
 // ── reset ───────────────────────────────────────────────────────────
 {
-  const st = new SmokeState(makeSmokePool(256), seeded())
+  const st = new SmokeState(makeSmokePool(256), ORB_PORTS, seeded())
   st.update(cfg, 'cadence', cfg.CADENCE_MS, 16)
   st.reset()
   check('reset clears every live puff', st.sample(cfg.CADENCE_MS + 5, cfg).length === 0)
   // The sequence re-enters `landed` on every replay; a state that could not
   // restart its cadence would burst once per page load.
   check('and the cadence can fire again', st.update(cfg, 'cadence', cfg.CADENCE_MS, 16) > 0)
+}
+
+// ── the port list is a parameter, not four ──────────────────────────
+{
+  // SAMSARA has TWO exhausts. The rate is per-port, so a two-port emitter must
+  // produce half what a four-port one does over the same second — if the count
+  // were baked at four, this would silently double SAMSARA's output.
+  const two: PortSpec[] = [
+    { at: [0.5, 0.6, -0.5], dir: [0.3, 0.9, -0.4] },
+    { at: [-0.5, 0.6, -0.5], dir: [-0.3, 0.9, -0.4] },
+  ]
+  const st = new SmokeState(makeSmokePool(512), two, seeded())
+  let total = 0
+  for (let t = 0; t < 1000; t += 16) total += st.update(cfg, 'thrust', t, 16)
+  const want = cfg.THRUST_RATE * 2
+  check('a two-port emitter emits at two ports\u2019 worth',
+    Math.abs(total - want) / want < 0.2, `${total} vs ~${want}`)
+  check('and uses both of them',
+    new Set(st.sample(500, cfg).map((p) => p.port)).size === 2)
+
+  const burst = new SmokeState(makeSmokePool(256), two, seeded())
+  check('its cadence fires once per port', burst.update(cfg, 'cadence', cfg.CADENCE_MS, 16) === cfg.CADENCE_PUFFS * 2)
+
+  // Direction has to reach the puff, or every emitter plumes the same way.
+  const up = st.sample(600, cfg)
+  check('puffs travel along the port direction', up.some((p) => p.y > 0.6),
+    `max y ${Math.max(...up.map((q) => q.y)).toFixed(2)}`)
 }
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll orbSmoke checks passed.')

@@ -349,6 +349,40 @@ export type OrbSlotConfig = {
   DEPTH_FRAC: number
 }
 
+/**
+ * SAMSARA's own two exhausts — the brass tubes on its upper rear.
+ *
+ * ⚠️ The port is TUNABLE rather than a hand-measured constant, unlike the orb's
+ * PORT_OFFSETS, and that is a deliberate correction. The orb's offsets are
+ * baked into code and a model re-export silently invalidates them, which the
+ * spec ranks as the sub-project's first risk. Here the owner nudges the plume
+ * onto the actual tube mouth while watching it, and a re-export is a slider
+ * move rather than a code hunt.
+ *
+ * ⚠️ ONE port, MIRRORED on X. The two tubes are symmetric on the model, so a
+ * second set of coordinates could only ever drift out of symmetry — and would
+ * double the sliders to express something the mesh does not offer.
+ */
+export type ExhaustConfig = {
+  ENABLED: boolean
+  /** Port position in BODY RADII, right-hand side. Mirrored to the left. */
+  PORT_X: number
+  PORT_Y: number
+  PORT_Z: number
+  /** Plume direction, body radii per second. DIR_X mirrors with the port. */
+  DIR_X: number
+  DIR_Y: number
+  DIR_Z: number
+  /** Puffs per second PER PORT. Continuous, not a cadence — an engine idles. */
+  RATE: number
+  SPREAD: number
+  /** Puff size in PIXELS at the body's depth, matching BURST.SIZE's units. */
+  PUFF_SIZE: number
+  PUFF_LIFE_MS: number
+  PUFF_COLOR: string
+  PUFF_OPACITY: number
+}
+
 export type EmittersConfig = {
   /**
    * ⚠️ ONE size for BOTH orbs, and that is not an omission.
@@ -480,6 +514,7 @@ export type SequenceConfig = {
   IDLE_EYES: IdleEyesConfig
   BURST: BurstConfig
   EMITTERS: EmittersConfig
+  EXHAUST: ExhaustConfig
   HOLOGRAM: HologramConfig
   /** Scroll-up from the room: a quick exit, NOT a rewind of the fall. */
   EXIT_MS: number
@@ -693,6 +728,24 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     PUFF_LIFE_MS: 1500,
     PUFF_COLOR: '#C9B896',
     PUFF_OPACITY: 0.34,
+  },
+
+  // Starting points, measured off the turntable rather than tuned — the owner
+  // moves them onto the real tube mouths at the bench.
+  EXHAUST: {
+    ENABLED: true,
+    PORT_X: 0.52,
+    PORT_Y: 0.62,
+    PORT_Z: -0.55,
+    DIR_X: 0.35,
+    DIR_Y: 0.85,
+    DIR_Z: -0.4,
+    RATE: 14,
+    SPREAD: 0.45,
+    PUFF_SIZE: 54,
+    PUFF_LIFE_MS: 1800,
+    PUFF_COLOR: '#C9B896',
+    PUFF_OPACITY: 0.13,
   },
 
   HOLOGRAM: {

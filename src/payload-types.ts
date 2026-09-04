@@ -1767,6 +1767,54 @@ export interface SamsaraSequence {
     puffOpacity?: number | null;
   };
   /**
+   * The two brass tubes on SAMSARA’s upper rear. One port is configured and MIRRORED across the centreline, because the tubes are symmetric on the model — a second set of coordinates could only drift out of line with them. The plume turns with the body, so parking or dragging SAMSARA carries it along.
+   */
+  exhaust?: {
+    /**
+     * Off leaves SAMSARA’s own golden burst untouched — they are separate systems.
+     */
+    enabled?: boolean | null;
+    /**
+     * Right-hand tube, in body radii from the centre. Mirrored to the left.
+     */
+    portX?: number | null;
+    /**
+     * Height. The tubes sit high on the hull.
+     */
+    portY?: number | null;
+    /**
+     * Depth. NEGATIVE is behind — the face is +Z, so a positive value puts smoke on SAMSARA’s face.
+     */
+    portZ?: number | null;
+    /**
+     * Outward lean of the plume. Mirrors with the port.
+     */
+    dirX?: number | null;
+    /**
+     * Rise. Keep positive, or the plume pools under a hovering body.
+     */
+    dirY?: number | null;
+    /**
+     * Backward push, away from the face.
+     */
+    dirZ?: number | null;
+    /**
+     * Puffs per second PER TUBE. Continuous, not a repeating burst — an engine idles.
+     */
+    rate?: number | null;
+    spread?: number | null;
+    /**
+     * Pixels at the body’s depth, the same units as the golden burst’s size.
+     */
+    puffSize?: number | null;
+    puffLifeMs?: number | null;
+    /**
+     * Warm grey steam, matching the orbs rather than the golden burst.
+     */
+    puffColor?: string | null;
+    puffOpacity?: number | null;
+  };
+  /**
    * The screen the two orbs project. It will later carry subtitles and option buttons as real DOM on top, which is why the flicker below applies to the GLASS ONLY — flickering text would defeat the accessibility feature it exists to provide.
    */
   hologram?: {
@@ -2355,6 +2403,23 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         thrustSpread?: T;
         cadenceMs?: T;
         cadencePuffs?: T;
+        puffSize?: T;
+        puffLifeMs?: T;
+        puffColor?: T;
+        puffOpacity?: T;
+      };
+  exhaust?:
+    | T
+    | {
+        enabled?: T;
+        portX?: T;
+        portY?: T;
+        portZ?: T;
+        dirX?: T;
+        dirY?: T;
+        dirZ?: T;
+        rate?: T;
+        spread?: T;
         puffSize?: T;
         puffLifeMs?: T;
         puffColor?: T;

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { SequenceConfig } from './types'
+import { PORT_OFFSETS, type SequenceConfig } from './types'
 import {
   orbParkedPose,
   orbPoseAt,
@@ -11,7 +11,7 @@ import {
   type OrbPose,
   type OrbSlot,
 } from './emitterOrbs'
-import { makeSmokePool, SmokeState, type SmokeMode } from './orbSmoke'
+import { makeSmokePool, SmokeState, type PortSpec, type SmokeMode } from './orbSmoke'
 import { screenQuad, shaftFor, flickerAt, type Vec3 } from './hologramGeometry'
 import type { HoloPhase } from './HologramController'
 
@@ -361,11 +361,17 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   })
 
   // ── smoke: one pool and one draw call per orb ─────────────────────
+  /** The four afterburners, pointing down and biased outward by their own offset. */
+  const ORB_PORTS: PortSpec[] = PORT_OFFSETS.map((o) => ({
+    at: o,
+    dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
+  }))
+
   const smoke = SLOTS.map(() => {
     // Seeded per orb, and differently, so the two plumes are not identical.
     let s = 987654321
     const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
-    return new SmokeState(makeSmokePool(POOL), rnd)
+    return new SmokeState(makeSmokePool(POOL), ORB_PORTS, rnd)
   })
 
   const smokeMat = new THREE.ShaderMaterial({

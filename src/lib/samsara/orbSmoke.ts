@@ -1,4 +1,4 @@
-import { PORT_OFFSETS, type EmittersConfig } from './types'
+import type { EmittersConfig } from './types'
 
 /**
  * The emitter orbs' smoke — pure particle bookkeeping, no GL.
@@ -74,8 +74,26 @@ export function makeSmokePool(size: number): Puff[] {
   return pool
 }
 
+export type Port = readonly [number, number, number]
+
+/**
+ * Where a plume leaves from, and which way it goes.
+ *
+ * ⚠️ Both are supplied by the CALLER rather than imported. The orbs have four
+ * afterburners pointing down; SAMSARA has two exhausts on its upper rear
+ * pointing up and back. Same bookkeeping, different hardware — and importing a
+ * fixed four-port constant here is what would have forced a second copy of this
+ * file the first time something else needed to emit.
+ */
+export type PortSpec = {
+  at: Port
+  /** Outward velocity, in emitter radii per second. */
+  dir: Port
+}
+
 export class SmokeState {
   private pool: Puff[]
+  private ports: PortSpec[]
   private rnd: () => number
   private next = 0
   /** Fractional puff budget carried between frames, so a low rate still emits. */
@@ -87,32 +105,39 @@ export class SmokeState {
    *
    * ⚠️ PERSISTENT across frames, and that is the whole point. Cycling on the
    * index within a single frame's batch looks equivalent and is not: at a
-   * typical rate the batch is only 2-3 puffs, so `i % 4` never reaches port 3
-   * and one afterburner silently never fires. Caught by asserting the set of
-   * ports actually seen in a sample.
+   * typical rate the batch is only 2-3 puffs, so cycling on that index never
+   * reaches the last port and one afterburner silently never fires. Caught by
+   * asserting the set of ports actually seen in a sample.
    */
   private thrustPort = 0
 
-  constructor(pool: Puff[], rnd: () => number) {
+  constructor(pool: Puff[], ports: PortSpec[], rnd: () => number) {
     this.pool = pool
+    this.ports = ports
     this.rnd = rnd
+  }
+
+  /** Swapped live, so a bench slider can move a port without a rebuild. */
+  setPorts(ports: PortSpec[]) {
+    this.ports = ports
   }
 
   private spawn(cfg: EmittersConfig, nowMs: number, port: number, spread: number) {
     const p = this.pool[this.next]
     this.next = (this.next + 1) % this.pool.length
-    const o = PORT_OFFSETS[port]
+    const spec = this.ports[port % this.ports.length]
+    const o = spec.at
     p.x = o[0]
     p.y = o[1]
     p.z = o[2]
-    // Ports point DOWN, so the plume falls away and spreads outward. The
-    // port's own offset biases the lateral drift, which keeps four plumes
-    // visibly separate instead of merging into one cloud under the orb.
+    // The plume leaves along the port's own direction, with a cone of scatter
+    // around it. Scatter is applied on the two axes the direction is weakest
+    // on, so a mostly-vertical exhaust spreads sideways rather than stalling.
     const a = this.rnd() * Math.PI * 2
     const r = this.rnd() * spread
-    p.vx = Math.cos(a) * r * 0.4 + o[0] * 0.3
-    p.vy = -0.5 - this.rnd() * 0.4
-    p.vz = Math.sin(a) * r * 0.4 + o[2] * 0.3
+    p.vx = spec.dir[0] + Math.cos(a) * r * 0.4
+    p.vy = spec.dir[1] + (this.rnd() - 0.5) * r * 0.4
+    p.vz = spec.dir[2] + Math.sin(a) * r * 0.4
     p.born = nowMs
     // ⚠️ Randomised up to 1.25x. Anything asserting a puff is gone must sample
     // past the LONGEST life, not the nominal one.
@@ -134,12 +159,12 @@ export class SmokeState {
 
     if (mode === 'thrust') {
       // THRUST_RATE is per SECOND per PORT, across four ports.
-      this.carry += (cfg.THRUST_RATE * 4 * dtMs) / 1000
+      this.carry += (cfg.THRUST_RATE * this.ports.length * dtMs) / 1000
       const n = Math.floor(this.carry)
       this.carry -= n
       for (let i = 0; i < n; i++) {
         this.spawn(cfg, elapsedMs, this.thrustPort, cfg.THRUST_SPREAD)
-        this.thrustPort = (this.thrustPort + 1) % 4
+        this.thrustPort = (this.thrustPort + 1) % this.ports.length
       }
       return n
     }
@@ -151,12 +176,12 @@ export class SmokeState {
     const due = Math.floor(elapsedMs / cfg.CADENCE_MS)
     if (due <= this.lastBurst) return 0
     this.lastBurst = due
-    for (let port = 0; port < 4; port++) {
+    for (let port = 0; port < this.ports.length; port++) {
       for (let k = 0; k < cfg.CADENCE_PUFFS; k++) {
         this.spawn(cfg, elapsedMs, port, cfg.THRUST_SPREAD * 0.6)
       }
     }
-    return cfg.CADENCE_PUFFS * 4
+    return cfg.CADENCE_PUFFS * this.ports.length
   }
 
   /** Live puffs at `nowMs`, in orb radii. Dead ones are simply omitted. */

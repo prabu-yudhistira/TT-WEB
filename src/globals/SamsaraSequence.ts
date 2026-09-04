@@ -904,6 +904,43 @@ export const SamsaraSequence: GlobalConfig = {
     },
 
     {
+      name: 'exhaust',
+      type: 'group',
+      label: 'SAMSARA — exhaust smoke',
+      admin: {
+        description:
+          'The two brass tubes on SAMSARA\u2019s upper rear. One port is configured and MIRRORED across the centreline, because the tubes are symmetric on the model \u2014 a second set of coordinates could only drift out of line with them. The plume turns with the body, so parking or dragging SAMSARA carries it along.',
+      },
+      fields: [
+        {
+          name: 'enabled',
+          type: 'checkbox',
+          defaultValue: d.EXHAUST.ENABLED,
+          admin: { description: 'Off leaves SAMSARA\u2019s own golden burst untouched \u2014 they are separate systems.' },
+        },
+        {
+          name: 'portX',
+          type: 'number',
+          defaultValue: d.EXHAUST.PORT_X,
+          min: 0,
+          max: 2,
+          admin: { description: 'Right-hand tube, in body radii from the centre. Mirrored to the left.' },
+        },
+        { name: 'portY', type: 'number', defaultValue: d.EXHAUST.PORT_Y, min: -2, max: 2, admin: { description: 'Height. The tubes sit high on the hull.' } },
+        { name: 'portZ', type: 'number', defaultValue: d.EXHAUST.PORT_Z, min: -2, max: 2, admin: { description: 'Depth. NEGATIVE is behind \u2014 the face is +Z, so a positive value puts smoke on SAMSARA\u2019s face.' } },
+        { name: 'dirX', type: 'number', defaultValue: d.EXHAUST.DIR_X, min: -3, max: 3, admin: { description: 'Outward lean of the plume. Mirrors with the port.' } },
+        { name: 'dirY', type: 'number', defaultValue: d.EXHAUST.DIR_Y, min: -3, max: 3, admin: { description: 'Rise. Keep positive, or the plume pools under a hovering body.' } },
+        { name: 'dirZ', type: 'number', defaultValue: d.EXHAUST.DIR_Z, min: -3, max: 3, admin: { description: 'Backward push, away from the face.' } },
+        { name: 'rate', type: 'number', defaultValue: d.EXHAUST.RATE, min: 0, max: 120, admin: { description: 'Puffs per second PER TUBE. Continuous, not a repeating burst \u2014 an engine idles.' } },
+        { name: 'spread', type: 'number', defaultValue: d.EXHAUST.SPREAD, min: 0, max: 3 },
+        { name: 'puffSize', type: 'number', defaultValue: d.EXHAUST.PUFF_SIZE, min: 2, max: 400, admin: { description: 'Pixels at the body\u2019s depth, the same units as the golden burst\u2019s size.' } },
+        { name: 'puffLifeMs', type: 'number', defaultValue: d.EXHAUST.PUFF_LIFE_MS, min: 100, max: 9000 },
+        colour('puffColor', d.EXHAUST.PUFF_COLOR, 'Warm grey steam, matching the orbs rather than the golden burst.'),
+        { name: 'puffOpacity', type: 'number', defaultValue: d.EXHAUST.PUFF_OPACITY, min: 0, max: 1 },
+      ],
+    },
+
+    {
       name: 'hologram',
       type: 'group',
       label: 'Holographic screen',
