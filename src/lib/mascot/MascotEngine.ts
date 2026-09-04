@@ -2482,7 +2482,7 @@ export class MascotEngine {
         this.emitters.setConfig(holo.cfg)
         this.holoCfgApplied = holo.cfg
       }
-      this.emitters.update(holo)
+      this.emitters.update(holo, cam)
 
       const pts = this.emitters.screenCorners()
       if (pts.length === 4 && this.emitters.group.visible) {

@@ -169,6 +169,16 @@ export type SamsaraSequenceInput = {
     shaftColor?: string | null
     shaftOpacity?: number | null
     shaftSpread?: number | null
+    shaftReach?: number | null
+    shaftRays?: number | null
+    shaftSpeed?: number | null
+    shaftFade?: number | null
+    shaftContrast?: number | null
+    shaftBound?: number | null
+    shaftCore?: number | null
+    shaftTip?: number | null
+    shaftCoreColor?: string | null
+    shaftCoreSpan?: number | null
   } | null
   exitMs?: number | null
 }
@@ -414,6 +424,16 @@ export function resolveSamsara(
       SHAFT_COLOR: hex(ho.shaftColor, d.HOLOGRAM.SHAFT_COLOR),
       SHAFT_OPACITY: num(ho.shaftOpacity, d.HOLOGRAM.SHAFT_OPACITY),
       SHAFT_SPREAD: num(ho.shaftSpread, d.HOLOGRAM.SHAFT_SPREAD),
+      SHAFT_REACH: num(ho.shaftReach, d.HOLOGRAM.SHAFT_REACH),
+      SHAFT_RAYS: num(ho.shaftRays, d.HOLOGRAM.SHAFT_RAYS),
+      SHAFT_SPEED: num(ho.shaftSpeed, d.HOLOGRAM.SHAFT_SPEED),
+      SHAFT_FADE: num(ho.shaftFade, d.HOLOGRAM.SHAFT_FADE),
+      SHAFT_CONTRAST: num(ho.shaftContrast, d.HOLOGRAM.SHAFT_CONTRAST),
+      SHAFT_BOUND: num(ho.shaftBound, d.HOLOGRAM.SHAFT_BOUND),
+      SHAFT_CORE: num(ho.shaftCore, d.HOLOGRAM.SHAFT_CORE),
+      SHAFT_TIP: num(ho.shaftTip, d.HOLOGRAM.SHAFT_TIP),
+      SHAFT_CORE_COLOR: hex(ho.shaftCoreColor, d.HOLOGRAM.SHAFT_CORE_COLOR),
+      SHAFT_CORE_SPAN: num(ho.shaftCoreSpan, d.HOLOGRAM.SHAFT_CORE_SPAN),
     },
 
     EXIT_MS: num(cms?.exitMs, d.EXIT_MS),
@@ -568,6 +588,16 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       shaftColor: c.HOLOGRAM.SHAFT_COLOR,
       shaftOpacity: c.HOLOGRAM.SHAFT_OPACITY,
       shaftSpread: c.HOLOGRAM.SHAFT_SPREAD,
+      shaftReach: c.HOLOGRAM.SHAFT_REACH,
+      shaftRays: c.HOLOGRAM.SHAFT_RAYS,
+      shaftSpeed: c.HOLOGRAM.SHAFT_SPEED,
+      shaftFade: c.HOLOGRAM.SHAFT_FADE,
+      shaftContrast: c.HOLOGRAM.SHAFT_CONTRAST,
+      shaftBound: c.HOLOGRAM.SHAFT_BOUND,
+      shaftCore: c.HOLOGRAM.SHAFT_CORE,
+      shaftTip: c.HOLOGRAM.SHAFT_TIP,
+      shaftCoreColor: c.HOLOGRAM.SHAFT_CORE_COLOR,
+      shaftCoreSpan: c.HOLOGRAM.SHAFT_CORE_SPAN,
     },
     exitMs: c.EXIT_MS,
   }

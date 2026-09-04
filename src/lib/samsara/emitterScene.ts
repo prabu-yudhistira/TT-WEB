@@ -12,7 +12,7 @@ import {
   type OrbSlot,
 } from './emitterOrbs'
 import { makeSmokePool, SmokeState, type PortSpec, type SmokeMode } from './orbSmoke'
-import { screenQuad, shaftFor, flickerAt, type Vec3 } from './hologramGeometry'
+import { screenQuad, shaftFor, shaftReach, flickerAt, type Vec3 } from './hologramGeometry'
 import type { HoloPhase } from './HologramController'
 import { DEFAULT_SEQUENCE } from './types'
 
@@ -62,7 +62,12 @@ export type EmitterUpdateArgs = {
 export type EmitterScene = {
   group: THREE.Group
   setConfig(cfg: SequenceConfig): void
-  update(a: EmitterUpdateArgs): void
+  /**
+   * ⚠️ The CAMERA is a parameter, not part of EmitterUpdateArgs. The args are
+   * assembled in the React layer, which has no camera and should not grow one;
+   * the engine that owns the camera passes it here.
+   */
+  update(a: EmitterUpdateArgs, cam: THREE.Camera): void
   /** The screen's four world-space corners, for the projected-rect contract. */
   screenCorners(): Vec3[]
   dispose(): void
@@ -115,63 +120,181 @@ const SMOKE_FRAG = /* glsl */ `
 `
 
 /**
- * A light shaft, not a translucent wedge.
+ * The light shafts — a FAN OF RAYS, not a wedge.
  *
- * A cone drawn at uniform opacity reads as a solid polygon with hard edges,
- * because every fragment is equally opaque no matter how much notional volume
- * the eye is looking through. Two terms fix that:
+ * ⚠️ Rewritten 2026-09-04. This was a cone mesh shaded with a fresnel term and
+ * a length falloff, which is a perfectly good way to draw a volume of lit dust
+ * and is NOT what the owner's reference shows. Their reference is a spray of
+ * many fine straight rays from a point, and no amount of tuning a smooth
+ * surface produces that: the rays have to be BANDED, and banded on the ANGLE
+ * from the source. Everything below follows from that one fact.
  *
- *  - a FRESNEL term, so the surface is most transparent where it faces the
- *    camera and brightest at grazing angles, which is how looking through a
- *    volume of lit dust actually behaves;
- *  - a LENGTH falloff, so the beam is strongest at the lens and dissipates
- *    toward the screen instead of ending in a hard rim.
+ * ── Why a camera-facing plane, and not the cone ─────────────────────
+ *
+ * The banding is a screen-space effect: what makes a ray a ray is that it runs
+ * straight away from the source AS SEEN. On a cone's surface the same maths
+ * bands the SURFACE, which is a striped lampshade seen edge-on.
+ *
+ * So: a plane centred on the lens, turned to face the camera every frame. Its
+ * local xy is then the screen plane, the source sits at its origin, and
+ * `position.xy` is exactly the reference shader's `coord - raySource` with no
+ * projection maths of our own. A full-screen pass would be the other way to do
+ * it, and would have to be composited outside this scene, miss the bloom, and
+ * carry each orb's projected pixel position — three moving parts to avoid.
+ *
+ * ⚠️ The fan is banded on cos(angle), NOT on the angle itself. Spacing is
+ * therefore wide near the axis and tight at the rim. That is the reference's
+ * look and it is deliberate; "fixing" it to even spacing loses the splay.
  */
 const SHAFT_VERT = /* glsl */ `
-  varying vec3 vN;
-  varying vec3 vV;
-  varying float vT;
+  varying vec2 vP;
   void main() {
-    // ConeGeometry runs along local Y from -0.5 (base) to +0.5 (apex).
-    vT = position.y + 0.5;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vN = normalize(normalMatrix * normal);
-    vV = normalize(-mv.xyz);
-    gl_Position = projectionMatrix * mv;
+    // PlaneGeometry(2, 2) runs -1..1 with the lens at its centre, so this is
+    // already source-relative. Scale carries the reach.
+    vP = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 
 const SHAFT_FRAG = /* glsl */ `
-  varying vec3 vN;
-  varying vec3 vV;
-  varying float vT;
+  precision highp float;
+  varying vec2 vP;
   uniform vec3 uColor;
   uniform float uOpacity;
+  /** Fan axis, in the plane's own space — i.e. on screen. */
+  uniform vec2 uDir;
+  uniform float uSpread;
+  uniform float uRays;
+  uniform float uSpeed;
+  uniform float uFade;
+  uniform float uContrast;
+  /** The screen's left and right edges, in this plane's own x. */
+  uniform vec2 uClip;
+  uniform float uBound;
+  uniform float uCore;
+  uniform float uTip;
+  uniform vec3 uCoreColor;
+  uniform float uCoreSpan;
+  /** Per-orb phase, so two fans are not the same fan twice. */
+  uniform float uSeed;
+  uniform float uTime;
+
+  float layer(float cosA, float a, float b) {
+    // Two beats at different frequencies: one alone gives a regular comb, and
+    // a regular comb reads as a printed pattern rather than as light.
+    return clamp(
+      (0.45 + 0.15 * sin(cosA * a + uTime * uSpeed)) +
+      (0.30 + 0.20 * cos(-cosA * b + uTime * uSpeed)),
+      0.0, 1.0);
+  }
+
   void main() {
-    float facing = abs(dot(normalize(vN), normalize(vV)));
-    float rim = pow(1.0 - facing, 1.6);
-    // vT = 1 is the apex, which sits at the lens. Brightest there.
-    float along = mix(0.15, 1.0, vT);
-    gl_FragColor = vec4(uColor, uOpacity * rim * along);
+    float dist = length(vP);
+    if (dist > 1.0) discard;
+    vec2 n = vP / max(dist, 1e-4);
+    float cosA = dot(n, uDir);
+    if (cosA <= 0.0) discard;
+    float cone = pow(cosA, 1.0 / max(uSpread, 0.001));
+    /**
+     * ONE falloff, shaped.
+     *
+     * ⚠️ The reference multiplies TWO distance terms — a length falloff over
+     * rayLength screen widths and a fade floored at 0.5 over fadeDistance.
+     * Both are measured in PIXELS against the viewport, which is why it needs
+     * two: neither alone lands in the right place. Here the disc's radius IS
+     * the reach, so distance is already normalised and one term does the work.
+     * Two linear terms multiplied is what killed the first attempt — the fan
+     * was under a quarter strength by the time it left the orb.
+     *
+     * Completing exactly at dist 1 is what keeps the disc's edge invisible.
+     * uFade shapes the curve rather than moving its end: below 1 the ray
+     * carries most of its way across the frame, which is what the reference's
+     * do.
+     */
+    float falloff = pow(clamp(1.0 - dist, 0.0, 1.0), max(uFade, 0.01));
+    /**
+     * ⚠️ A FEATHER on top of the falloff, and it is not redundant.
+     *
+     * pow(1 - dist, uFade) does reach zero at the disc's edge, but below 1 it
+     * arrives there steeply: at uFade 0.5 the last tenth of the radius carries
+     * a third of full strength. On the near orb that is a bright arc drawn
+     * across the room, and bloom makes it a hoop. Whatever the falloff's
+     * shape, the last quarter has to be given away smoothly.
+     */
+    falloff *= smoothstep(1.0, 0.75, dist);
+    float r1 = layer(cosA, 36.2214 * uRays + uSeed, 21.1135 * uRays + uSeed);
+    float r2 = layer(cosA, 22.3991 * uRays + uSeed, 18.0234 * uRays + uSeed);
+    /**
+     * ⚠️ NORMALISED, then crushed — and both halves are load-bearing.
+     *
+     * Each layer floors at 0.4 and the two are averaged, so their sum never
+     * leaves [0.36, 0.9]: the gaps between rays are two thirds as bright as
+     * the rays, which is a smooth wash and not a fan. The reference has real
+     * darkness between its streaks. Mapping that band onto 0..1 restores the
+     * floor; uContrast then decides how wide the gaps read.
+     */
+    float rays = clamp(((r1 * 0.5 + r2 * 0.4) - 0.36) / 0.54, 0.0, 1.0);
+    /**
+     * ⚠️ The crush TIGHTENS WITH DISTANCE, and that is what makes a tip.
+     *
+     * An angular band is a wedge: narrowest at the source, widest at its far
+     * end. Drawn that way the fan ends in a row of blunt fans, which is the
+     * opposite of the reference — there each ray is a spike that converges to
+     * a point. Raising the exponent along the ray eats it from both sides, so
+     * only the band's peak survives at the end and the wedge closes back up.
+     * The falloff then takes the spike to nothing exactly where it closes.
+     */
+    rays = pow(rays, max(uContrast, 0.01) * mix(1.0, max(uTip, 1.0), dist));
+    /**
+     * ⚠️ BOUNDED BY THE SCREEN, left and right.
+     *
+     * The owner's reference has the fan living INSIDE the panel — the orbs are
+     * projecting a screen, not floodlighting the room, and an unbounded fan
+     * washes over the floor and past SAMSARA with nothing to say. The bounds
+     * are the panel's own edges, handed in already converted into this plane's
+     * x so the shader stays free of matrices.
+     *
+     * Feathered by a share of the span rather than a fixed width, so the edge
+     * stays equally soft on a narrow viewport as on a wide one.
+     */
+    float soft = max(0.01, (uClip.y - uClip.x) * 0.05);
+    float edge = smoothstep(uClip.x - soft, uClip.x + soft, vP.x)
+               * smoothstep(uClip.y + soft, uClip.y - soft, vP.x);
+    // ⚠️ A MIX, not a switch. At 0 the fan is free of the screen entirely; the
+    // owner has asked for both looks on different references, and a hard
+    // boolean would make the choice a code change instead of a slider.
+    float bound = mix(1.0, edge, clamp(uBound, 0.0, 1.0));
+
+    /**
+     * The hot core.
+     *
+     * ⚠️ OUTSIDE the striation and outside the bound. In the reference the
+     * rays converge into a small bloom at the emitter, not into a point — and
+     * that bloom sits ON the orb, which is below the screen. Banding it would
+     * cut it into wedges; bounding it would clip it in half.
+     *
+     * The radius is a fixed share of the reach rather than a knob of its own:
+     * the reach already follows the orb's depth, so this stays the same size
+     * on screen wherever the orb is, which is what a lens flare does.
+     */
+    float core = uCore * exp(-(dist * dist) / (0.05 * 0.05));
+
+    /**
+     * Hot at the lens, amber further out.
+     *
+     * ⚠️ On DISTANCE, not on brightness. Grading by the ray's own strength
+     * would make every band's centre-line white for its whole length, which
+     * reads as a set of glowing wires. Light does not do that: the throat of
+     * the beam is hot because that is where it is dense, and it cools as it
+     * spreads. sqrt puts most of the transition close to the source, where the
+     * eye reads it as a filament rather than as a wash.
+     */
+    vec3 tint = mix(uCoreColor, uColor, smoothstep(0.0, max(uCoreSpan, 1e-4), sqrt(dist)));
+
+    gl_FragColor = vec4(tint, min(1.0, uOpacity * rays * cone * falloff * bound + core));
   }
 `
 
-/**
- * The glass — the owner's HUD panel, drawn procedurally.
- *
- * Signed-distance fields rather than a texture, for three reasons that all
- * matter here: the panel is re-projected at every viewport so a bitmap would
- * resample and soften; its colour is CMS-driven, so a baked-in amber would need
- * re-exporting to retune; and the flicker scales one uniform rather than
- * cross-fading two images.
- *
- * ⚠️ All geometry is laid out in U-SPACE: u = vUv.x * aspect, v = 1 - vUv.y.
- * That makes u and v share a scale, so a circle stays a circle and a chamfer
- * keeps 45 degrees whatever the screen's aspect happens to be. It also puts the
- * origin TOP-LEFT, matching how the reference art is measured.
- *
- * Coordinates below are taken directly off the owner's reference at 1012x599.
- */
 const GLASS_VERT = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -420,22 +543,44 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   })
 
   // ── shafts, one per orb ───────────────────────────────────────────
-  const shaftMat = new THREE.ShaderMaterial({
+  //
+  // ⚠️ A material EACH, not one shared. uDir differs per orb because the two
+  // are at different places relative to the screen, and uSeed differs so the
+  // two fans are not a copy of one another — the reference's are visibly
+  // distinct. Sharing the material would silently give both orbs whichever
+  // one was written last.
+  const shaftMats = SLOTS.map((_, i) => new THREE.ShaderMaterial({
     vertexShader: SHAFT_VERT,
     fragmentShader: SHAFT_FRAG,
     uniforms: {
       uColor: { value: new THREE.Color('#ffffff') },
       uOpacity: { value: 0 },
+      uDir: { value: new THREE.Vector2(0, 1) },
+      uSpread: { value: 1 },
+      uRays: { value: 1 },
+      uSpeed: { value: 1 },
+      uFade: { value: 1 },
+      uContrast: { value: 2 },
+      uClip: { value: new THREE.Vector2(-1, 1) },
+      uBound: { value: 1 },
+      uCore: { value: 0 },
+      uTip: { value: 1 },
+      uCoreColor: { value: new THREE.Color('#ffffff') },
+      uCoreSpan: { value: 0.5 },
+      uSeed: { value: i * 7.31 },
+      uTime: { value: 0 },
     },
     transparent: true,
     depthWrite: false,
     depthTest: true,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-  })
-  // Open-ended cone, apex at the lens. Unit height so scale carries the length.
-  const shafts = SLOTS.map(() => {
-    const m = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 28, 1, true), shaftMat)
+  }))
+  const shafts = SLOTS.map((_, i) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), shaftMats[i])
+    // Turned to face the camera every frame, so its own bounds tell the culler
+    // nothing useful until after that.
+    m.frustumCulled = false
     m.visible = false
     group.add(m)
     return m
@@ -488,10 +633,11 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
   }
 
   let corners: Vec3[] = []
-  const up = new THREE.Vector3(0, 1, 0)
   const dir = new THREE.Vector3()
-  const mid = new THREE.Vector3()
-  const quat = new THREE.Quaternion()
+  /** Scratch for the NDC projections that place the screen-edge bound. */
+  const pv = new THREE.Vector3()
+  const camRight = new THREE.Vector3()
+  const camUp = new THREE.Vector3()
 
   const writeSmoke = (
     i: number,
@@ -546,11 +692,23 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       // identity change, which is exactly when a port can have moved.
       for (const st of smoke) st.setPorts(orbPorts(cfg.EMITTERS))
       for (let i = 0; i < markers.length; i++) markers[i].visible = cfg.EMITTERS.SHOW_PORTS
-      ;(shaftMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_COLOR)
+      for (const m of shaftMats) {
+        ;(m.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_COLOR)
+        m.uniforms.uSpread.value = cfg.HOLOGRAM.SHAFT_SPREAD
+        m.uniforms.uRays.value = cfg.HOLOGRAM.SHAFT_RAYS
+        m.uniforms.uSpeed.value = cfg.HOLOGRAM.SHAFT_SPEED
+        m.uniforms.uFade.value = cfg.HOLOGRAM.SHAFT_FADE
+        m.uniforms.uContrast.value = cfg.HOLOGRAM.SHAFT_CONTRAST
+        m.uniforms.uBound.value = cfg.HOLOGRAM.SHAFT_BOUND
+        m.uniforms.uCore.value = cfg.HOLOGRAM.SHAFT_CORE
+        m.uniforms.uTip.value = cfg.HOLOGRAM.SHAFT_TIP
+        ;(m.uniforms.uCoreColor.value as THREE.Color).set(cfg.HOLOGRAM.SHAFT_CORE_COLOR)
+        m.uniforms.uCoreSpan.value = cfg.HOLOGRAM.SHAFT_CORE_SPAN
+      }
       ;(glassMat.uniforms.uColor.value as THREE.Color).set(cfg.HOLOGRAM.GLASS_COLOR)
     },
 
-    update(a) {
+    update(a, cam) {
       const { cfg, ctx, phase } = a
       group.visible = phase !== 'dormant' && a.reveal > 0.01
       if (!group.visible) return
@@ -566,6 +724,9 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       const clock = a.smokeMs
 
       const lit = phase === 'emitting' || phase === 'forming' || phase === 'live'
+      const setShaftOpacity = (v: number) => {
+        for (const m of shaftMats) m.uniforms.uOpacity.value = v
+      }
 
       SLOTS.forEach((slot, i) => {
         const pose =
@@ -613,20 +774,78 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         shafts[i].visible = lit
         if (lit) {
           const s = shaftFor(lensWorld({ ...pose, y: pose.y + bob }, cfg.EMITTERS, rot), quad, cfg.HOLOGRAM)
-          mid.set(
-            (s.origin[0] + s.target[0]) / 2,
-            (s.origin[1] + s.target[1]) / 2,
-            (s.origin[2] + s.target[2]) / 2,
+          shafts[i].position.set(s.origin[0], s.origin[1], s.origin[2])
+          shafts[i].quaternion.copy(cam.quaternion)
+          // ⚠️ Sized from the REAL camera, at THIS orb's own distance. See
+          // shaftReach: anything derived from the composition instead leaves
+          // the disc's edge inside the frame for whichever orb sits closest.
+          const persp = cam as THREE.PerspectiveCamera
+          const reach = shaftReach(
+            cam.position.distanceTo(shafts[i].position),
+            persp.isPerspectiveCamera ? persp.fov : 20,
+            persp.isPerspectiveCamera ? persp.aspect : ctx.W / ctx.H,
+            cfg.HOLOGRAM,
           )
+          shafts[i].scale.setScalar(reach)
+
+          /**
+           * The fan's axis, flattened onto the screen.
+           *
+           * The plane wears the camera's rotation, so its local x and y ARE the
+           * camera's right and up. Projecting the world lens-to-screen vector
+           * onto those two gives the direction the fan must point in the
+           * shader's space — which is why the shader needs no matrices at all.
+           */
           dir
             .set(s.target[0] - s.origin[0], s.target[1] - s.origin[1], s.target[2] - s.origin[2])
             .normalize()
-          shafts[i].position.copy(mid)
-          // ConeGeometry's axis is +Y; aim it along the lens-to-screen vector.
-          shafts[i].quaternion.copy(quat.setFromUnitVectors(up, dir))
-          // Widening toward the screen is what reads as a projection rather
-          // than as a laser, so the cone's base sits at the screen end.
-          shafts[i].scale.set(s.spread * pose.radius * 3, s.length, s.spread * pose.radius * 3)
+          camRight.setFromMatrixColumn(cam.matrixWorld, 0)
+          camUp.setFromMatrixColumn(cam.matrixWorld, 1)
+          const dx = dir.dot(camRight)
+          const dy = dir.dot(camUp)
+          const dl = Math.hypot(dx, dy)
+          // Degenerate only when the fan points straight at the viewer, where
+          // there is no on-screen direction to have. Up is the sane default —
+          // it is where the screen sits relative to both orbs.
+          const u = shaftMats[i].uniforms.uDir.value as THREE.Vector2
+          if (dl > 1e-3) u.set(dx / dl, dy / dl)
+          else u.set(0, 1)
+
+          /**
+           * The screen's edges, in this plane's own x.
+           *
+           * ⚠️ Measured in NDC and then converted, NOT in world units. The
+           * panel sits at a different depth from either orb, so its world
+           * width is not where it APPEARS relative to the orb's plane — and
+           * where it appears is the whole point of a bound the eye reads as
+           * the screen's edge. One extra projection per orb per frame buys
+           * that exactly.
+           */
+          pv.set(s.origin[0], s.origin[1], s.origin[2]).project(cam)
+          const lensNdc = pv.x
+          pv
+            .set(
+              s.origin[0] + camRight.x * reach,
+              s.origin[1] + camRight.y * reach,
+              s.origin[2] + camRight.z * reach,
+            )
+            .project(cam)
+          const halfNdc = Math.abs(pv.x - lensNdc)
+          const clip = shaftMats[i].uniforms.uClip.value as THREE.Vector2
+          if (halfNdc > 1e-6) {
+            let lo = Infinity
+            let hi = -Infinity
+            for (const corner of quad.corners) {
+              pv.set(corner[0], corner[1], corner[2]).project(cam)
+              if (pv.x < lo) lo = pv.x
+              if (pv.x > hi) hi = pv.x
+            }
+            clip.set((lo - lensNdc) / halfNdc, (hi - lensNdc) / halfNdc)
+          } else {
+            // Degenerate only if the plane has collapsed; leave it unbounded
+            // rather than blanking the fan on a divide by nothing.
+            clip.set(-1e3, 1e3)
+          }
         }
       })
 
@@ -655,11 +874,15 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         glassMat.uniforms.uAspect.value = quad.w / Math.max(0.001, quad.h)
         glassMat.uniforms.uOpacity.value =
           cfg.HOLOGRAM.GLASS_OPACITY * forming * (1 - dip) * a.reveal
-        shaftMat.uniforms.uOpacity.value =
-          cfg.HOLOGRAM.SHAFT_OPACITY * (1 - dip * 0.5) * a.reveal
+        setShaftOpacity(cfg.HOLOGRAM.SHAFT_OPACITY * (1 - dip * 0.5) * a.reveal)
       } else {
-        shaftMat.uniforms.uOpacity.value = lit ? cfg.HOLOGRAM.SHAFT_OPACITY * a.reveal : 0
+        setShaftOpacity(lit ? cfg.HOLOGRAM.SHAFT_OPACITY * a.reveal : 0)
       }
+
+      // ⚠️ From the MONOTONIC clock, not parkedMs. parkedMs restarts at the
+      // park, and a shimmer that jumps backwards there is a visible hitch on
+      // the exact frame the orbs settle.
+      for (const m of shaftMats) m.uniforms.uTime.value = a.smokeMs / 1000
     },
 
     screenCorners: () => corners,
@@ -671,7 +894,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
       smokeGeo.forEach((g) => g.dispose())
       smokeMat.dispose()
       shafts.forEach((s) => s.geometry.dispose())
-      shaftMat.dispose()
+      shaftMats.forEach((m) => m.dispose())
       glass.geometry.dispose()
       glassMat.dispose()
       // The clones share the SOURCE model's geometry, which the engine owns and

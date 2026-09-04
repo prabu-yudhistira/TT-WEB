@@ -1872,7 +1872,50 @@ export interface SamsaraSequence {
      * The shafts are additive geometry, not fog — fog is banned in this room because it shares its scene with the hero orbit and would tint SAMSARA mid-flight.
      */
     shaftOpacity?: number | null;
+    /**
+     * How wide the fan opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.
+     */
     shaftSpread?: number | null;
+    /**
+     * How far the rays travel, as a multiple of the frame’s diagonal at the orb’s own depth. At 1 or above the fan always runs off the frame; below 1 you will see where it ends.
+     */
+    shaftReach?: number | null;
+    /**
+     * Ray density. They are banded on the angle, so spacing is naturally wide near the fan’s axis and tight at its edges.
+     */
+    shaftRays?: number | null;
+    /**
+     * Shimmer speed. 0 freezes the fan.
+     */
+    shaftSpeed?: number | null;
+    /**
+     * Falloff shape along a ray, not a distance — the reach sets where a ray ends. 1 is a straight ramp; below 1 it stays bright most of the way.
+     */
+    shaftFade?: number | null;
+    /**
+     * How dark it gets between rays. At 1 the fan is a soft wash; raise it until the streaks separate.
+     */
+    shaftContrast?: number | null;
+    /**
+     * How strongly the screen’s own left and right edges hold the light in. 1 keeps the fan inside the panel; 0 lets it run across the room.
+     */
+    shaftBound?: number | null;
+    /**
+     * A hot bloom where the rays leave the lens.
+     */
+    shaftCore?: number | null;
+    /**
+     * How sharply each ray closes to a point. 1 leaves the natural wedge, which ends blunt because a wedge is widest at its far end.
+     */
+    shaftTip?: number | null;
+    /**
+     * The colour at the throat of the beam, before it cools to the shaft colour.
+     */
+    shaftCoreColor?: string | null;
+    /**
+     * How far the hot colour carries before the ray is fully amber.
+     */
+    shaftCoreSpan?: number | null;
   };
   /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
@@ -2461,6 +2504,16 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         shaftColor?: T;
         shaftOpacity?: T;
         shaftSpread?: T;
+        shaftReach?: T;
+        shaftRays?: T;
+        shaftSpeed?: T;
+        shaftFade?: T;
+        shaftContrast?: T;
+        shaftBound?: T;
+        shaftCore?: T;
+        shaftTip?: T;
+        shaftCoreColor?: T;
+        shaftCoreSpan?: T;
       };
   exitMs?: T;
   updatedAt?: T;

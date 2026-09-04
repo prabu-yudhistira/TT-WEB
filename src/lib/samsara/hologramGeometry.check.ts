@@ -3,7 +3,7 @@
  * that will become the DOM contract.
  */
 import { DEFAULT_SEQUENCE } from './types'
-import { screenQuad, projectQuad, shaftFor, flickerAt, type Vec3 } from './hologramGeometry'
+import { screenQuad, projectQuad, shaftFor, shaftReach, flickerAt, type Vec3 } from './hologramGeometry'
 import type { OrbCtx } from './emitterOrbs'
 
 let failures = 0
@@ -84,6 +84,31 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
   // read as one beam and the "projected by two emitters" idea is lost.
   const other = shaftFor([6, -6, 10], q, cfg)
   check('a different lens gives a different shaft', Math.abs(other.length - s.length) > 1e-3)
+}
+
+// ── the fan's reach ─────────────────────────────────────────────────
+{
+  const cfg1 = { ...cfg, SHAFT_REACH: 1 }
+  const fov = 20
+  const aspect = 16 / 9
+  const camDist = 40
+  const r = shaftReach(camDist, fov, aspect, cfg1)
+
+  // The invariant the owner's bug turned on: a fan anywhere in the frame must
+  // still reach every corner of it, or its edge is visible on screen.
+  const halfH = camDist * Math.tan((fov * Math.PI) / 360)
+  const halfW = halfH * aspect
+  const worstCase = Math.hypot(2 * halfW, 2 * halfH)
+  check('reach covers the frame from any point in it', r >= worstCase - 1e-9,
+    `${r.toFixed(2)} vs worst case ${worstCase.toFixed(2)}`)
+
+  // ⚠️ Scales with DEPTH. The two orbs sit at very different distances from the
+  // camera; a reach that did not follow would draw one huge fan and one small.
+  check('reach grows with camera distance',
+    shaftReach(camDist * 2, fov, aspect, cfg1) > r * 1.9)
+  check('and with a wider viewport',
+    shaftReach(camDist, fov, aspect * 2, cfg1) > r)
+  check('SHAFT_REACH scales it', Math.abs(shaftReach(camDist, fov, aspect, { ...cfg, SHAFT_REACH: 2 }) - r * 2) < 1e-9)
 }
 
 // ── flicker ─────────────────────────────────────────────────────────

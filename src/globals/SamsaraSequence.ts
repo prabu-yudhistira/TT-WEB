@@ -1068,6 +1068,105 @@ export const SamsaraSequence: GlobalConfig = {
           defaultValue: d.HOLOGRAM.SHAFT_SPREAD,
           min: 0.02,
           max: 3,
+          admin: {
+            description:
+              'How wide the fan opens. An angular falloff, not a radius — the cone mesh this replaced on 2026-09-04 measured the same idea in orb radii, so a value from before that date does not carry over.',
+          },
+        },
+        {
+          name: 'shaftReach',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_REACH,
+          min: 0.2,
+          max: 6,
+          admin: {
+            description:
+              'How far the rays travel, as a multiple of the frame’s diagonal at the orb’s own depth. At 1 or above the fan always runs off the frame; below 1 you will see where it ends.',
+          },
+        },
+        {
+          name: 'shaftRays',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_RAYS,
+          min: 0.1,
+          max: 6,
+          admin: {
+            description:
+              'Ray density. They are banded on the angle, so spacing is naturally wide near the fan\u2019s axis and tight at its edges.',
+          },
+        },
+        {
+          name: 'shaftSpeed',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_SPEED,
+          min: 0,
+          max: 6,
+          admin: { description: 'Shimmer speed. 0 freezes the fan.' },
+        },
+        {
+          name: 'shaftFade',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_FADE,
+          min: 0.05,
+          max: 4,
+          admin: {
+            description:
+              'Falloff shape along a ray, not a distance — the reach sets where a ray ends. 1 is a straight ramp; below 1 it stays bright most of the way.',
+          },
+        },
+        {
+          name: 'shaftContrast',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CONTRAST,
+          min: 0.2,
+          max: 8,
+          admin: {
+            description:
+              'How dark it gets between rays. At 1 the fan is a soft wash; raise it until the streaks separate.',
+          },
+        },
+        {
+          name: 'shaftBound',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_BOUND,
+          min: 0,
+          max: 1,
+          admin: {
+            description:
+              'How strongly the screen’s own left and right edges hold the light in. 1 keeps the fan inside the panel; 0 lets it run across the room.',
+          },
+        },
+        {
+          name: 'shaftCore',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CORE,
+          min: 0,
+          max: 1,
+          admin: { description: 'A hot bloom where the rays leave the lens.' },
+        },
+        {
+          name: 'shaftTip',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_TIP,
+          min: 1,
+          max: 10,
+          admin: {
+            description:
+              'How sharply each ray closes to a point. 1 leaves the natural wedge, which ends blunt because a wedge is widest at its far end.',
+          },
+        },
+        colour(
+          'shaftCoreColor',
+          d.HOLOGRAM.SHAFT_CORE_COLOR,
+          'The colour at the throat of the beam, before it cools to the shaft colour.',
+        ),
+        {
+          name: 'shaftCoreSpan',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_CORE_SPAN,
+          min: 0.02,
+          max: 1,
+          admin: { description: 'How far the hot colour carries before the ray is fully amber.' },
         },
       ],
     },

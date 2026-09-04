@@ -498,7 +498,60 @@ export type HologramConfig = {
   GLASS_OPACITY: number
   SHAFT_COLOR: string
   SHAFT_OPACITY: number
+  /**
+   * Fan half-width, as the exponent `pow(cos, 1 / SHAFT_SPREAD)`.
+   *
+   * ⚠️ THE UNITS CHANGED on 2026-09-04. This used to be a radius multiplier on
+   * a cone mesh, where 1.05 meant "a bit wider than the orb". The shafts are a
+   * screen-space ray fan now, so it is an angular falloff: larger is wider,
+   * and past about 2 the fan is nearly a full half-disc. The owner's cone-era
+   * value is NOT meaningful here and was re-tuned rather than carried over.
+   */
   SHAFT_SPREAD: number
+  /**
+   * How far the rays travel, as a multiple of the frame's diagonal at the
+   * orb's own depth. At 1 the fan always covers the frame, so its edge is
+   * never on screen; below 1 the edge comes into view.
+   */
+  SHAFT_REACH: number
+  /**
+   * Ray density. Multiplies the striation frequency, so 2 is roughly twice as
+   * many distinct rays across the fan.
+   *
+   * ⚠️ The rays are banded on the ANGLE, not on arc length, so they are not
+   * evenly spaced: cos changes slowly near the axis and quickly at the rim, so
+   * the fan is naturally sparse in the middle and dense at its edges. That is
+   * the reference's look, not a bug to correct.
+   */
+  SHAFT_RAYS: number
+  /** Shimmer speed. 0 freezes the fan. */
+  SHAFT_SPEED: number
+  /**
+   * Falloff shape along a ray. 1 is linear over the full reach; below 1 the
+   * ray holds its strength most of the way and gives out near the end.
+   */
+  SHAFT_FADE: number
+  /**
+   * How dark the gaps between rays get. 1 leaves a soft wash; higher narrows
+   * each ray and opens real darkness between them.
+   */
+  SHAFT_CONTRAST: number
+  /**
+   * How strongly the screen's own left and right edges bound the fan.
+   * 1 keeps the light inside the panel; 0 lets it run across the room.
+   */
+  SHAFT_BOUND: number
+  /** A hot bloom where the rays leave the lens. 0 is off. */
+  SHAFT_CORE: number
+  /**
+   * How sharply each ray closes to a point at its far end. 1 leaves the
+   * natural wedge, which ends blunt; higher tapers it to a spike.
+   */
+  SHAFT_TIP: number
+  /** The colour at the throat of the beam, before it cools to SHAFT_COLOR. */
+  SHAFT_CORE_COLOR: string
+  /** How far the hot colour carries, 0..1 of the reach. */
+  SHAFT_CORE_SPAN: number
 }
 
 /**
@@ -815,8 +868,22 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     GLASS_COLOR: '#F5C542',
     GLASS_OPACITY: 0.22,
     SHAFT_COLOR: '#F5C542',
-    SHAFT_OPACITY: 0.15,
-    SHAFT_SPREAD: 1.05,
+    // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
+    // against a solid wedge where every fragment was fully lit; the fan
+    // multiplies this by the striation and the cone falloff, so the same
+    // number reads as almost nothing.
+    SHAFT_OPACITY: 0.2,
+    SHAFT_SPREAD: 0.8,
+    SHAFT_REACH: 1.15,
+    SHAFT_RAYS: 4,
+    SHAFT_SPEED: 1,
+    SHAFT_FADE: 0.5,
+    SHAFT_CONTRAST: 2.2,
+    SHAFT_BOUND: 1,
+    SHAFT_CORE: 0.3,
+    SHAFT_TIP: 3.4,
+    SHAFT_CORE_COLOR: '#FFF3D0',
+    SHAFT_CORE_SPAN: 0.45,
   },
 
   EXIT_MS: 800,

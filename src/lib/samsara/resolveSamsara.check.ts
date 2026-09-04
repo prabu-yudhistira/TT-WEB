@@ -250,6 +250,16 @@ check(
       SHAFT_COLOR: '#E8B733',
       SHAFT_OPACITY: 0.19,
       SHAFT_SPREAD: 0.48,
+      SHAFT_REACH: 2.4,
+      SHAFT_RAYS: 1.7,
+      SHAFT_SPEED: 0.6,
+      SHAFT_FADE: 1.3,
+      SHAFT_CONTRAST: 3.1,
+      SHAFT_BOUND: 0.4,
+      SHAFT_CORE: 0.62,
+      SHAFT_TIP: 2.2,
+      SHAFT_CORE_COLOR: '#FFEEBB',
+      SHAFT_CORE_SPAN: 0.31,
     },
     EXIT_MS: 1250,
   }
@@ -305,6 +315,8 @@ check(
   const SEMANTIC_MAX: Record<string, string> = {
     'freeze.chargePerBeat[2].value':
       'charge is 0..1 by definition — 1 is the logo fully separated, and the commit drives it there regardless',
+    'hologram.shaftBound':
+      'a 0..1 mix, and 1 is fully held by the screen — there is nothing above “entirely”',
   }
 
   const walk = (fields: Field[], value: unknown, path: string) => {

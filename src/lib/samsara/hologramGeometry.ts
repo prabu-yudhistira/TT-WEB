@@ -101,6 +101,33 @@ export function shaftFor(
 }
 
 /**
+ * Disc radius for a fan, in world units at the emitter's own depth.
+ *
+ * ⚠️ From the CAMERA FRUSTUM, not from the lens-to-screen distance. That was
+ * the first attempt and the owner caught it: the near orb sits close to the
+ * screen, so its disc was the smallest of the two and its edge landed inside
+ * the frame — the rays visibly stopped either side of the panel. Worse, the
+ * two orbs are at very different depths, so one world reach draws a huge fan
+ * for the near orb and a small one for the far.
+ *
+ * The frame's full diagonal at a given depth is the greatest distance any
+ * point inside the frame can be from any corner of it. A disc of that radius
+ * therefore covers the frame from ANYWHERE, at any viewport and any depth, so
+ * at SHAFT_REACH 1 the fan can never be seen to end. Above 1 is headroom for
+ * the falloff; below 1 deliberately brings the edge into view.
+ */
+export function shaftReach(
+  camDist: number,
+  fovDeg: number,
+  aspect: number,
+  cfg: HologramConfig,
+): number {
+  const halfH = Math.abs(camDist) * Math.tan((fovDeg * Math.PI) / 360)
+  const halfW = halfH * aspect
+  return Math.hypot(halfW, halfH) * 2 * cfg.SHAFT_REACH
+}
+
+/**
  * The glass's brightness dip at `tMs`. 0 = clear, FLICKER_DEPTH = deepest.
  *
  * ⚠️ This applies to the GLASS ONLY. The published rect and the `live` state
