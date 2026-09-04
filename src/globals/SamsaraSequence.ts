@@ -48,8 +48,10 @@ const orbSlot = (
       name: 'depthFrac',
       type: 'number',
       defaultValue: d0.DEPTH_FRAC,
-      min: 0.05,
-      max: 1.4,
+      min: 0.02,
+      // Raised from 1.4 on 2026-09-04: the owner's far orb ran out of slider
+      // at exactly the ceiling, which is how a range says it is too small.
+      max: 2.5,
       admin: {
         description:
           '0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.',

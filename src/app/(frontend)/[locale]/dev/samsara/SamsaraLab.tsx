@@ -205,10 +205,10 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'EMITTERS.SIZE_FRAC', label: 'Orb size (vh)', min: 0.02, max: 0.45, step: 0.005 },
       { kind: 'num', path: 'EMITTERS.NEAR.X_FRAC', label: 'Near x', min: -0.4, max: 1.4, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.NEAR.Y_FRAC', label: 'Near y', min: -0.4, max: 1.4, step: 0.01 },
-      { kind: 'num', path: 'EMITTERS.NEAR.DEPTH_FRAC', label: 'Near depth', min: 0.05, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.NEAR.DEPTH_FRAC', label: 'Near depth', min: 0.02, max: 2.5, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.FAR.X_FRAC', label: 'Far x', min: -0.4, max: 1.4, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.FAR.Y_FRAC', label: 'Far y', min: -0.4, max: 1.4, step: 0.01 },
-      { kind: 'num', path: 'EMITTERS.FAR.DEPTH_FRAC', label: 'Far depth', min: 0.05, max: 1.4, step: 0.01 },
+      { kind: 'num', path: 'EMITTERS.FAR.DEPTH_FRAC', label: 'Far depth', min: 0.02, max: 2.5, step: 0.01 },
     ],
   },
   {

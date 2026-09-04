@@ -462,6 +462,20 @@ export type EmittersConfig = {
    */
   THRUST_RATE: number
   THRUST_SPREAD: number
+  /**
+   * How far each afterburner's plume leans AWAY from the orb's axis, as a
+   * multiple of that nozzle's own offset.
+   *
+   * ⚠️ This and PLUME_Y were hardcoded at 0.3 and -0.7 until 2026-09-04, which
+   * is why the four plumes read as one bunched flame: the nozzles sit at
+   * ±0.55 and ±0.45 radii, so the lean was ±0.16 against an axial 0.7 and all
+   * four jets left within about 13 degrees of straight down. SAMSARA's exhaust
+   * had DIR_X/Y/Z from the start; the orbs never got the equivalent, so the
+   * one thing that actually looked wrong was the one thing not on the bench.
+   */
+  PLUME_OUT: number
+  /** Along the orb's own Y, in radii per second. Negative vents downward. */
+  PLUME_Y: number
 
   /** Shared by both behaviours. Sizes are in ORB RADII. */
   PUFF_SIZE: number
@@ -637,6 +651,20 @@ export type ShaftSlotConfig = {
  * them exactly. These are RECESSED nozzles, holes in the hull; the same search
  * run against this model returns one bulb and nothing else.
  */
+/**
+ * Which way each afterburner vents, in ORB RADII PER SECOND, orb local space.
+ *
+ * ⚠️ Paired with `portOffsets` and in the same order. The lean is taken from
+ * each nozzle's own x/z, so the four plumes splay apart instead of running
+ * parallel — at PLUME_OUT 0 they are four copies of the same jet, which is
+ * exactly the bug this replaced.
+ */
+export function portDirs(cfg: EmittersConfig): [number, number, number][] {
+  return portOffsets(cfg).map(
+    (o) => [o[0] * cfg.PLUME_OUT, cfg.PLUME_Y, o[2] * cfg.PLUME_OUT] as [number, number, number],
+  )
+}
+
 export function portOffsets(cfg: EmittersConfig): [number, number, number][] {
   const { PORT_X: x, PORT_Y: y, PORT_Z: z } = cfg
   return [
@@ -776,32 +804,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      * face forever with nothing in the console to say why. types.check.ts pins
      * each key against EXPRESSION_ORDER for exactly that reason.
      */
-    WEIGHTS: {
-      neutral: 15,
-      blink: 5,
-      squint: 2,
-      // ⚠️ ZERO is a decision, not an omission. Every expression keeps its key
-      // so the bench always has a slider for it and pickWeighted can never miss
-      // one through a typo — but the owner settled the room on a calm resting
-      // face: mostly neutral, a periodic blink, an occasional squint.
-      //
-      // `happy` in particular is 0 ON PURPOSE. The smile moved out of the random
-      // idle pool and became a deliberate interaction — press and hold SAMSARA
-      // and it smiles at you (HOLD_EXPRESSION below). A smile that also fired on
-      // its own every few seconds would spend the thing that makes holding it
-      // worth doing.
-      happy: 0,
-      wide: 0,
-      wink: 0,
-      lookLeft: 0,
-      lookRight: 0,
-      lookUp: 0,
-      lookDown: 0,
-      lookUpLeft: 0,
-      lookUpRight: 0,
-      lookDownLeft: 0,
-      lookDownRight: 0,
-    },
+    WEIGHTS: { neutral: 15, blink: 5, squint: 2, happy: 0, wide: 0, wink: 0, lookLeft: 0, lookRight: 0, lookUp: 0, lookDown: 0, lookUpLeft: 0, lookUpRight: 0, lookDownLeft: 0, lookDownRight: 0 },
     INTERVAL_MS: 4200,
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
@@ -827,7 +830,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SPEED: 1,
     DRAG: 0.7,
     RISE: -1.54,
-    GROWTH: 2.5,
+    GROWTH: 2.3,
     SWIRL: 0.35,
     SPREAD: 0.35,
     BACK_OFFSET: 0,
@@ -857,7 +860,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
    * owner tunes them at /dev/samsara and presses `copy json`.
    */
   EMITTERS: {
-    SIZE_FRAC: 0.13,
+    SIZE_FRAC: 0.14,
     // ⚠️ Kept BELOW the landscape value, not merely different. The fraction is
     // of ROOM.DEPTH, which is the same in both orientations, so an equal value
     // gives an equal world radius — and a portrait viewport is narrower, so
@@ -865,8 +868,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // moved landscape 0.14 -> 0.13 on a desktop; this follows by the same
     // ratio, because the bench cannot show what portrait is doing.
     MOBILE_SIZE_FRAC: 0.12,
-    NEAR: { X_FRAC: 0.1, Y_FRAC: 0.82, DEPTH_FRAC: 0.25 },
-    FAR: { X_FRAC: 0.48, Y_FRAC: 0.78, DEPTH_FRAC: 1.27 },
+    NEAR: { X_FRAC: 0.12, Y_FRAC: 0.85, DEPTH_FRAC: 0.05 },
+    FAR: { X_FRAC: 0.57, Y_FRAC: 0.92, DEPTH_FRAC: 1.4 },
     MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
     // Starting points read off an underside render, NOT measured — the ports are
@@ -879,7 +882,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     LENS_Y: 0.9,
     LENS_Z: 0,
     SHOW_PORTS: false,
-    NEAR_ROT: { X_DEG: -31, Y_DEG: -15, Z_DEG: -26 },
+    NEAR_ROT: { X_DEG: 13, Y_DEG: 161, Z_DEG: 23 },
     FAR_ROT: { X_DEG: 31, Y_DEG: -15, Z_DEG: 7 },
     ENTRY_MS: 1600,
     ENTRY_STAGGER_MS: 200,
@@ -887,9 +890,11 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     BOB_MS: 3400,
     THRUST_RATE: 26,
     THRUST_SPREAD: 0.5,
+    PLUME_OUT: 0.3,
+    PLUME_Y: -0.7,
     PUFF_SIZE: 0.32,
     PUFF_LIFE_MS: 1850,
-    PUFF_COLOR: '#FFF1D1',
+    PUFF_COLOR: '#F4EEE1',
     PUFF_OPACITY: 0.34,
   },
 
@@ -900,35 +905,35 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // MEASURED off the mesh by scripts/_find-exhausts.mjs, not eyeballed. It
     // found exactly two protrusion clusters, symmetric to 0.003 across X at
     // 116 and 115 verts — nothing else on the hull reaches that far out.
-    PORT_X: 0.765,
-    PORT_Y: 0.816,
-    PORT_Z: -0.266,
+    PORT_X: 0.76,
+    PORT_Y: 0.77,
+    PORT_Z: -0.29,
     // Radially outward through the tip, which for a tube protruding from a
     // spheroid IS its axis.
-    DIR_X: 0.45,
-    DIR_Y: 0.95,
-    DIR_Z: -0.231,
-    RATE: 14,
-    SPREAD: 0.45,
-    PUFF_SIZE: 54,
-    PUFF_LIFE_MS: 1800,
-    PUFF_COLOR: '#D2C5AD',
-    PUFF_OPACITY: 0.13,
+    DIR_X: 0.35,
+    DIR_Y: 1.95,
+    DIR_Z: -0.3,
+    RATE: 24,
+    SPREAD: 0.73,
+    PUFF_SIZE: 81,
+    PUFF_LIFE_MS: 925,
+    PUFF_COLOR: '#F7ECD9',
+    PUFF_OPACITY: 0.18,
   },
 
   HOLOGRAM: {
-    W_FRAC: 0.63,
-    H_FRAC: 0.765,
-    X_FRAC: 0.275,
-    Y_FRAC: 0.33,
+    W_FRAC: 0.615,
+    H_FRAC: 0.77,
+    X_FRAC: 0.3,
+    Y_FRAC: 0.38,
     MOBILE_W_FRAC: 0.78,
     MOBILE_H_FRAC: 0.3,
     MOBILE_X_FRAC: 0.5,
     MOBILE_Y_FRAC: 0.66,
-    FORM_MS: 2100,
-    FLICKER_MS: 5000,
+    FORM_MS: 1500,
+    FLICKER_MS: 4900,
     FLICKER_DUR_MS: 220,
-    FLICKER_DEPTH: 0.35,
+    FLICKER_DEPTH: 0.37,
     GLASS_COLOR: '#F5C542',
     GLASS_OPACITY: 0.22,
     SHAFT_COLOR: '#F5C542',
@@ -936,24 +941,24 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // against a solid wedge where every fragment was fully lit; the fan
     // multiplies this by the striation and the cone falloff, so the same
     // number reads as almost nothing.
-    SHAFT_OPACITY: 0.2,
-    SHAFT_SPREAD: 0.8,
+    SHAFT_OPACITY: 0.39,
+    SHAFT_SPREAD: 2.52,
     // The owner's annotated target: edges up and out, not out sideways.
-    SHAFT_HALF_DEG: 62,
+    SHAFT_HALF_DEG: 68,
     SHAFT_GUIDE: false,
-    SHAFT_REACH: 1.15,
-    SHAFT_RAYS: 4,
+    SHAFT_REACH: 0.35,
+    SHAFT_RAYS: 4.8,
     SHAFT_SPEED: 1,
-    SHAFT_FADE: 0.5,
+    SHAFT_FADE: 1.35,
     SHAFT_CONTRAST: 2.2,
     SHAFT_BOUND: 1,
-    SHAFT_CORE: 0.3,
-    SHAFT_TIP: 3.4,
+    SHAFT_CORE: 0.7,
+    SHAFT_TIP: 4.25,
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.45,
     // Both zero, so the slot config changes nothing until a slider moves.
-    NEAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1, REACH: 1 },
-    FAR_SHAFT: { DX: 0, DY: 0, ANGLE_DEG: 0, SPREAD: 1, REACH: 1 },
+    NEAR_SHAFT: { DX: 0.05, DY: -0.2, ANGLE_DEG: 11, SPREAD: 0.85, REACH: 0.75 },
+    FAR_SHAFT: { DX: 0.05, DY: -0.55, ANGLE_DEG: -15, SPREAD: 0.9, REACH: 0.8 },
   },
 
   EXIT_MS: 800,

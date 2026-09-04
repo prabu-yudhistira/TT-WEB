@@ -6,7 +6,7 @@
  * later edit has to be deliberate and has to come back through the owner.
  * Run: npm run verify:config
  */
-import { DEFAULT_SEQUENCE, portOffsets } from './types'
+import { DEFAULT_SEQUENCE, portOffsets, portDirs } from './types'
 import { EXPRESSION_ORDER } from '../mascot/eyes'
 
 let failures = 0
@@ -318,6 +318,43 @@ check('the screen clears SAMSARA horizontally in landscape',
 check('the screen clears SAMSARA vertically in portrait',
   DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_Y_FRAC - DEFAULT_SEQUENCE.HOLOGRAM.MOBILE_H_FRAC / 2
     > DEFAULT_SEQUENCE.LANDING.MOBILE_Y_FRAC)
+
+// ── the orb plume splays, and that is the whole point ───────────────
+{
+  const e = DEFAULT_SEQUENCE.EMITTERS
+  const dirs = portDirs(e)
+  check('one direction per nozzle', dirs.length === portOffsets(e).length)
+
+  // ⚠️ THE BUG THIS REPLACED. The lean was hardcoded, and small enough against
+  // the axial term that all four jets left within about 13 degrees of straight
+  // down — four afterburners reading as one flame. Asserting the four are
+  // DISTINCT is what stops a future tune quietly collapsing them again.
+  const keys = new Set(dirs.map((d) => `${d[0].toFixed(4)},${d[2].toFixed(4)}`))
+  check('all four plumes point somewhere different', keys.size === 4)
+
+  // Mirrored on x and z, like the nozzles they leave from.
+  const sx = dirs.map((d) => Math.sign(d[0])).sort().join('')
+  const sz = dirs.map((d) => Math.sign(d[2])).sort().join('')
+  check('and they mirror on both axes', sx === '-1-111' && sz === '-1-111')
+
+  check('they all vent the same way along Y', dirs.every((d) => d[1] === e.PLUME_Y))
+
+  // At 0 they collapse to one jet — the failure mode, made reachable so the
+  // assertion above is measuring something real.
+  const flat = portDirs({ ...e, PLUME_OUT: 0 })
+  check('PLUME_OUT 0 collapses them, which is why it is a slider',
+    new Set(flat.map((d) => `${d[0]},${d[2]}`)).size === 1)
+
+  // ⚠️ The rate slider must not run past what a pool can hold. Above that the
+  // pool recycles live puffs and the slider's remaining travel does nothing.
+  // POOL is 2048 per orb; see emitterScene.
+  const standing = 200 * portOffsets(e).length * (e.PUFF_LIFE_MS / 1000)
+  check('the rate slider stays inside the puff pool', standing <= 2048)
+
+  const wide = portDirs({ ...e, PLUME_OUT: e.PLUME_OUT * 2 })
+  check('and doubling it doubles the lean',
+    Math.abs(wide[0][0] - dirs[0][0] * 2) < 1e-9)
+}
 
 console.log(failures ? `\n${failures} check(s) failed.` : '\nAll sequence config checks passed.')
 process.exit(failures ? 1 : 0)

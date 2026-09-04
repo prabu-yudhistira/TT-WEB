@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { portOffsets, type EmittersConfig, type SequenceConfig } from './types'
+import { portOffsets,
+  portDirs, type EmittersConfig, type SequenceConfig } from './types'
 import {
   orbParkedPose,
   orbPoseAt,
@@ -83,14 +84,23 @@ export type EmitterScene = {
 const SLOTS: OrbSlot[] = ['near', 'far']
 
 /**
- * ⚠️ Sized for THRUST, not for the cadence.
+ * Live puffs one orb can hold.
  *
- * Thrust runs at THRUST_RATE per second per port across four ports for the
- * whole entry; the cadence is a few puffs every three seconds. A pool sized for
- * the cadence truncates the entrance silently — puffs stop appearing and
- * nothing logs.
+ * ⚠️ THE RATE SLIDER'S REAL CEILING, so it is sized from the slider and not
+ * from taste. A puff lives PUFF_LIFE_MS, so the standing population is
+ *
+ *     THRUST_RATE x ports x PUFF_LIFE_MS / 1000
+ *
+ * and once that passes POOL the pool recycles live puffs: raising the rate
+ * further adds nothing and quietly shortens every plume instead. At 420 that
+ * happened at rate 57 — under a third of the slider's travel, with the rest of
+ * it doing nothing. That is what "the tuning bench does not work" looks like
+ * from the outside.
+ *
+ * 2048 covers the whole rate slider at the default life, and the cost is a
+ * one-off 40 KB of attribute buffer per orb plus a loop nobody can measure.
  */
-const POOL = 420
+const POOL = 2048
 
 /**
  * Per-point alpha and size, which `PointsMaterial` cannot express.
@@ -561,11 +571,13 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
 
   // ── smoke: one pool and one draw call per orb ─────────────────────
   /** The four afterburners, pointing down and biased outward by their own offset. */
-  const orbPorts = (e: EmittersConfig): PortSpec[] =>
-    portOffsets(e).map((o) => ({
+  const orbPorts = (e: EmittersConfig): PortSpec[] => {
+    const dirs = portDirs(e)
+    return portOffsets(e).map((o, k) => ({
       at: o as unknown as readonly [number, number, number],
-      dir: [o[0] * 0.3, -0.7, o[2] * 0.3] as const,
+      dir: dirs[k] as unknown as readonly [number, number, number],
     }))
+  }
 
   const smoke = SLOTS.map(() => {
     // Seeded per orb, and differently, so the two plumes are not identical.
