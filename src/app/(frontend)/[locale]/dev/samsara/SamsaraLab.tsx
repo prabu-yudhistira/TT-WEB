@@ -245,6 +245,8 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
       { kind: 'num', path: 'EMITTERS.BOB_MS', label: 'Float ms', min: 400, max: 12000, step: 50 },
       { kind: 'num', path: 'EMITTERS.THRUST_RATE', label: 'Puffs /s /port', min: 0, max: 200, step: 1 },
       { kind: 'num', path: 'EMITTERS.THRUST_SPREAD', label: 'Thrust spread', min: 0, max: 3, step: 0.02 },
+      { kind: 'num', path: 'EMITTERS.PLUME_OUT', label: 'Plume splay', min: 0, max: 4, step: 0.02 },
+      { kind: 'num', path: 'EMITTERS.PLUME_Y', label: 'Plume along Y (− = down)', min: -4, max: 4, step: 0.02 },
       { kind: 'num', path: 'EMITTERS.PUFF_SIZE', label: 'Puff size (radii)', min: 0.02, max: 2, step: 0.01 },
       { kind: 'num', path: 'EMITTERS.PUFF_LIFE_MS', label: 'Puff life ms', min: 100, max: 8000, step: 25 },
       { kind: 'num', path: 'EMITTERS.PUFF_OPACITY', label: 'Puff opacity', min: 0, max: 1, step: 0.01 },

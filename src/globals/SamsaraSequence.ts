@@ -899,6 +899,28 @@ export const SamsaraSequence: GlobalConfig = {
           max: 3,
         },
         {
+          name: 'plumeOut',
+          type: 'number',
+          defaultValue: d.EMITTERS.PLUME_OUT,
+          min: 0,
+          max: 4,
+          admin: {
+            description:
+              'How far each plume leans away from the orb’s axis, as a multiple of that nozzle’s own offset. At 0 all four jets are parallel and read as one flame rather than four afterburners.',
+          },
+        },
+        {
+          name: 'plumeY',
+          type: 'number',
+          defaultValue: d.EMITTERS.PLUME_Y,
+          min: -4,
+          max: 4,
+          admin: {
+            description:
+              'How hard the plume is driven along the orb’s own Y, in radii per second. Negative vents out of the underside.',
+          },
+        },
+        {
           name: 'puffSize',
           type: 'number',
           defaultValue: d.EMITTERS.PUFF_SIZE,

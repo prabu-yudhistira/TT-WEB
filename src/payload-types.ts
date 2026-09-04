@@ -1764,6 +1764,14 @@ export interface SamsaraSequence {
     thrustRate?: number | null;
     thrustSpread?: number | null;
     /**
+     * How far each plume leans away from the orb’s axis, as a multiple of that nozzle’s own offset. At 0 all four jets are parallel and read as one flame rather than four afterburners.
+     */
+    plumeOut?: number | null;
+    /**
+     * How hard the plume is driven along the orb’s own Y, in radii per second. Negative vents out of the underside.
+     */
+    plumeY?: number | null;
+    /**
      * In orb radii, so it holds its proportion at every viewport.
      */
     puffSize?: number | null;
@@ -2490,6 +2498,8 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         bobMs?: T;
         thrustRate?: T;
         thrustSpread?: T;
+        plumeOut?: T;
+        plumeY?: T;
         puffSize?: T;
         puffLifeMs?: T;
         puffColor?: T;

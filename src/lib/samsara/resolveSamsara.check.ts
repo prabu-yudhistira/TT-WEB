@@ -165,7 +165,10 @@ check(
     },
     IDLE_EYES: {
       WEIGHTS: Object.fromEntries(
-        Object.keys(d.IDLE_EYES.WEIGHTS).map((k, i) => [k, (i % 5) + 1]),
+        // ⚠️ Offset well clear of any plausible default. At (i % 5) + 1 the
+        // third key landed on 3, and the day the owner tuned squint to 3 the
+        // perturbation silently stopped being one.
+        Object.keys(d.IDLE_EYES.WEIGHTS).map((k, i) => [k, (i % 7) + 11]),
       ),
       INTERVAL_MS: 3300,
       SMILE_SHAKE_PX: 14,

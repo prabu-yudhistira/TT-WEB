@@ -702,7 +702,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   GESTURES: {
     BEATS_TO_COMMIT: 3,
-    WHEEL_THRESHOLD: 230,
+    WHEEL_THRESHOLD: 160,
     COOLDOWN_MS: 380,
     QUIET_MS: 120,
     TOUCH_THRESHOLD: 60,
@@ -804,7 +804,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      * face forever with nothing in the console to say why. types.check.ts pins
      * each key against EXPRESSION_ORDER for exactly that reason.
      */
-    WEIGHTS: { neutral: 15, blink: 5, squint: 2, happy: 0, wide: 0, wink: 0, lookLeft: 0, lookRight: 0, lookUp: 0, lookDown: 0, lookUpLeft: 0, lookUpRight: 0, lookDownLeft: 0, lookDownRight: 0 },
+    WEIGHTS: { neutral: 15, blink: 5, squint: 3, happy: 0, wide: 0, wink: 0, lookLeft: 0, lookRight: 0, lookUp: 0, lookDown: 0, lookUpLeft: 0, lookUpRight: 0, lookDownLeft: 0, lookDownRight: 0 },
     INTERVAL_MS: 4200,
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
@@ -829,7 +829,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // These give about 2 radii of travel: out past the body, then hanging.
     SPEED: 1,
     DRAG: 0.7,
-    RISE: -1.54,
+    RISE: -1.4,
     GROWTH: 2.3,
     SWIRL: 0.35,
     SPREAD: 0.35,
@@ -892,10 +892,10 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     THRUST_SPREAD: 0.5,
     PLUME_OUT: 0.3,
     PLUME_Y: -0.7,
-    PUFF_SIZE: 0.32,
-    PUFF_LIFE_MS: 1850,
-    PUFF_COLOR: '#F4EEE1',
-    PUFF_OPACITY: 0.34,
+    PUFF_SIZE: 1.11,
+    PUFF_LIFE_MS: 1000,
+    PUFF_COLOR: '#F0E6D1',
+    PUFF_OPACITY: 0.25,
   },
 
   // Starting points, measured off the turntable rather than tuned — the owner
@@ -913,7 +913,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     DIR_X: 0.35,
     DIR_Y: 1.95,
     DIR_Z: -0.3,
-    RATE: 24,
+    RATE: 10,
     SPREAD: 0.73,
     PUFF_SIZE: 81,
     PUFF_LIFE_MS: 925,
@@ -935,7 +935,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     FLICKER_DUR_MS: 220,
     FLICKER_DEPTH: 0.37,
     GLASS_COLOR: '#F5C542',
-    GLASS_OPACITY: 0.22,
+    GLASS_OPACITY: 0.44,
     SHAFT_COLOR: '#F5C542',
     // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
     // against a solid wedge where every fragment was fully lit; the fan
@@ -953,7 +953,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SHAFT_CONTRAST: 2.2,
     SHAFT_BOUND: 1,
     SHAFT_CORE: 0.7,
-    SHAFT_TIP: 4.25,
+    SHAFT_TIP: 4.6,
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.45,
     // Both zero, so the slot config changes nothing until a slider moves.
