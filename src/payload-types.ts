@@ -1663,6 +1663,139 @@ export interface SamsaraSequence {
     coreColor?: string | null;
   };
   /**
+   * Two instances of ONE model, sharing one download. They differ by DEPTH, not by size, which is why there is a single size control and four positions.
+   */
+  emitters?: {
+    /**
+     * On-screen height as a fraction of viewport height — the same units as SAMSARA’s own landing size. Both orbs share it.
+     */
+    sizeFrac?: number | null;
+    /**
+     * Portrait, where the orbs flank the screen below SAMSARA.
+     */
+    mobileSizeFrac?: number | null;
+    near?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    far?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    mobileNear?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    mobileFar?: {
+      xFrac?: number | null;
+      yFrac?: number | null;
+      /**
+       * 0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.
+       */
+      depthFrac?: number | null;
+    };
+    /**
+     * How long one orb takes to fly in from behind the camera.
+     */
+    entryMs?: number | null;
+    /**
+     * How far the far orb lags the near one. At 0 they arrive together and read as one rigid object rather than two machines.
+     */
+    entryStaggerMs?: number | null;
+    /**
+     * Idle float, in orb radii. The two orbs bob out of phase deliberately.
+     */
+    bobAmp?: number | null;
+    bobMs?: number | null;
+    /**
+     * Afterburner plume DURING ENTRY, puffs per second per port. This is not the repeating burst below — it ends the moment the orb parks.
+     */
+    thrustRate?: number | null;
+    thrustSpread?: number | null;
+    /**
+     * The PERMANENT burst interval once parked. It runs for as long as the room is up, not just during the entrance.
+     */
+    cadenceMs?: number | null;
+    /**
+     * Puffs per port per burst, across four ports.
+     */
+    cadencePuffs?: number | null;
+    /**
+     * In orb radii, so it holds its proportion at every viewport.
+     */
+    puffSize?: number | null;
+    /**
+     * Keep this well below the burst interval. Lifetimes vary up to 1.25x, and a puff outliving its interval turns the bursts into one continuous plume.
+     */
+    puffLifeMs?: number | null;
+    /**
+     * Warm grey steam — deliberately not the gold of SAMSARA’s own bursts.
+     */
+    puffColor?: string | null;
+    puffOpacity?: number | null;
+  };
+  /**
+   * The screen the two orbs project. It will later carry subtitles and option buttons as real DOM on top, which is why the flicker below applies to the GLASS ONLY — flickering text would defeat the accessibility feature it exists to provide.
+   */
+  hologram?: {
+    wFrac?: number | null;
+    hFrac?: number | null;
+    /**
+     * Landscape. Keep the screen clear of SAMSARA, which parks at 0.75.
+     */
+    xFrac?: number | null;
+    yFrac?: number | null;
+    mobileWFrac?: number | null;
+    mobileHFrac?: number | null;
+    mobileXFrac?: number | null;
+    /**
+     * Portrait. The screen goes BELOW SAMSARA, which parks at 0.3.
+     */
+    mobileYFrac?: number | null;
+    /**
+     * The screen flickers first and then resolves — an unstable ramp, not a clean fade.
+     */
+    formMs?: number | null;
+    /**
+     * The permanent flicker interval once the screen is live.
+     */
+    flickerMs?: number | null;
+    /**
+     * Keep well below the interval, or the screen reads as broken rather than as a projection.
+     */
+    flickerDurMs?: number | null;
+    /**
+     * How far the glass dips. Never 1 — a screen that fully extinguishes reads as a fault rather than a hologram.
+     */
+    flickerDepth?: number | null;
+    /**
+     * The screen’s own amber.
+     */
+    glassColor?: string | null;
+    glassOpacity?: number | null;
+    /**
+     * The light shafts from each lens. Usually the same amber as the glass.
+     */
+    shaftColor?: string | null;
+    /**
+     * The shafts are additive geometry, not fog — fog is banned in this room because it shares its scene with the hero orbit and would tint SAMSARA mid-flight.
+     */
+    shaftOpacity?: number | null;
+    shaftSpread?: number | null;
+  };
+  /**
    * Scrolling up from the room returns to the hero. A quick exit, deliberately NOT a rewind of the fall.
    */
   exitMs?: number | null;
@@ -2145,6 +2278,73 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         glow?: T;
         color?: T;
         coreColor?: T;
+      };
+  emitters?:
+    | T
+    | {
+        sizeFrac?: T;
+        mobileSizeFrac?: T;
+        near?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        far?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        mobileNear?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        mobileFar?:
+          | T
+          | {
+              xFrac?: T;
+              yFrac?: T;
+              depthFrac?: T;
+            };
+        entryMs?: T;
+        entryStaggerMs?: T;
+        bobAmp?: T;
+        bobMs?: T;
+        thrustRate?: T;
+        thrustSpread?: T;
+        cadenceMs?: T;
+        cadencePuffs?: T;
+        puffSize?: T;
+        puffLifeMs?: T;
+        puffColor?: T;
+        puffOpacity?: T;
+      };
+  hologram?:
+    | T
+    | {
+        wFrac?: T;
+        hFrac?: T;
+        xFrac?: T;
+        yFrac?: T;
+        mobileWFrac?: T;
+        mobileHFrac?: T;
+        mobileXFrac?: T;
+        mobileYFrac?: T;
+        formMs?: T;
+        flickerMs?: T;
+        flickerDurMs?: T;
+        flickerDepth?: T;
+        glassColor?: T;
+        glassOpacity?: T;
+        shaftColor?: T;
+        shaftOpacity?: T;
+        shaftSpread?: T;
       };
   exitMs?: T;
   updatedAt?: T;

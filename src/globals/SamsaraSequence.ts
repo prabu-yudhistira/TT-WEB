@@ -27,6 +27,38 @@ const colour = (name: string, defaultValue: string, description?: string): Field
 })
 
 /**
+ * One emitter orb's parked position.
+ *
+ * Four of these exist — near/far x landscape/portrait — and writing them out
+ * longhand would be ~80 lines of near-identical field definitions in which a
+ * single wrong default would be invisible.
+ */
+const orbSlot = (
+  name: string,
+  label: string,
+  d0: { X_FRAC: number; Y_FRAC: number; DEPTH_FRAC: number },
+): Field => ({
+  name,
+  type: 'group',
+  label,
+  fields: [
+    { name: 'xFrac', type: 'number', defaultValue: d0.X_FRAC, min: -0.5, max: 1.5 },
+    { name: 'yFrac', type: 'number', defaultValue: d0.Y_FRAC, min: -0.5, max: 1.5 },
+    {
+      name: 'depthFrac',
+      type: 'number',
+      defaultValue: d0.DEPTH_FRAC,
+      min: 0.05,
+      max: 0.95,
+      admin: {
+        description:
+          '0 = at the camera, 1 = at the back wall. This is what makes the two orbs look like different sizes — they are one model at two depths, not two sizes.',
+      },
+    },
+  ],
+})
+
+/**
  * A list of numbers, one row per beat or per bounce.
  *
  * ⚠️ Rows are how Payload stores a list, and an editor can delete one. The
@@ -694,6 +726,265 @@ export const SamsaraSequence: GlobalConfig = {
         },
         colour('color', d.BURST.COLOR, 'The hero’s own gold, so the room reads as the same material.'),
         colour('coreColor', d.BURST.CORE_COLOR, 'The warmer centre of each puff.'),
+      ],
+    },
+
+    {
+      name: 'emitters',
+      type: 'group',
+      label: 'Emitter orbs — the two projectors',
+      admin: {
+        description:
+          'Two instances of ONE model, sharing one download. They differ by DEPTH, not by size, which is why there is a single size control and four positions.',
+      },
+      fields: [
+        {
+          name: 'sizeFrac',
+          type: 'number',
+          defaultValue: d.EMITTERS.SIZE_FRAC,
+          min: 0.02,
+          max: 0.45,
+          admin: {
+            description:
+              'On-screen height as a fraction of viewport height — the same units as SAMSARA’s own landing size. Both orbs share it.',
+          },
+        },
+        {
+          name: 'mobileSizeFrac',
+          type: 'number',
+          defaultValue: d.EMITTERS.MOBILE_SIZE_FRAC,
+          min: 0.02,
+          max: 0.4,
+          admin: { description: 'Portrait, where the orbs flank the screen below SAMSARA.' },
+        },
+        orbSlot('near', 'Near orb — landscape', d.EMITTERS.NEAR),
+        orbSlot('far', 'Far orb — landscape', d.EMITTERS.FAR),
+        orbSlot('mobileNear', 'Near orb — portrait', d.EMITTERS.MOBILE_NEAR),
+        orbSlot('mobileFar', 'Far orb — portrait', d.EMITTERS.MOBILE_FAR),
+        {
+          name: 'entryMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.ENTRY_MS,
+          min: 200,
+          max: 6000,
+          admin: { description: 'How long one orb takes to fly in from behind the camera.' },
+        },
+        {
+          name: 'entryStaggerMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.ENTRY_STAGGER_MS,
+          min: 0,
+          max: 3000,
+          admin: {
+            description:
+              'How far the far orb lags the near one. At 0 they arrive together and read as one rigid object rather than two machines.',
+          },
+        },
+        {
+          name: 'bobAmp',
+          type: 'number',
+          defaultValue: d.EMITTERS.BOB_AMP,
+          min: 0,
+          max: 0.6,
+          admin: {
+            description: 'Idle float, in orb radii. The two orbs bob out of phase deliberately.',
+          },
+        },
+        { name: 'bobMs', type: 'number', defaultValue: d.EMITTERS.BOB_MS, min: 400, max: 12000 },
+        {
+          name: 'thrustRate',
+          type: 'number',
+          defaultValue: d.EMITTERS.THRUST_RATE,
+          min: 0,
+          max: 200,
+          admin: {
+            description:
+              'Afterburner plume DURING ENTRY, puffs per second per port. This is not the repeating burst below — it ends the moment the orb parks.',
+          },
+        },
+        {
+          name: 'thrustSpread',
+          type: 'number',
+          defaultValue: d.EMITTERS.THRUST_SPREAD,
+          min: 0,
+          max: 3,
+        },
+        {
+          name: 'cadenceMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.CADENCE_MS,
+          min: 400,
+          max: 20000,
+          admin: {
+            description:
+              'The PERMANENT burst interval once parked. It runs for as long as the room is up, not just during the entrance.',
+          },
+        },
+        {
+          name: 'cadencePuffs',
+          type: 'number',
+          defaultValue: d.EMITTERS.CADENCE_PUFFS,
+          min: 1,
+          max: 24,
+          admin: { description: 'Puffs per port per burst, across four ports.' },
+        },
+        {
+          name: 'puffSize',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_SIZE,
+          min: 0.02,
+          max: 2,
+          admin: { description: 'In orb radii, so it holds its proportion at every viewport.' },
+        },
+        {
+          name: 'puffLifeMs',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_LIFE_MS,
+          min: 100,
+          max: 8000,
+          admin: {
+            description:
+              'Keep this well below the burst interval. Lifetimes vary up to 1.25x, and a puff outliving its interval turns the bursts into one continuous plume.',
+          },
+        },
+        colour(
+          'puffColor',
+          d.EMITTERS.PUFF_COLOR,
+          'Warm grey steam — deliberately not the gold of SAMSARA’s own bursts.',
+        ),
+        {
+          name: 'puffOpacity',
+          type: 'number',
+          defaultValue: d.EMITTERS.PUFF_OPACITY,
+          min: 0,
+          max: 1,
+        },
+      ],
+    },
+
+    {
+      name: 'hologram',
+      type: 'group',
+      label: 'Holographic screen',
+      admin: {
+        description:
+          'The screen the two orbs project. It will later carry subtitles and option buttons as real DOM on top, which is why the flicker below applies to the GLASS ONLY — flickering text would defeat the accessibility feature it exists to provide.',
+      },
+      fields: [
+        { name: 'wFrac', type: 'number', defaultValue: d.HOLOGRAM.W_FRAC, min: 0.05, max: 1.2 },
+        { name: 'hFrac', type: 'number', defaultValue: d.HOLOGRAM.H_FRAC, min: 0.05, max: 1.2 },
+        {
+          name: 'xFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.X_FRAC,
+          min: -0.2,
+          max: 1.2,
+          admin: {
+            description: 'Landscape. Keep the screen clear of SAMSARA, which parks at 0.75.',
+          },
+        },
+        { name: 'yFrac', type: 'number', defaultValue: d.HOLOGRAM.Y_FRAC, min: -0.2, max: 1.2 },
+        {
+          name: 'mobileWFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_W_FRAC,
+          min: 0.05,
+          max: 1.2,
+        },
+        {
+          name: 'mobileHFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_H_FRAC,
+          min: 0.05,
+          max: 1.2,
+        },
+        {
+          name: 'mobileXFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_X_FRAC,
+          min: -0.2,
+          max: 1.2,
+        },
+        {
+          name: 'mobileYFrac',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.MOBILE_Y_FRAC,
+          min: -0.2,
+          max: 1.4,
+          admin: { description: 'Portrait. The screen goes BELOW SAMSARA, which parks at 0.3.' },
+        },
+        {
+          name: 'formMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FORM_MS,
+          min: 100,
+          max: 8000,
+          admin: {
+            description:
+              'The screen flickers first and then resolves — an unstable ramp, not a clean fade.',
+          },
+        },
+        {
+          name: 'flickerMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_MS,
+          min: 500,
+          max: 30000,
+          admin: { description: 'The permanent flicker interval once the screen is live.' },
+        },
+        {
+          name: 'flickerDurMs',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_DUR_MS,
+          min: 20,
+          max: 2000,
+          admin: {
+            description:
+              'Keep well below the interval, or the screen reads as broken rather than as a projection.',
+          },
+        },
+        {
+          name: 'flickerDepth',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.FLICKER_DEPTH,
+          min: 0,
+          max: 0.95,
+          admin: {
+            description:
+              'How far the glass dips. Never 1 — a screen that fully extinguishes reads as a fault rather than a hologram.',
+          },
+        },
+        colour('glassColor', d.HOLOGRAM.GLASS_COLOR, 'The screen’s own amber.'),
+        {
+          name: 'glassOpacity',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.GLASS_OPACITY,
+          min: 0,
+          max: 1,
+        },
+        colour(
+          'shaftColor',
+          d.HOLOGRAM.SHAFT_COLOR,
+          'The light shafts from each lens. Usually the same amber as the glass.',
+        ),
+        {
+          name: 'shaftOpacity',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_OPACITY,
+          min: 0,
+          max: 1,
+          admin: {
+            description:
+              'The shafts are additive geometry, not fog — fog is banned in this room because it shares its scene with the hero orbit and would tint SAMSARA mid-flight.',
+          },
+        },
+        {
+          name: 'shaftSpread',
+          type: 'number',
+          defaultValue: d.HOLOGRAM.SHAFT_SPREAD,
+          min: 0.02,
+          max: 3,
+        },
       ],
     },
 
