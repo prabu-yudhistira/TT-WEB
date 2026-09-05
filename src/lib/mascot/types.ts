@@ -160,10 +160,19 @@ export type MascotConfig = {
  * on desktop, and on mobile the mascot orbited ENTIRELY above the belt, never
  * once overlapping it. 70 brings desktop's peak to ~36px above the belt (was
  * 94) and puts most of the mobile orbit inside the belt's own band. This
- * roughly HALVES the depth bias above (-24px at 70, not -46px) — the 420-
- * sample sort-safety measurement was taken at 136 and has not been re-run at
- * 70. Treat the sort-safety guarantee as unverified at this value, not
- * re-proven, until it is.
+ * roughly HALVES the depth bias above (-24px at 70, not -46px), so the sorting
+ * guarantee was RE-MEASURED rather than assumed to survive: mascot-sorting.mjs
+ * at 70 reports 0.0% wrong-sorting on all three viewports, still exercised
+ * (desktop overlaps a bead in 10.0% of frames, deepest overlap 16.4px). The
+ * bias is smaller and it still clears the belt. Re-run that gate before
+ * lowering HEIGHT any further — the margin is now half of what it was.
+ *
+ * ⚠️ Lowering it DID cost something else, found the same night: at 70 the far
+ * point no longer clears the mark's box (it cleared by 23.6px at 136 and now
+ * OVERLAPS by 22.2px on desktop), so `hasClearedLogo` in SamsaraSequence defers
+ * the promotion to the first bounce instead of firing on the seam's first
+ * frame. That deferral is legitimate, but it exposed two latent bugs in the
+ * transit clock — see `fallStartedAtMs` there.
  *
  * The trail was re-tuned separately after the ribbon was replaced by this
  * gold-dust field at the owner's request, and these are their approved dust

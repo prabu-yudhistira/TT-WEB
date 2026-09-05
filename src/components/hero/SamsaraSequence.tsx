@@ -216,6 +216,23 @@ export function SamsaraSequence({
     // ── state that lives for one run of the sequence ──────────────────
     let promoted = false
     let promotedAtMs = 0
+    /**
+     * When the scripted fall actually BEGAN — the first frame past the seam.
+     *
+     * ⚠️ Not the same instant as `promotedAtMs`, and conflating the two was a
+     * bug. The fall starts the moment the seam block runs; the promotion can
+     * defer behind `hasClearedLogo` for hundreds of ms. Anchoring the transit
+     * clock to the promotion made the fall's progress depend on a value that is
+     * 0 on a fresh load — so the fall advanced before it had started — and
+     * STALE after a demote, where `tMs` restarts and `tMs - promotedAtMs` goes
+     * negative and clamps the fall to its own first frame forever. That is why
+     * the sequence played correctly exactly once per page load and dropped
+     * SAMSARA at the back wall on every replay after it.
+     *
+     * -1, not 0: 0 is a legitimate `tMs`, and the seam must be able to tell
+     * "not started" from "started on frame zero".
+     */
+    let fallStartedAtMs = -1
     let startSizePx = 0
     let sweepFrom = 0
     let sweepBy = 0
@@ -345,6 +362,11 @@ export function SamsaraSequence({
 
     const demote = (eng: MascotEngine) => {
       promoted = false
+      // ⚠️ Both clocks go back with it. Left standing, they are read on the NEXT
+      // run — before they are written again — and a stale anchor is what made
+      // the replay differ from the first play at all.
+      promotedAtMs = 0
+      fallStartedAtMs = -1
       sweepSettled = false
       sweepArmed = false
       const root = rootElRef.current
@@ -644,7 +666,19 @@ export function SamsaraSequence({
         // the far point by the override. Read rather than recomputed on purpose:
         // a second copy of the depth-cue formula would make the seam depend on
         // two expressions agreeing, and this one cannot disagree with itself.
-        startSizePx = eng.getOrbitFrame().diameterPx
+        //
+        // ⚠️ ONCE, on the first frame past the seam — NEVER re-read while the
+        // promotion is deferred. This block runs every frame until the guard
+        // below lets go, but by the second of them the fall has already put the
+        // engine in `transit`, so `diameterPx` stops being an orbit frame and
+        // becomes the engine reporting back the scripted size that this very
+        // value computes. That loop inflated it 12px -> 408px over ~900ms and
+        // walked `zBack` from -89 to -60 — invisible while the guard passed on
+        // the first frame, which it did until the orbit was lowered.
+        if (fallStartedAtMs < 0) {
+          startSizePx = eng.getOrbitFrame().diameterPx
+          fallStartedAtMs = tMs
+        }
         const seamCtx = buildCtx(eng)
         if (!seamCtx) {
           raf = requestAnimationFrame(frame)
@@ -677,7 +711,9 @@ export function SamsaraSequence({
         raf = requestAnimationFrame(frame)
         return
       }
-      // ⚠️ The transit clock starts at the PROMOTION, not at HALF_ORBIT_MS.
+      // ⚠️ The transit clock starts at the SEAM, not at HALF_ORBIT_MS — and not
+      // at the promotion, which is a different instant whenever the clearance
+      // guard defers (see `fallStartedAtMs`).
       //
       // Those are not the same instant. The sweep ends on the first frame where
       // `tMs >= half`, one more frame goes to settling the angle on the far
@@ -693,7 +729,7 @@ export function SamsaraSequence({
       const t01 =
         mode === 'landed' || mode === 'exiting'
           ? 1
-          : clamp01((tMs - promotedAtMs) / Math.max(1, total - promotedAtMs))
+          : clamp01((tMs - fallStartedAtMs) / Math.max(1, total - fallStartedAtMs))
       const pose = transitPoseAt(t01, ctx)
       let x = pose.x
       let y = pose.y

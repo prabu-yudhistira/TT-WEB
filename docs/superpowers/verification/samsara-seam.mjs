@@ -40,8 +40,14 @@ const TOL_PX = 1
 
 /**
  * ⚠️ Must track `LANDING.SIZE_FRAC` / `MOBILE_SIZE_FRAC` in
- * src/lib/samsara/types.ts — owner-approved 0.455 and 0.35 (2026-09-01, third
- * tuning pass; the desktop fraction moved again after the HiDPI canvas fix).
+ * src/lib/samsara/types.ts — owner-approved 0.455 and 0.33 (portrait retuned
+ * 0.35 -> 0.33 on 2026-09-05, mobile tuning pass; desktop unchanged since the
+ * 2026-09-01 pass that moved it after the HiDPI canvas fix).
+ *
+ * It drifted exactly as the note below predicted: the portrait check failed
+ * alone and read as a mobile seam bug, while the seam itself was continuous to
+ * 0.000px. Check this constant against types.ts BEFORE debugging a lone
+ * portrait failure here.
  *
  * ⚠️ TWO values, not one. They were both 0.4 when this file was written, so a
  * single constant happened to work; the owner set them independently at the
@@ -54,7 +60,7 @@ const TOL_PX = 1
  * this asserts is that the LIVE PAGE actually arrives there.
  */
 const LANDED_SIZE_FRAC = 0.455
-const LANDED_SIZE_FRAC_MOBILE = 0.35
+const LANDED_SIZE_FRAC_MOBILE = 0.33
 /** Matches the engine's own split — see MascotEngine.sizePx(). */
 const MOBILE_MAX_W = 640
 
