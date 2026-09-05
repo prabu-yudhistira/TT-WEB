@@ -415,7 +415,7 @@ export class MascotEngine {
       // less would measure a scene that never ships.
       if (on) {
         this.setMode('room')
-        this.setCameraMode('perspective', roomCameraFor(this.roomCfg, this.H))
+        this.setCameraMode('perspective', roomCameraFor(this.roomCfg, this.H, this.isMobileViewport()))
         this.setTransform({ x: this.W * 0.72, y: this.H * 0.52, sizePx: this.H * 0.4, z: 0 })
       } else {
         this.setCameraMode('ortho')

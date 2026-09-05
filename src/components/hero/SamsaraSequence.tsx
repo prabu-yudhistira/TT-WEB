@@ -309,7 +309,7 @@ export function SamsaraSequence({
      * would let the bench show a framing the real transition does not use.
      */
     const solveCamera = (ctx: TransitContext) => {
-      const cam = roomCameraFor(ctx.cfg.ROOM, ctx.H)
+      const cam = roomCameraFor(ctx.cfg.ROOM, ctx.H, ctx.mobile)
       cameraDistance = cam.distance
       // SAMSARA enters at the BACK of the room and comes forward with every
       // bounce (spec §5.6, §6.3). Held off the back wall by its own world radius

@@ -68,4 +68,15 @@ export const MOBILE_PATHS: Readonly<Record<string, string>> = {
   'HOLOGRAM.W_FRAC': 'HOLOGRAM.MOBILE_W_FRAC',
   'HOLOGRAM.X_FRAC': 'HOLOGRAM.MOBILE_X_FRAC',
   'HOLOGRAM.Y_FRAC': 'HOLOGRAM.MOBILE_Y_FRAC',
+
+  /**
+   * ⚠️ The LENS is a pair too, added 2026-09-05 — this is the one that was
+   * NOT obviously a pair, because `EMITTERS.SIZE_FRAC`/`HOLOGRAM.W_FRAC`
+   * already looked correctly split. FOV is not a position or a size; it is
+   * the ZOOM for the whole 3D scene, and `ROOM` carried no split of any kind.
+   * Measured, not assumed: `ROOM.DEPTH` is pixel-invariant by design, but 15°
+   * of FOV moved the hologram 10px and the orb 2px on a 1440-wide frame — a
+   * real, shared lever with no portrait answer of its own.
+   */
+  'ROOM.CAMERA_FOV_DEG': 'ROOM.MOBILE_CAMERA_FOV_DEG',
 }

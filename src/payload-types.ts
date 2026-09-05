@@ -1509,9 +1509,13 @@ export interface SamsaraSequence {
      */
     fogDensity?: number | null;
     /**
-     * Changing this moves the camera to keep the landed size identical, so it changes how deep the room LOOKS rather than how big SAMSARA is.
+     * Changing this moves the camera to keep the landed size identical, so it changes how deep the room LOOKS rather than how big SAMSARA is. It DOES change the size of the orbs and the holographic screen, which are not re-solved the way the landed pose is.
      */
     cameraFovDeg?: number | null;
+    /**
+     * PORTRAIT lens. Split on 2026-09-05 — this is the value that was moving the orbs and the screen when tuning desktop with the phone simulated. Starts equal to the desktop lens.
+     */
+    mobileCameraFovDeg?: number | null;
     /**
      * The room’s world-unit SCALE, not its apparent size. The camera is solved from it, so changing this pulls the camera back by the same factor and the picture does not change. To push the floor and walls out of shot, use Surface extent below.
      */
@@ -2426,6 +2430,7 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         ambientIntensity?: T;
         fogDensity?: T;
         cameraFovDeg?: T;
+        mobileCameraFovDeg?: T;
         depth?: T;
         extent?: T;
         mascotTintColor?: T;

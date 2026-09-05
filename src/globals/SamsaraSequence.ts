@@ -505,7 +505,18 @@ export const SamsaraSequence: GlobalConfig = {
           max: 100,
           admin: {
             description:
-              'Changing this moves the camera to keep the landed size identical, so it changes how deep the room LOOKS rather than how big SAMSARA is.',
+              'Changing this moves the camera to keep the landed size identical, so it changes how deep the room LOOKS rather than how big SAMSARA is. It DOES change the size of the orbs and the holographic screen, which are not re-solved the way the landed pose is.',
+          },
+        },
+        {
+          name: 'mobileCameraFovDeg',
+          type: 'number',
+          defaultValue: d.ROOM.MOBILE_CAMERA_FOV_DEG,
+          min: 8,
+          max: 100,
+          admin: {
+            description:
+              'PORTRAIT lens. Split on 2026-09-05 — this is the value that was moving the orbs and the screen when tuning desktop with the phone simulated. Starts equal to the desktop lens.',
           },
         },
         {

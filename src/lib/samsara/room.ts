@@ -67,8 +67,8 @@ export const ROOM_HEIGHT_FACTOR = 1.1
  * every frame, so any distance reproduces the pixel pose. That is what frees
  * this one to serve composition.
  */
-export function roomCameraFor(cfg: RoomConfig, viewportH: number) {
-  const fovDeg = cfg.CAMERA_FOV_DEG
+export function roomCameraFor(cfg: RoomConfig, viewportH: number, mobile = false) {
+  const fovDeg = mobile ? cfg.MOBILE_CAMERA_FOV_DEG : cfg.CAMERA_FOV_DEG
   const { distance } = solveHandoff(viewportH, cfg.DEPTH * ROOM_HEIGHT_FACTOR, viewportH, fovDeg)
   return { fovDeg, distance }
 }

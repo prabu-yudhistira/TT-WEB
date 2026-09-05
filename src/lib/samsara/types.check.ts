@@ -113,6 +113,10 @@ check('exit is quicker than the fall', DEFAULT_SEQUENCE.EXIT_MS < DEFAULT_SEQUEN
 
 // ── room ────────────────────────────────────────────────────────────
 check('room camera fov is sane', DEFAULT_SEQUENCE.ROOM.CAMERA_FOV_DEG > 10 && DEFAULT_SEQUENCE.ROOM.CAMERA_FOV_DEG < 120)
+check(
+  'and so is the portrait lens',
+  DEFAULT_SEQUENCE.ROOM.MOBILE_CAMERA_FOV_DEG > 10 && DEFAULT_SEQUENCE.ROOM.MOBILE_CAMERA_FOV_DEG < 120,
+)
 check('room has depth to fall into', DEFAULT_SEQUENCE.ROOM.DEPTH > 0)
 const HEX = /^#[0-9A-F]{6}$/
 // Every stored colour on this project is UPPERCASE hex — the admin colour

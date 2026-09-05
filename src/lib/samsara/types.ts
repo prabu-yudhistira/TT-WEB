@@ -163,6 +163,23 @@ export type RoomConfig = {
   AMBIENT_INTENSITY: number
   FOG_DENSITY: number
   CAMERA_FOV_DEG: number
+  /**
+   * The same, in PORTRAIT. Split on 2026-09-05 after the owner noticed the
+   * orbs and the hologram changing SIZE while tuning desktop with the phone
+   * simulated.
+   *
+   * ⚠️ Confirmed as the actual lever, not assumed. `ROOM.DEPTH` is
+   * pixel-invariant BY DESIGN (`roomCameraFor`'s own comment; measured: 90 ->
+   * 150 moved the hologram 0px). FOV is not — measured 20° -> 35° on the same
+   * scene moved the hologram 818px -> 808px and the orb 10px -> 12px. It is
+   * the zoom for the WHOLE 3D scene, and ROOM had no split of any kind, so
+   * that zoom was one value for both viewports.
+   *
+   * Whether portrait actually wants a different number is an open question —
+   * it starts equal to landscape's, since nobody has looked at a phone with
+   * this split available yet.
+   */
+  MOBILE_CAMERA_FOV_DEG: number
   /** Room depth in world units — how far back SAMSARA falls. */
   DEPTH: number
 
@@ -835,6 +852,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     AMBIENT_INTENSITY: 0.78,
     FOG_DENSITY: 0.035,
     CAMERA_FOV_DEG: 20,
+    MOBILE_CAMERA_FOV_DEG: 20,
     DEPTH: 90,
     EXTENT: 12,
 

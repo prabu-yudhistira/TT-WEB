@@ -142,6 +142,7 @@ check(
       AMBIENT_INTENSITY: 0.77,
       FOG_DENSITY: 0.061,
       CAMERA_FOV_DEG: 41,
+      MOBILE_CAMERA_FOV_DEG: 27,
       DEPTH: 33,
       EXTENT: 2.5,
       MASCOT_TINT_COLOR: '#556677',
