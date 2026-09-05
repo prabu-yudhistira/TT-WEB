@@ -98,6 +98,23 @@ export type LandingConfig = {
   ROT_X_DEG: number
   ROT_Y_DEG: number
   ROT_Z_DEG: number
+
+  /**
+   * The parked orientation in PORTRAIT, which is a different pose and not a
+   * smaller one.
+   *
+   * ⚠️ Split on 2026-09-05, after one value had to serve both and could not.
+   * Landscape parks SAMSARA at X_FRAC 0.82 — off to the right — where a yaw
+   * turns the face back toward the centre of the composition. Portrait parks
+   * it at 0.5, dead centre, where the same yaw turns it AWAY from a visitor it
+   * was already facing. The owner tuned the pose on a phone, the shared value
+   * carried the phone's answer to the desktop, and the desktop's three-quarter
+   * view was gone. Geometry, not taste: the two positions cannot share a
+   * facing.
+   */
+  MOBILE_ROT_X_DEG: number
+  MOBILE_ROT_Y_DEG: number
+  MOBILE_ROT_Z_DEG: number
 }
 
 /**
@@ -420,6 +437,19 @@ export type EmittersConfig = {
    */
   NEAR_ROT: OrbRotConfig
   FAR_ROT: OrbRotConfig
+  /**
+   * The same, in PORTRAIT. Split alongside LANDING's pose on 2026-09-05 and
+   * for the same reason: the far orb parks at X_FRAC 0.57 in landscape and
+   * 0.88 in portrait — opposite sides of the composition — so which way it
+   * faces is a property of where it sits, not of the machine.
+   *
+   * ⚠️ These START equal to their landscape twins rather than at the value
+   * the phone pass produced, EXCEPT where the owner actually moved one. A
+   * portrait default invented to look different would be a number nobody has
+   * ever seen on a phone.
+   */
+  MOBILE_NEAR_ROT: OrbRotConfig
+  MOBILE_FAR_ROT: OrbRotConfig
 
   /**
    * The four steam ports, in ORB RADII. Mirrored on X and Z — see portOffsets.
@@ -778,11 +808,18 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     HOVER_BOB_PX: 8,
     HOVER_BOB_MS: 2500,
 
-    // Frontal and level. The owner parks it for real at the bench — this is
-    // that pass: face-on, tipped back 17° so the display catches the key light.
-    ROT_X_DEG: 17,
-    ROT_Y_DEG: 0,
-    ROT_Z_DEG: 0,
+    // Landscape: parked right of centre, so it turns back toward the
+    // composition. RESTORED on 2026-09-05 — the phone pass had overwritten
+    // this with portrait's frontal pose while the two shared one value.
+    ROT_X_DEG: -5,
+    ROT_Y_DEG: -34,
+    ROT_Z_DEG: -7,
+    // Portrait: parked dead centre, already facing the visitor, so no yaw at
+    // all — just tipped back so the display catches the key light. The owner's
+    // phone pass, now able to keep its own answer.
+    MOBILE_ROT_X_DEG: 17,
+    MOBILE_ROT_Y_DEG: 0,
+    MOBILE_ROT_Z_DEG: 0,
   },
 
   ROOM: {
@@ -932,7 +969,13 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     LENS_Z: 0,
     SHOW_PORTS: false,
     NEAR_ROT: { X_DEG: 13, Y_DEG: 161, Z_DEG: 23 },
-    FAR_ROT: { X_DEG: 33, Y_DEG: -19, Z_DEG: 14 },
+    // RESTORED — the phone pass moved this while the two viewports shared it.
+    FAR_ROT: { X_DEG: 31, Y_DEG: -21, Z_DEG: 7 },
+    // Portrait. NEAR starts equal to landscape (the owner never moved it on a
+    // phone, so there is no portrait answer to record yet); FAR carries the
+    // value the phone pass actually produced.
+    MOBILE_NEAR_ROT: { X_DEG: 13, Y_DEG: 161, Z_DEG: 23 },
+    MOBILE_FAR_ROT: { X_DEG: 33, Y_DEG: -19, Z_DEG: 14 },
     ENTRY_MS: 1600,
     ENTRY_STAGGER_MS: 200,
     BOB_AMP: 0.08,

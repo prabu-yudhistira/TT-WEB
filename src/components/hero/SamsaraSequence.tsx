@@ -931,11 +931,19 @@ export function SamsaraSequence({
   useEffect(() => {
     ctrlRef.current?.setConfig(config)
     engine?.setRoomConfig(config.ROOM)
-    engine?.setRoomPose({
-      x: config.LANDING.ROT_X_DEG,
-      y: config.LANDING.ROT_Y_DEG,
-      z: config.LANDING.ROT_Z_DEG,
-    })
+    // Both viewports' poses; the engine picks per frame — see setRoomPose.
+    engine?.setRoomPose(
+      {
+        x: config.LANDING.ROT_X_DEG,
+        y: config.LANDING.ROT_Y_DEG,
+        z: config.LANDING.ROT_Z_DEG,
+      },
+      {
+        x: config.LANDING.MOBILE_ROT_X_DEG,
+        y: config.LANDING.MOBILE_ROT_Y_DEG,
+        z: config.LANDING.MOBILE_ROT_Z_DEG,
+      },
+    )
     engine?.setDragConfig(config.DRAG)
     // Same number the press uses, so the cursor never promises a target the
     // press would miss, nor misses one the press would take.

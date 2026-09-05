@@ -693,6 +693,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
     bob: number,
     clock: number,
     cfg: SequenceConfig,
+    ctx: OrbCtx,
   ) => {
     const puffs = smoke[i].sample(clock, cfg.EMITTERS)
     const pos = smokeGeo[i].getAttribute('position') as THREE.BufferAttribute
@@ -713,7 +714,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
        * three numbers the mesh is given. A plume that did not rotate with the
        * body would pour out of empty space beside it.
        */
-      const q = rotateLocal([p.x, p.y, p.z], orbRot(slot, cfg.EMITTERS))
+      const q = rotateLocal([p.x, p.y, p.z], orbRot(slot, cfg.EMITTERS, ctx))
       pos.setXYZ(
         k,
         pose.x + q[0] * pose.radius,
@@ -788,7 +789,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         // BOB_AMP is in orb radii; no bob during entry, or the arrival wobbles.
         const bob = phase === 'entering' ? 0 : orbBobY(slot, a.parkedMs, cfg.EMITTERS) * pose.radius
 
-        const rot = orbRot(slot, cfg.EMITTERS)
+        const rot = orbRot(slot, cfg.EMITTERS, ctx)
 
         /**
          * The press-and-hold wobble, on the SCREEN'S axes.
@@ -824,7 +825,7 @@ export function createEmitterScene(orbModel: THREE.Object3D): EmitterScene {
         orbs[i].scale.setScalar(pose.radius)
 
         smoke[i].update(cfg.EMITTERS, mode, clock, a.dtMs)
-        writeSmoke(i, slot, pose, bob, clock, cfg)
+        writeSmoke(i, slot, pose, bob, clock, cfg, ctx)
 
         if (cfg.EMITTERS.SHOW_PORTS) {
           const locals = portOffsets(cfg.EMITTERS)

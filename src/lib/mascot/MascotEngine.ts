@@ -184,8 +184,15 @@ export class MascotEngine {
   private spinParked = false
 
   // ── the room's orientation, and turning it by hand ──────────────────
-  /** Parked orientation, radians. Pitch, yaw, roll. See LandingConfig. */
-  private roomPose = { x: 0, y: 0, z: 0 }
+  /**
+   * Parked orientation, radians. Pitch, yaw, roll. See LandingConfig.
+   *
+   * A getter, so the per-frame easing below reads whichever viewport is
+   * current without any of its callers having to know there are two.
+   */
+  private get roomPose() {
+    return this.isMobileViewport() ? this.roomPosePortrait : this.roomPoseLandscape
+  }
   /** What is actually drawn, easing toward roomPose so a park never snaps. */
   private posed = { x: 0, y: 0, z: 0 }
   private dragCfg: DragConfig = DEFAULT_SEQUENCE.DRAG
@@ -1453,11 +1460,29 @@ export class MascotEngine {
 
   // ── the room pose, and turning it by hand ───────────────────────────
 
-  /** The parked orientation, in DEGREES. See LandingConfig's ROT_*_DEG. */
-  setRoomPose(deg: { x: number; y: number; z: number }) {
+  /**
+   * The parked orientation, in DEGREES — BOTH viewports' answers.
+   *
+   * ⚠️ Takes the pair and chooses here, rather than letting the caller pick.
+   * The caller is a React effect that runs on CONFIG change; the viewport can
+   * change without it, so a pose resolved up there would keep the landscape
+   * facing on a window dragged narrow until something else happened to touch
+   * the config. Choosing per frame also means the bench's simulated phone gets
+   * the portrait pose through the same `isMobileViewport()` as everything
+   * else, with no extra plumbing.
+   */
+  setRoomPose(
+    landscape: { x: number; y: number; z: number },
+    portrait: { x: number; y: number; z: number },
+  ) {
     const R = Math.PI / 180
-    this.roomPose = { x: deg.x * R, y: deg.y * R, z: deg.z * R }
+    const rad = (d: { x: number; y: number; z: number }) => ({ x: d.x * R, y: d.y * R, z: d.z * R })
+    this.roomPoseLandscape = rad(landscape)
+    this.roomPosePortrait = rad(portrait)
   }
+
+  private roomPoseLandscape = { x: 0, y: 0, z: 0 }
+  private roomPosePortrait = { x: 0, y: 0, z: 0 }
 
   setDragConfig(cfg: DragConfig) {
     this.dragCfg = cfg

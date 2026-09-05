@@ -145,7 +145,7 @@ const port: OrbCtx = { W: 390, H: 844, mobile: true, roomDepth: 42, camZ: 30 }
   check('a 180 pitch puts the lens below the centre', lensSpun[1] < pose.y)
 
   check('the two orbs can be oriented independently',
-    orbRot('near', cfg) !== orbRot('far', cfg) ||
+    orbRot('near', cfg, land) !== orbRot('far', cfg, land) ||
       JSON.stringify(cfg.NEAR_ROT) === JSON.stringify(cfg.FAR_ROT))
 }
 

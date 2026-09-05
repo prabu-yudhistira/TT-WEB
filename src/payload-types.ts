@@ -1472,6 +1472,18 @@ export interface SamsaraSequence {
      * Roll — the head tilt.
      */
     rotZDeg?: number | null;
+    /**
+     * PORTRAIT pitch. A separate pose, not a smaller one: landscape parks SAMSARA off to the right and turns it back toward the composition, while portrait parks it dead centre where it already faces the visitor.
+     */
+    mobileRotXDeg?: number | null;
+    /**
+     * Portrait yaw. Usually 0 — centred, it is already facing you.
+     */
+    mobileRotYDeg?: number | null;
+    /**
+     * Portrait roll.
+     */
+    mobileRotZDeg?: number | null;
   };
   /**
    * Graphite on black: the Atelier drawing language inverted. The Section 2 block reads the background colour from here too, so the DOM behind the 3D layer always matches.
@@ -1741,6 +1753,22 @@ export interface SamsaraSequence {
      * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
      */
     farRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    mobileNearRot?: {
+      xDeg?: number | null;
+      yDeg?: number | null;
+      zDeg?: number | null;
+    };
+    /**
+     * Pitch, yaw and roll in degrees. The four afterburners and the projector lens are part of the body, so they turn with it — the smoke follows.
+     */
+    mobileFarRot?: {
       xDeg?: number | null;
       yDeg?: number | null;
       zDeg?: number | null;
@@ -2383,6 +2411,9 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
         rotXDeg?: T;
         rotYDeg?: T;
         rotZDeg?: T;
+        mobileRotXDeg?: T;
+        mobileRotYDeg?: T;
+        mobileRotZDeg?: T;
       };
   room?:
     | T
@@ -2507,6 +2538,20 @@ export interface SamsaraSequenceSelect<T extends boolean = true> {
               zDeg?: T;
             };
         farRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
+            };
+        mobileNearRot?:
+          | T
+          | {
+              xDeg?: T;
+              yDeg?: T;
+              zDeg?: T;
+            };
+        mobileFarRot?:
           | T
           | {
               xDeg?: T;

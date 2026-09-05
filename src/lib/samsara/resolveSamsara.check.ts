@@ -129,6 +129,9 @@ check(
       ROT_X_DEG: 11,
       ROT_Y_DEG: -21,
       ROT_Z_DEG: 6,
+      MOBILE_ROT_X_DEG: -13,
+      MOBILE_ROT_Y_DEG: 29,
+      MOBILE_ROT_Z_DEG: -8,
     },
     ROOM: {
       BG_COLOR: '#112233',
@@ -219,6 +222,8 @@ check(
       SHOW_PORTS: true,
       NEAR_ROT: { X_DEG: 7, Y_DEG: -23, Z_DEG: 4 },
       FAR_ROT: { X_DEG: -11, Y_DEG: 31, Z_DEG: -6 },
+      MOBILE_NEAR_ROT: { X_DEG: -17, Y_DEG: 143, Z_DEG: 31 },
+      MOBILE_FAR_ROT: { X_DEG: 24, Y_DEG: -37, Z_DEG: 19 },
       ENTRY_MS: 1850,
       ENTRY_STAGGER_MS: 410,
       BOB_AMP: 0.11,

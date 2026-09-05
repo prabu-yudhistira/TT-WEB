@@ -428,6 +428,33 @@ export const SamsaraSequence: GlobalConfig = {
           max: 90,
           admin: { description: 'Roll — the head tilt.' },
         },
+        {
+          name: 'mobileRotXDeg',
+          type: 'number',
+          defaultValue: d.LANDING.MOBILE_ROT_X_DEG,
+          min: -90,
+          max: 90,
+          admin: {
+            description:
+              'PORTRAIT pitch. A separate pose, not a smaller one: landscape parks SAMSARA off to the right and turns it back toward the composition, while portrait parks it dead centre where it already faces the visitor.',
+          },
+        },
+        {
+          name: 'mobileRotYDeg',
+          type: 'number',
+          defaultValue: d.LANDING.MOBILE_ROT_Y_DEG,
+          min: -180,
+          max: 180,
+          admin: { description: 'Portrait yaw. Usually 0 — centred, it is already facing you.' },
+        },
+        {
+          name: 'mobileRotZDeg',
+          type: 'number',
+          defaultValue: d.LANDING.MOBILE_ROT_Z_DEG,
+          min: -90,
+          max: 90,
+          admin: { description: 'Portrait roll.' },
+        },
       ],
     },
 
@@ -850,6 +877,11 @@ export const SamsaraSequence: GlobalConfig = {
         },
         orbRotGroup('nearRot', 'Near orb — parked orientation', d.EMITTERS.NEAR_ROT),
         orbRotGroup('farRot', 'Far orb — parked orientation', d.EMITTERS.FAR_ROT),
+        // Portrait puts the far orb on the opposite side of the frame
+        // (X_FRAC 0.57 vs 0.88), so which way it faces is a property of where
+        // it sits rather than of the machine — hence its own pair.
+        orbRotGroup('mobileNearRot', 'Near orb — parked orientation (portrait)', d.EMITTERS.MOBILE_NEAR_ROT),
+        orbRotGroup('mobileFarRot', 'Far orb — parked orientation (portrait)', d.EMITTERS.MOBILE_FAR_ROT),
         {
           name: 'entryMs',
           type: 'number',

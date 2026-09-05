@@ -56,6 +56,9 @@ export type SamsaraSequenceInput = {
     mobileYFrac?: number | null
     hoverBobPx?: number | null
     hoverBobMs?: number | null
+    mobileRotXDeg?: number | null
+    mobileRotYDeg?: number | null
+    mobileRotZDeg?: number | null
     rotXDeg?: number | null
     rotYDeg?: number | null
     rotZDeg?: number | null
@@ -126,6 +129,8 @@ export type SamsaraSequenceInput = {
     showPorts?: boolean | null
     nearRot?: OrbRotCms
     farRot?: OrbRotCms
+    mobileNearRot?: OrbRotCms
+    mobileFarRot?: OrbRotCms
     entryMs?: number | null
     entryStaggerMs?: number | null
     bobAmp?: number | null
@@ -329,6 +334,9 @@ export function resolveSamsara(
       ROT_X_DEG: num(l.rotXDeg, d.LANDING.ROT_X_DEG),
       ROT_Y_DEG: num(l.rotYDeg, d.LANDING.ROT_Y_DEG),
       ROT_Z_DEG: num(l.rotZDeg, d.LANDING.ROT_Z_DEG),
+      MOBILE_ROT_X_DEG: num(l.mobileRotXDeg, d.LANDING.MOBILE_ROT_X_DEG),
+      MOBILE_ROT_Y_DEG: num(l.mobileRotYDeg, d.LANDING.MOBILE_ROT_Y_DEG),
+      MOBILE_ROT_Z_DEG: num(l.mobileRotZDeg, d.LANDING.MOBILE_ROT_Z_DEG),
     },
 
     ROOM: {
@@ -409,6 +417,8 @@ export function resolveSamsara(
       SHOW_PORTS: bool(em.showPorts, d.EMITTERS.SHOW_PORTS),
       NEAR_ROT: rot(em.nearRot, d.EMITTERS.NEAR_ROT),
       FAR_ROT: rot(em.farRot, d.EMITTERS.FAR_ROT),
+      MOBILE_NEAR_ROT: rot(em.mobileNearRot, d.EMITTERS.MOBILE_NEAR_ROT),
+      MOBILE_FAR_ROT: rot(em.mobileFarRot, d.EMITTERS.MOBILE_FAR_ROT),
       ENTRY_MS: num(em.entryMs, d.EMITTERS.ENTRY_MS),
       ENTRY_STAGGER_MS: num(em.entryStaggerMs, d.EMITTERS.ENTRY_STAGGER_MS),
       BOB_AMP: num(em.bobAmp, d.EMITTERS.BOB_AMP),
@@ -524,6 +534,9 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       rotXDeg: c.LANDING.ROT_X_DEG,
       rotYDeg: c.LANDING.ROT_Y_DEG,
       rotZDeg: c.LANDING.ROT_Z_DEG,
+      mobileRotXDeg: c.LANDING.MOBILE_ROT_X_DEG,
+      mobileRotYDeg: c.LANDING.MOBILE_ROT_Y_DEG,
+      mobileRotZDeg: c.LANDING.MOBILE_ROT_Z_DEG,
     },
     room: {
       bgColor: c.ROOM.BG_COLOR,
@@ -591,6 +604,8 @@ export function toSamsaraPayload(c: SequenceConfig): SamsaraSequenceInput {
       showPorts: c.EMITTERS.SHOW_PORTS,
       nearRot: { xDeg: c.EMITTERS.NEAR_ROT.X_DEG, yDeg: c.EMITTERS.NEAR_ROT.Y_DEG, zDeg: c.EMITTERS.NEAR_ROT.Z_DEG },
       farRot: { xDeg: c.EMITTERS.FAR_ROT.X_DEG, yDeg: c.EMITTERS.FAR_ROT.Y_DEG, zDeg: c.EMITTERS.FAR_ROT.Z_DEG },
+      mobileNearRot: { xDeg: c.EMITTERS.MOBILE_NEAR_ROT.X_DEG, yDeg: c.EMITTERS.MOBILE_NEAR_ROT.Y_DEG, zDeg: c.EMITTERS.MOBILE_NEAR_ROT.Z_DEG },
+      mobileFarRot: { xDeg: c.EMITTERS.MOBILE_FAR_ROT.X_DEG, yDeg: c.EMITTERS.MOBILE_FAR_ROT.Y_DEG, zDeg: c.EMITTERS.MOBILE_FAR_ROT.Z_DEG },
       entryMs: c.EMITTERS.ENTRY_MS,
       entryStaggerMs: c.EMITTERS.ENTRY_STAGGER_MS,
       bobAmp: c.EMITTERS.BOB_AMP,

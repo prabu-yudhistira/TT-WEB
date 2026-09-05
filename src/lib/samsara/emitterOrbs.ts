@@ -134,9 +134,23 @@ export function orbBobY(slot: OrbSlot, tMs: number, cfg: EmittersConfig): number
   return Math.sin((tMs / cfg.BOB_MS) * Math.PI * 2 + phase) * cfg.BOB_AMP
 }
 
-/** The parked orientation for a slot. Shared across landscape and portrait. */
-export function orbRot(slot: OrbSlot, cfg: EmittersConfig): OrbRotConfig {
-  return slot === 'near' ? cfg.NEAR_ROT : cfg.FAR_ROT
+/**
+ * The parked orientation for a slot, per viewport.
+ *
+ * ⚠️ Took a `ctx` on 2026-09-05, and the signature change IS the fix. It used
+ * to read NEAR_ROT/FAR_ROT unconditionally — "shared across landscape and
+ * portrait" — so the orbs faced the same way at both, even though FAR parks on
+ * opposite sides of the frame (X_FRAC 0.57 vs 0.88). Tuning the facing on a
+ * phone therefore turned the desktop's orbs too.
+ */
+export function orbRot(slot: OrbSlot, cfg: EmittersConfig, ctx: OrbCtx): OrbRotConfig {
+  return ctx.mobile
+    ? slot === 'near'
+      ? cfg.MOBILE_NEAR_ROT
+      : cfg.MOBILE_FAR_ROT
+    : slot === 'near'
+      ? cfg.NEAR_ROT
+      : cfg.FAR_ROT
 }
 
 const D2R = Math.PI / 180
