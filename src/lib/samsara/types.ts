@@ -774,7 +774,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     X_FRAC: 0.82,
     Y_FRAC: 0.555,
     MOBILE_X_FRAC: 0.5,
-    MOBILE_Y_FRAC: 0.28,
+    MOBILE_Y_FRAC: 0.31,
     HOVER_BOB_PX: 8,
     HOVER_BOB_MS: 2500,
 
@@ -973,31 +973,35 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   HOLOGRAM: {
     W_FRAC: 0.665,
     /**
-     * ⚠️ NO LONGER THE ARTWORK'S OWN ASPECT, and that is a deliberate override
-     * with a visible cost. panel2.png is 1672x941 = 1.7768; drawing it into a
-     * 1.469 frame stretches it VERTICALLY by 1.7768/1.469 = 1.21x, so the
-     * dashed circle in the art is now a 21%-tall ellipse.
+     * ⚠️ NOT the artwork's own aspect, deliberately — but only just.
      *
-     * Set by the owner on 2026-09-05 while tuning portrait, where the screen
-     * had to be taller. There is no height control to reach for — h follows w
-     * and this number (which is why MOBILE_H_FRAC does not exist) — so this is
-     * the only lever that makes the panel taller, and it is SHARED: landscape
-     * is stretched by the same 1.21x.
+     * panel2.png is 1672x941 = 1.7768, and h follows w and this number, so
+     * anything below 1.7768 draws the art into a frame taller than it was
+     * made for and stretches it VERTICALLY by 1.7768/PANEL_ASPECT. At 1.704
+     * that is 1.043 — a 4.3% tallening, which is inside what the eye reads as
+     * the same drawing.
      *
-     * If the ellipse is not wanted, the fix is new artwork at the taller
-     * aspect, not a smaller number here. Reverting to 1.7768 restores the
-     * drawing exactly and returns the panel to its original proportions.
+     * The value went to 1.469 first (a 21% stretch, the dashed circle visibly
+     * an ellipse) and was pulled back here on the same day once the distortion
+     * was pointed out. Both passes were reaching for the same thing: portrait
+     * wants a TALLER screen and there is no height control to reach for —
+     * which is exactly why MOBILE_H_FRAC does not exist. This is the only
+     * lever, and it is SHARED, so landscape wears the same 4.3%.
+     *
+     * ⚠️ Treat 1.7768 as the floor of honesty, not a target to drift from. If
+     * portrait ever needs materially more height than this, the fix is new
+     * artwork drawn at that aspect — not a smaller number here.
      */
-    PANEL_ASPECT: 1.469,
+    PANEL_ASPECT: 1.704,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
     // ⚠️ Past 1.0 — the portrait screen is now WIDER than the viewport, so its
     // left and right edges sit off-frame. Owner-set at the phone bench: the
     // panel reads as a surface the room is looking through rather than a
     // rectangle floating inside it.
-    MOBILE_W_FRAC: 1.07,
+    MOBILE_W_FRAC: 1.035,
     MOBILE_X_FRAC: 0.5,
-    MOBILE_Y_FRAC: 0.695,
+    MOBILE_Y_FRAC: 0.72,
     FORM_MS: 1475,
     FLICKER_MS: 5300,
     FLICKER_DUR_MS: 360,
