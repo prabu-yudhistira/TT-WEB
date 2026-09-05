@@ -804,7 +804,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     X_FRAC: 0.82,
     Y_FRAC: 0.555,
     MOBILE_X_FRAC: 0.5,
-    MOBILE_Y_FRAC: 0.31,
+    MOBILE_Y_FRAC: 0.33,
     HOVER_BOB_PX: 8,
     HOVER_BOB_MS: 2500,
 
@@ -952,7 +952,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // looking at a phone, and it went to roughly half that — which is the
     // measure of how far a derived guess was off.
     MOBILE_SIZE_FRAC: 0.07,
-    NEAR: { X_FRAC: 0.12, Y_FRAC: 0.85, DEPTH_FRAC: 0.05 },
+    NEAR: { X_FRAC: 0.13, Y_FRAC: 0.84, DEPTH_FRAC: 0.02 },
     FAR: { X_FRAC: 0.57, Y_FRAC: 0.92, DEPTH_FRAC: 1.4 },
     // Portrait spreads the pair to the two bottom corners, where landscape
     // clusters them left. Owner-set on the phone bench, 2026-09-05.
@@ -1014,7 +1014,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
   },
 
   HOLOGRAM: {
-    W_FRAC: 0.665,
+    W_FRAC: 0.635,
     /**
      * ⚠️ NOT the artwork's own aspect, deliberately — but only just.
      *
@@ -1073,7 +1073,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     SHAFT_FADE: 1.35,
     SHAFT_CONTRAST: 2.2,
     SHAFT_BOUND: 1,
-    SHAFT_CORE: 0.7,
+    SHAFT_CORE: 0.71,
     SHAFT_TIP: 4.6,
     SHAFT_CORE_COLOR: '#FFF3D0',
     SHAFT_CORE_SPAN: 0.5,
