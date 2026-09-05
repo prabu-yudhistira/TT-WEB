@@ -147,12 +147,23 @@ export type MascotConfig = {
  * ABOVE the belt plane rather than a large body outside it.
  *
  * ⚠️ HEIGHT is load-bearing, not decorative. A positive height shifts the
- * mascot's depth by -HEIGHT*sin(TILT) — about -46px here — which biases it
- * consistently toward the viewer. That is the only reason the mascot never
+ * mascot's depth by -HEIGHT*sin(TILT) — about -46px at the original 136 —
+ * which biases it toward the viewer. That is the only reason the mascot never
  * sorts wrongly against a satellite bead despite orbiting INSIDE the bead band
  * (0.5–0.8) rather than outside it: measured 0.0% wrong-sorting over 420
- * samples at three viewports, with up to 13.6% of frames overlapping a bead.
- * Drop HEIGHT toward 0 or negative and that guarantee goes with it.
+ * samples at three viewports, AT HEIGHT 136. Drop HEIGHT toward 0 or negative
+ * and that guarantee goes with it.
+ *
+ * ⚠️ Lowered 136 -> 70 on 2026-09-05, owner's request: measured (projectOrbit,
+ * not guessed) the orbit's on-screen Y excursion against the satellite belt's
+ * own — at 136 the mascot's peak sat 94px above the belt's own highest point
+ * on desktop, and on mobile the mascot orbited ENTIRELY above the belt, never
+ * once overlapping it. 70 brings desktop's peak to ~36px above the belt (was
+ * 94) and puts most of the mobile orbit inside the belt's own band. This
+ * roughly HALVES the depth bias above (-24px at 70, not -46px) — the 420-
+ * sample sort-safety measurement was taken at 136 and has not been re-run at
+ * 70. Treat the sort-safety guarantee as unverified at this value, not
+ * re-proven, until it is.
  *
  * The trail was re-tuned separately after the ribbon was replaced by this
  * gold-dust field at the owner's request, and these are their approved dust
@@ -164,7 +175,7 @@ export const DEFAULT_MASCOT: Readonly<MascotConfig> = Object.freeze({
 
   RADIUS: 0.71,
   MOBILE_RADIUS: 0.55,
-  HEIGHT: 136,
+  HEIGHT: 70,
   TILT_OFFSET: 0,
   PHASE: 88,
   SPEED_SCALE: 0.52,

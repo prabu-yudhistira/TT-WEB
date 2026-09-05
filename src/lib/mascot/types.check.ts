@@ -68,7 +68,7 @@ inside('TRAIL_SECONDS', d.TRAIL_SECONDS, 0.05, 5)
 // The owner's approved values, pinned. A future drift should be a deliberate
 // act with the owner in the loop, not a silent diff.
 check('approved RADIUS', d.RADIUS === 0.71)
-check('approved HEIGHT', d.HEIGHT === 136)
+check('approved HEIGHT', d.HEIGHT === 70)
 check('approved SIZE', d.SIZE === 28)
 check('approved SPIN_SPEED', d.SPIN_SPEED === 113)
 check('approved SPEED_SCALE', d.SPEED_SCALE === 0.52)
