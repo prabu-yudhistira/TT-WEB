@@ -1378,7 +1378,7 @@ export class MascotEngine {
       orbitR: this.orbitR,
       innerR: this.innerR,
       angle: this.angle,
-      mobile: typeof window !== 'undefined' && window.innerWidth < 640,
+      mobile: this.isMobileViewport(),
       /**
        * The out-of-plane offset place() is CURRENTLY using — HEIGHT plus the
        * live bob, not HEIGHT alone.
@@ -1878,6 +1878,32 @@ export class MascotEngine {
   /** True once the orbs are loaded and their scene is in the graph. */
   hasEmitters(): boolean {
     return !!this.emitters
+  }
+
+  /**
+   * Force the landscape/portrait split, for the bench's simulated phone.
+   *
+   * ⚠️ NARROW ON PURPOSE. This reaches `getOrbitFrame().mobile` and nothing
+   * else — which is the transit's landing target (`LANDING.MOBILE_*`) and the
+   * logo box the arc is scripted against. It deliberately does NOT touch
+   * `sizePx()` or `layout()`, whose own comments explain why: SatelliteEngine
+   * keys its belt off `window.innerWidth` independently, and an engine that
+   * disagreed with it would put the mascot on a portrait orbit around a
+   * landscape belt. The bench's phone box is a SAMSARA-transition preview, not
+   * a full mobile hero.
+   *
+   * null restores the real window, which is what production always uses — no
+   * caller outside the bench sets this.
+   */
+  setMobileOverride(v: boolean | null) {
+    this.mobileOverride = v
+  }
+
+  private mobileOverride: boolean | null = null
+
+  private isMobileViewport(): boolean {
+    if (this.mobileOverride !== null) return this.mobileOverride
+    return typeof window !== 'undefined' && window.innerWidth < 640
   }
 
   /**

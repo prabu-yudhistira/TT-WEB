@@ -6,6 +6,7 @@ import { SatelliteField } from '@/components/hero/SatelliteField'
 import { MascotLayer } from '@/components/hero/MascotLayer'
 import { SamsaraSequence, type SequenceControls } from '@/components/hero/SamsaraSequence'
 import { DEFAULT_SEQUENCE, type SequenceConfig } from '@/lib/samsara/types'
+import { MOBILE_PATHS } from '@/lib/samsara/mobilePairs'
 import type { MascotEngine } from '@/lib/mascot/MascotEngine'
 import type { Mode } from '@/lib/samsara/SequenceController'
 import type { SatelliteConfig } from '@/lib/satellites/types'
@@ -90,12 +91,14 @@ const GROUPS: { title: string; note?: string; rows: Row[] }[] = [
     title: 'landing',
     note: 'owner: 40% of viewport height, right on desktop, upper area on mobile',
     rows: [
+      // ⚠️ The three MOBILE_ twins are NOT listed here. They are the same three
+      // controls at the other viewport, so the panel swaps these rows onto them
+      // in mobile mode (see MOBILE_PATHS). Listing both was how the owner ended
+      // up with six near-identical sliders and no indication which pair the
+      // render in front of them was actually reading.
       { kind: 'num', path: 'LANDING.SIZE_FRAC', label: 'Size × vh', min: 0.1, max: 0.9, step: 0.005 },
       { kind: 'num', path: 'LANDING.X_FRAC', label: 'Centre x × vw', min: 0, max: 1, step: 0.005 },
       { kind: 'num', path: 'LANDING.Y_FRAC', label: 'Centre y × vh', min: 0, max: 1, step: 0.005 },
-      { kind: 'num', path: 'LANDING.MOBILE_SIZE_FRAC', label: 'Mobile size × vh', min: 0.1, max: 0.9, step: 0.005 },
-      { kind: 'num', path: 'LANDING.MOBILE_X_FRAC', label: 'Mobile x × vw', min: 0, max: 1, step: 0.005 },
-      { kind: 'num', path: 'LANDING.MOBILE_Y_FRAC', label: 'Mobile y × vh', min: 0, max: 1, step: 0.005 },
       { kind: 'num', path: 'LANDING.HOVER_BOB_PX', label: 'Hover bob px', min: 0, max: 60, step: 0.5 },
       { kind: 'num', path: 'LANDING.HOVER_BOB_MS', label: 'Hover bob ms', min: 400, max: 9000, step: 50 },
     ],
@@ -449,6 +452,73 @@ export default function SamsaraLab({
   const [active, setActive] = useState(false)
   const [status, setStatus] = useState('loading…')
 
+  /**
+   * ── mobile tuning ────────────────────────────────────────────────
+   *
+   * Two ways in, ONE state. `narrow` is a genuinely small window — the honest
+   * case, where the engines read `window.innerWidth < 640` themselves and
+   * nothing is simulated. `simulatePhone` is the desktop-comfort case: a
+   * phone-shaped box with the split forced (see `viewportOverride`).
+   *
+   * Both land on `layout`, so what the panel EDITS is decided in one place.
+   * If they disagreed, the owner could be dragging a landscape slider while
+   * looking at a portrait render — the exact mix-up this whole change removes.
+   */
+  const [narrow, setNarrow] = useState(false)
+  const [simulatePhone, setSimulatePhone] = useState(false)
+  const layout: 'desktop' | 'mobile' = simulatePhone || narrow ? 'mobile' : 'desktop'
+
+  /**
+   * On a genuinely narrow window the docked panel is 310px of a 390px screen —
+   * it does not cover the scene so much as replace it. So it becomes a bottom
+   * sheet there, collapsed by default: you look, open it, drag, close it.
+   *
+   * ⚠️ Driven by `narrow`, NOT by `layout`. Simulating a phone on a desktop
+   * window is the case where there is plenty of room for the docked panel, and
+   * turning it into a sheet then would throw that room away.
+   */
+  const sheet = narrow
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  /**
+   * ⚠️ In an EFFECT, not a `useState` initialiser — there is no window during
+   * SSR, and a differing first value is a hydration mismatch. Same reason the
+   * dock preference above is read here rather than inline.
+   */
+  useEffect(() => {
+    const read = () => setNarrow(window.innerWidth < 640)
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
+  }, [])
+
+  /**
+   * The simulated phone's REAL size, measured rather than assumed.
+   *
+   * 390x844 is the target, but a laptop window shorter than that clamps the
+   * box — and the hologram places its screen as FRACTIONS of the viewport it
+   * is given. Feeding it 844 while rendering 700 would put the panel at
+   * fractions of a frame that is not on screen, which is a tuning session
+   * spent on numbers that do not transfer.
+   */
+  const phoneBoxRef = useRef<HTMLDivElement | null>(null)
+  const [phoneBox, setPhoneBox] = useState<{ W: number; H: number } | null>(null)
+  useEffect(() => {
+    const el = phoneBoxRef.current
+    if (!simulatePhone || !el) {
+      setPhoneBox(null)
+      return
+    }
+    const read = () => {
+      const r = el.getBoundingClientRect()
+      setPhoneBox({ W: Math.round(r.width), H: Math.round(r.height) })
+    }
+    read()
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [simulatePhone])
+
   const stageRef = useRef<HTMLDivElement>(null)
   const mascotRootRef = useRef<HTMLDivElement | null>(null)
   const controlsRef = useRef<SequenceControls | null>(null)
@@ -470,6 +540,19 @@ export default function SamsaraLab({
   const set = useCallback((path: string, value: unknown) => {
     setCfg((c) => setPath(c, path, value))
   }, [])
+
+  /**
+   * Which value a row actually edits right now.
+   *
+   * In mobile mode a row that HAS a portrait twin edits the twin; everything
+   * else — gestures, freeze, transit, room, shafts, smoke, poke — has one value
+   * for both viewports and is returned unchanged. One function, so read and
+   * write can never disagree about which of the two a slider is holding.
+   */
+  const pathFor = useCallback(
+    (path: string) => (layout === 'mobile' ? (MOBILE_PATHS[path] ?? path) : path),
+    [layout],
+  )
 
   // The bench has no video, so nothing else would ever arm the sequence.
   useEffect(() => {
@@ -522,6 +605,22 @@ export default function SamsaraLab({
   useEffect(() => {
     engine?.setSpinParked(parkSpin && (mode === 'landed' || mode === 'exiting'))
   }, [engine, parkSpin, mode])
+
+  /**
+   * Force the engine's landscape/portrait split while the phone is simulated.
+   *
+   * ⚠️ `null` when off, never `false`. false would PIN the engine to landscape
+   * and a genuinely narrow window would then render desktop values — turning
+   * the simulator off would break the honest path, which is the one case that
+   * has to keep working without this bench's help.
+   *
+   * This reaches the transit's landing target only; see setMobileOverride for
+   * why it deliberately stops short of the hero orbit's own split.
+   */
+  useEffect(() => {
+    engine?.setMobileOverride(simulatePhone ? true : null)
+    return () => engine?.setMobileOverride(null)
+  }, [engine, simulatePhone])
 
   /**
    * Any config value can be overridden from the query string, with dotted paths
@@ -623,12 +722,51 @@ export default function SamsaraLab({
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg, #F6F1E7)', position: 'relative' }}>
-      {/* THE STAGE. Mirrors the hero: relative, 100svh, overflow hidden, and
-          the three 3D layers in the hero's own DOM order. */}
+      {/* THE SIMULATED PHONE.
+
+          ⚠️ `transform: translateZ(0)` is the whole trick, and it is not a
+          rendering hint. A transformed element becomes the containing block for
+          `position: fixed` DESCENDANTS — and the landing promotes the mascot
+          canvas to `fixed; inset: 0`. Without this the room would escape the
+          box on the first beat and fill the desktop window while the engine
+          still believed it was 390px wide.
+
+          ⚠️ `display: contents` when off, so the desktop path renders through
+          exactly the DOM it always has. A wrapper that stayed in the layout
+          would be a second box between the page and the stage, live on every
+          bench visit, for a feature that is off. */}
       <div
-        ref={stageRef}
-        style={{ position: 'relative', minHeight: '100svh', overflow: 'hidden' }}
+        ref={phoneBoxRef}
+        style={
+          simulatePhone
+            ? {
+                position: 'relative',
+                width: 390,
+                // Clamped: a laptop window shorter than 844 gets a shorter
+                // phone rather than a box hanging off the screen. phoneBox
+                // MEASURES the result, so the ctx matches what is rendered.
+                height: 'min(844px, calc(100dvh - 32px))',
+                margin: '16px auto',
+                overflow: 'hidden',
+                transform: 'translateZ(0)',
+                border: '1px solid rgba(43,42,39,0.35)',
+                borderRadius: 12,
+                background: '#08080A',
+              }
+            : { display: 'contents' }
+        }
       >
+        {/* THE STAGE. Mirrors the hero: relative, 100svh, overflow hidden, and
+            the three 3D layers in the hero's own DOM order. */}
+        <div
+          ref={stageRef}
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            // 100svh is the WINDOW's, which overflows a clamped phone box.
+            ...(simulatePhone ? { height: '100%' } : { minHeight: '100svh' }),
+          }}
+        >
         <SatelliteField
           words={words}
           config={beltCfg}
@@ -677,6 +815,7 @@ export default function SamsaraLab({
         >
           DOM shake ±{shakePx}px
         </div>
+        </div>
       </div>
 
       <SamsaraSequence
@@ -693,6 +832,9 @@ export default function SamsaraLab({
         onPointerHold={setHoldEnabled}
         onMode={setMode}
         controlsRef={controlsRef}
+        /* The simulated phone, and only ever that — null on a real narrow
+           window, where the engines read the true viewport themselves. */
+        viewportOverride={simulatePhone && phoneBox ? { ...phoneBox, mobile: true } : null}
       />
 
       {/* SIBLING of the stage, deliberately — see the header. z-index is above
@@ -710,19 +852,34 @@ export default function SamsaraLab({
         data-lenis-prevent
         style={{
           position: 'fixed',
-          top: 16,
-          ...(dockRight ? { right: 16 } : { left: 16 }),
           zIndex: 100,
-          width: 310,
-          padding: '14px 16px',
           background: 'rgba(246,241,231,0.94)',
           border: '1px solid rgba(43,42,39,0.25)',
-          borderRadius: 4,
           font: '12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
           color: '#2B2A27',
-          maxHeight: 'calc(100dvh - 32px)',
-          overflowY: 'auto',
           overscrollBehavior: 'contain',
+          ...(sheet
+            ? {
+                left: 8,
+                right: 8,
+                bottom: 8,
+                padding: '10px 12px',
+                borderRadius: 8,
+                // Collapsed, the sheet is just its own header — the scene above
+                // it is the point, and a sheet that opened by default would
+                // cover the render on every reload.
+                maxHeight: sheetOpen ? '52dvh' : undefined,
+                overflowY: sheetOpen ? 'auto' : 'hidden',
+              }
+            : {
+                top: 16,
+                ...(dockRight ? { right: 16 } : { left: 16 }),
+                width: 310,
+                padding: '14px 16px',
+                borderRadius: 4,
+                maxHeight: 'calc(100dvh - 32px)',
+                overflowY: 'auto',
+              }),
         }}
       >
         <div
@@ -730,10 +887,31 @@ export default function SamsaraLab({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 8,
+            marginBottom: sheet && !sheetOpen ? 0 : 8,
+            gap: 8,
           }}
         >
-          <strong>SAMSARA — transition bench</strong>
+          <strong>
+            SAMSARA — {layout === 'mobile' ? 'MOBILE' : 'desktop'}
+            {simulatePhone ? ' (simulated)' : ''}
+          </strong>
+          {sheet ? (
+            <button
+              type="button"
+              onClick={() => setSheetOpen((v) => !v)}
+              style={{
+                font: 'inherit',
+                padding: '2px 10px',
+                cursor: 'pointer',
+                background: 'rgba(43,42,39,0.08)',
+                border: '1px solid rgba(43,42,39,0.25)',
+                borderRadius: 3,
+                color: 'inherit',
+              }}
+            >
+              {sheetOpen ? 'close ↓' : 'controls ↑'}
+            </button>
+          ) : (
           <button
             type="button"
             onClick={() => {
@@ -762,7 +940,10 @@ export default function SamsaraLab({
           >
             {dockRight ? '\u2190 dock left' : 'dock right \u2192'}
           </button>
+          )}
         </div>
+        {sheet && !sheetOpen ? null : (
+        <>
         <div style={{ marginBottom: 8, opacity: 0.75 }}>{status}</div>
 
         <div
@@ -824,6 +1005,38 @@ export default function SamsaraLab({
           `types.check.ts` in the same commit (plan Task 13).
         </div>
 
+        <label
+          style={{
+            display: 'flex',
+            gap: 6,
+            marginBottom: 6,
+            cursor: narrow ? 'not-allowed' : 'pointer',
+            opacity: narrow ? 0.5 : 1,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={simulatePhone}
+            /* Pointless on a window that is already a phone, and worse than
+               pointless: it would pin the split on while the honest path is
+               what is being looked at. */
+            disabled={narrow}
+            onChange={(e) => setSimulatePhone(e.target.checked)}
+          />
+          <span title="Render the stage in a 390px portrait box and force the mobile split. The sliders below switch to their MOBILE_ values.">
+            simulate phone
+          </span>
+        </label>
+        {layout === 'mobile' ? (
+          <div style={{ marginBottom: 10, opacity: 0.7, fontStyle: 'italic' }}>
+            editing the MOBILE values — rows marked · mobile. everything else is
+            shared by both layouts.
+            {simulatePhone
+              ? ' the belt and the hero orbit still use desktop sizing here; only the transition is simulated.'
+              : ''}
+          </div>
+        ) : null}
+
         {(
           [
             ['show logo', showLogo, setShowLogo],
@@ -876,14 +1089,26 @@ export default function SamsaraLab({
               <div style={{ opacity: 0.55, marginBottom: 6, fontStyle: 'italic' }}>{g.note}</div>
             ) : null}
             {g.rows.map((r) => {
+              // The path this row edits at the CURRENT viewport, and whether
+              // that is the portrait twin rather than the row's own path.
+              const p = pathFor(r.path)
+              const swapped = p !== r.path
+              const label = swapped ? (
+                <>
+                  {r.label}{' '}
+                  <span style={{ opacity: 0.65, fontStyle: 'italic' }}>· mobile</span>
+                </>
+              ) : (
+                r.label
+              )
               if (r.kind === 'expr') {
-                const v = getPath(cfg as unknown as Any, r.path) as string
+                const v = getPath(cfg as unknown as Any, p) as string
                 return (
-                  <label key={r.path} style={{ display: 'block', marginBottom: 8 }}>
-                    <span style={{ display: 'block', marginBottom: 3 }}>{r.label}</span>
+                  <label key={p} style={{ display: 'block', marginBottom: 8 }}>
+                    <span style={{ display: 'block', marginBottom: 3 }}>{label}</span>
                     <select
                       value={v}
-                      onChange={(e) => set(r.path, e.target.value)}
+                      onChange={(e) => set(p, e.target.value)}
                       style={{
                         width: '100%',
                         font: 'inherit',
@@ -905,33 +1130,33 @@ export default function SamsaraLab({
                 )
               }
               if (r.kind === 'color') {
-                const v = getPath(cfg as unknown as Any, r.path) as string
+                const v = getPath(cfg as unknown as Any, p) as string
                 return (
                   <label
-                    key={r.path}
+                    key={p}
                     style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}
                   >
-                    <span>{r.label}</span>
+                    <span>{label}</span>
                     <input
                       type="color"
                       value={v}
                       /* UPPERCASE on write: the admin colour swatch writes back
                          uppercase, and a lowercase value marks the form dirty
                          just from loading it. */
-                      onChange={(e) => set(r.path, e.target.value.toUpperCase())}
+                      onChange={(e) => set(p, e.target.value.toUpperCase())}
                     />
                   </label>
                 )
               }
               if (r.kind === 'arr') {
-                const arr = getPath(cfg as unknown as Any, r.path) as number[]
+                const arr = getPath(cfg as unknown as Any, p) as number[]
                 return (
-                  <div key={r.path}>
+                  <div key={p}>
                     {arr.map((v, i) => (
                       <label key={i} style={{ display: 'block', marginBottom: 6 }}>
                         <span style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span>
-                            {r.label} {i + 1}
+                            {label} {i + 1}
                           </span>
                           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v}</span>
                         </span>
@@ -941,7 +1166,7 @@ export default function SamsaraLab({
                           max={r.max}
                           step={r.step}
                           value={v}
-                          onChange={(e) => set(`${r.path}.${i}`, Number(e.target.value))}
+                          onChange={(e) => set(`${p}.${i}`, Number(e.target.value))}
                           style={{ width: '100%' }}
                         />
                       </label>
@@ -949,14 +1174,14 @@ export default function SamsaraLab({
                   </div>
                 )
               }
-              const v = getPath(cfg as unknown as Any, r.path) as number
+              const v = getPath(cfg as unknown as Any, p) as number
               const min = r.kind === 'weight' ? 0 : r.min
               const max = r.kind === 'weight' ? 20 : r.max
               const step = r.kind === 'weight' ? 1 : r.step
               return (
-                <label key={r.path} style={{ display: 'block', marginBottom: 6 }}>
+                <label key={p} style={{ display: 'block', marginBottom: 6 }}>
                   <span style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{r.label}</span>
+                    <span>{label}</span>
                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v}</span>
                   </span>
                   <input
@@ -965,7 +1190,7 @@ export default function SamsaraLab({
                     max={max}
                     step={step}
                     value={v}
-                    onChange={(e) => set(r.path, Number(e.target.value))}
+                    onChange={(e) => set(p, Number(e.target.value))}
                     style={{ width: '100%' }}
                   />
                 </label>
@@ -1023,6 +1248,8 @@ export default function SamsaraLab({
           falloff comes from the key light&apos;s own distance decay. The field
           stays in the config; nothing reads it.
         </div>
+        </>
+        )}
       </aside>
     </div>
   )

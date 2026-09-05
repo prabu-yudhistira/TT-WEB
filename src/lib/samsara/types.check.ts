@@ -89,7 +89,16 @@ check(
 
 // ── landing ─────────────────────────────────────────────────────────
 check('landed size is the approved 45.5% of viewport height', DEFAULT_SEQUENCE.LANDING.SIZE_FRAC === 0.455)
-check('mobile lands smaller than desktop', DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 0.35)
+// ⚠️ The label said "smaller than desktop" while the assertion pinned a
+// literal — two different claims, and only the literal was ever checked. Both
+// are asserted now: the frozen value, and the relationship it is supposed to
+// stand for. Retuned 0.35 -> 0.33 on 2026-09-05, the first pass made while
+// actually looking at a phone.
+check('mobile landed size is the approved 33% of viewport height', DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 0.33)
+check(
+  'and it really is smaller than desktop',
+  DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC < DEFAULT_SEQUENCE.LANDING.SIZE_FRAC,
+)
 check(
   'mobile landed size is set independently',
   typeof DEFAULT_SEQUENCE.LANDING.MOBILE_SIZE_FRAC === 'number',

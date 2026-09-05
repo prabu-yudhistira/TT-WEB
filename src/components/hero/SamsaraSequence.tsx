@@ -83,6 +83,7 @@ export function SamsaraSequence({
   onPointerHold,
   onMode,
   controlsRef,
+  viewportOverride = null,
 }: {
   config: SequenceConfig
   /** The belt SAMSARA orbits in — supplies the shared plane, as the engine does. */
@@ -140,10 +141,31 @@ export function SamsaraSequence({
    * and should not be a component's API.
    */
   controlsRef?: React.MutableRefObject<SequenceControls | null>
+  /**
+   * The viewport the hologram and the orbs are composed against — the bench's
+   * simulated phone, and nothing else.
+   *
+   * ⚠️ UNDEFINED EVERYWHERE BUT /dev/samsara, deliberately, and the homepage
+   * must keep it that way. `HOLOGRAM.MOBILE_*` and `EMITTERS.MOBILE_*` are a
+   * different composition, not a smaller one; a build that read this from
+   * anything but the bench could serve a real visitor the portrait screen on a
+   * desktop window. Same containment as `controlsRef`.
+   *
+   * ⚠️ Carries W and H, not just the flag. This context feeds `screenQuad` and
+   * `orbParkedPose`, which place things as FRACTIONS of it — a `mobile: true`
+   * with a 1440x900 W/H would put the portrait screen at portrait fractions of
+   * a landscape frame, which is a composition that exists nowhere.
+   */
+  viewportOverride?: { W: number; H: number; mobile: boolean } | null
 }) {
   const ctrlRef = useRef<SequenceController | null>(null)
   const cfgRef = useRef(config)
   cfgRef.current = config
+
+  // A ref, because the frame loop below is installed once and must see the
+  // current value without the effect tearing the sequence down mid-cinematic.
+  const viewportRef = useRef(viewportOverride)
+  viewportRef.current = viewportOverride
 
   const engineRef = useRef(engine)
   engineRef.current = engine
@@ -753,10 +775,12 @@ export function SamsaraSequence({
       if (eng.hasEmitters() && holoPhase !== 'dormant') {
         eng.setHologram({
           cfg,
+          // The real window, unless the bench is simulating a phone — see
+          // `viewportOverride`, which is undefined on every page but /dev/samsara.
           ctx: {
-            W: window.innerWidth,
-            H: window.innerHeight,
-            mobile: window.innerWidth < 640,
+            W: viewportRef.current?.W ?? window.innerWidth,
+            H: viewportRef.current?.H ?? window.innerHeight,
+            mobile: viewportRef.current?.mobile ?? window.innerWidth < 640,
             roomDepth: cfg.ROOM.DEPTH,
             camZ: cfg.ROOM.DEPTH / 2,
           },

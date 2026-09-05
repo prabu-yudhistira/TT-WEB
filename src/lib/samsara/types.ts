@@ -770,18 +770,19 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   LANDING: {
     SIZE_FRAC: 0.455,
-    MOBILE_SIZE_FRAC: 0.35,
+    MOBILE_SIZE_FRAC: 0.33,
     X_FRAC: 0.82,
     Y_FRAC: 0.555,
     MOBILE_X_FRAC: 0.5,
-    MOBILE_Y_FRAC: 0.3,
+    MOBILE_Y_FRAC: 0.28,
     HOVER_BOB_PX: 8,
     HOVER_BOB_MS: 2500,
 
-    // Frontal and level. The owner parks it for real at the bench.
-    ROT_X_DEG: -5,
-    ROT_Y_DEG: -34,
-    ROT_Z_DEG: -7,
+    // Frontal and level. The owner parks it for real at the bench — this is
+    // that pass: face-on, tipped back 17° so the display catches the key light.
+    ROT_X_DEG: 17,
+    ROT_Y_DEG: 0,
+    ROT_Z_DEG: 0,
   },
 
   ROOM: {
@@ -845,8 +846,8 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
      * face forever with nothing in the console to say why. types.check.ts pins
      * each key against EXPRESSION_ORDER for exactly that reason.
      */
-    WEIGHTS: { neutral: 15, blink: 5, squint: 3, happy: 0, wide: 0, wink: 0, lookLeft: 0, lookRight: 0, lookUp: 0, lookDown: 0, lookUpLeft: 0, lookUpRight: 0, lookDownLeft: 0, lookDownRight: 0 },
-    INTERVAL_MS: 4200,
+    WEIGHTS: { neutral: 11, blink: 5, squint: 0, happy: 0, wide: 0, wink: 0, lookLeft: 0, lookRight: 0, lookUp: 0, lookDown: 0, lookUpLeft: 0, lookUpRight: 0, lookDownLeft: 0, lookDownRight: 0 },
+    INTERVAL_MS: 3200,
     SMILE_SHAKE_PX: 9,
     SMILE_SHAKE_MS: 160,
     HOLD_EXPRESSION: 'happy',
@@ -854,7 +855,9 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
 
   BURST: {
     ENABLED: true,
-    // The owner asked for every 4 seconds.
+    // ⚠️ 8.2s, NOT the 4s of the original brief — retuned by the owner once the
+    // burst was faint enough (OPACITY 0.11) to read as a slow exhale rather than
+    // a pulse. `samsara-burst.mjs` still asserts the old 4000 and fails on it.
     INTERVAL_MS: 8200,
     // ⚠️ Count is NOT what separates smoke from dust — an earlier pass here
     // assumed it was and went down to 34, which just gave fewer, more obviously
@@ -905,14 +908,19 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // ⚠️ Kept BELOW the landscape value, not merely different. The fraction is
     // of ROOM.DEPTH, which is the same in both orientations, so an equal value
     // gives an equal world radius — and a portrait viewport is narrower, so
-    // the same orb eats far more of the width. The owner's 2026-09-04 bench
-    // moved landscape 0.14 -> 0.13 on a desktop; this follows by the same
-    // ratio, because the bench cannot show what portrait is doing.
-    MOBILE_SIZE_FRAC: 0.12,
+    // the same orb eats far more of the width.
+    //
+    // 0.12 was DERIVED (landscape's ratio applied blind, because the bench
+    // could not show portrait). This is the first value actually SET while
+    // looking at a phone, and it went to roughly half that — which is the
+    // measure of how far a derived guess was off.
+    MOBILE_SIZE_FRAC: 0.07,
     NEAR: { X_FRAC: 0.12, Y_FRAC: 0.85, DEPTH_FRAC: 0.05 },
     FAR: { X_FRAC: 0.57, Y_FRAC: 0.92, DEPTH_FRAC: 1.4 },
-    MOBILE_NEAR: { X_FRAC: 0.16, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
-    MOBILE_FAR: { X_FRAC: 0.84, Y_FRAC: 0.86, DEPTH_FRAC: 0.3 },
+    // Portrait spreads the pair to the two bottom corners, where landscape
+    // clusters them left. Owner-set on the phone bench, 2026-09-05.
+    MOBILE_NEAR: { X_FRAC: 0.15, Y_FRAC: 0.94, DEPTH_FRAC: 0.36 },
+    MOBILE_FAR: { X_FRAC: 0.88, Y_FRAC: 0.92, DEPTH_FRAC: 0.47 },
     // Starting points read off an underside render, NOT measured — the ports are
     // recessed, so the outlier search that found SAMSARA's tubes cannot see
     // them. Turn SHOW_PORTS on and place them properly.
@@ -924,7 +932,7 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     LENS_Z: 0,
     SHOW_PORTS: false,
     NEAR_ROT: { X_DEG: 13, Y_DEG: 161, Z_DEG: 23 },
-    FAR_ROT: { X_DEG: 31, Y_DEG: -21, Z_DEG: 7 },
+    FAR_ROT: { X_DEG: 33, Y_DEG: -19, Z_DEG: 14 },
     ENTRY_MS: 1600,
     ENTRY_STAGGER_MS: 200,
     BOB_AMP: 0.08,
@@ -954,26 +962,46 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     DIR_X: 0.35,
     DIR_Y: 1.95,
     DIR_Z: -0.3,
-    RATE: 10,
+    RATE: 25,
     SPREAD: 0.73,
     PUFF_SIZE: 81,
-    PUFF_LIFE_MS: 925,
+    PUFF_LIFE_MS: 700,
     PUFF_COLOR: '#F7ECD9',
     PUFF_OPACITY: 0.18,
   },
 
   HOLOGRAM: {
     W_FRAC: 0.665,
-    PANEL_ASPECT: 1.7768,
+    /**
+     * ⚠️ NO LONGER THE ARTWORK'S OWN ASPECT, and that is a deliberate override
+     * with a visible cost. panel2.png is 1672x941 = 1.7768; drawing it into a
+     * 1.469 frame stretches it VERTICALLY by 1.7768/1.469 = 1.21x, so the
+     * dashed circle in the art is now a 21%-tall ellipse.
+     *
+     * Set by the owner on 2026-09-05 while tuning portrait, where the screen
+     * had to be taller. There is no height control to reach for — h follows w
+     * and this number (which is why MOBILE_H_FRAC does not exist) — so this is
+     * the only lever that makes the panel taller, and it is SHARED: landscape
+     * is stretched by the same 1.21x.
+     *
+     * If the ellipse is not wanted, the fix is new artwork at the taller
+     * aspect, not a smaller number here. Reverting to 1.7768 restores the
+     * drawing exactly and returns the panel to its original proportions.
+     */
+    PANEL_ASPECT: 1.469,
     X_FRAC: 0.3,
     Y_FRAC: 0.38,
-    MOBILE_W_FRAC: 0.78,
+    // ⚠️ Past 1.0 — the portrait screen is now WIDER than the viewport, so its
+    // left and right edges sit off-frame. Owner-set at the phone bench: the
+    // panel reads as a surface the room is looking through rather than a
+    // rectangle floating inside it.
+    MOBILE_W_FRAC: 1.07,
     MOBILE_X_FRAC: 0.5,
-    MOBILE_Y_FRAC: 0.66,
-    FORM_MS: 1875,
-    FLICKER_MS: 5900,
+    MOBILE_Y_FRAC: 0.695,
+    FORM_MS: 1475,
+    FLICKER_MS: 5300,
     FLICKER_DUR_MS: 360,
-    FLICKER_DEPTH: 0.49,
+    FLICKER_DEPTH: 0.56,
     // ⚠️ WHITE, and white is the identity. It MULTIPLIES the artwork now
     // rather than replacing it — panel2 carries its own amber — so anything
     // else here shifts a colour the owner already chose.
@@ -981,18 +1009,18 @@ export const DEFAULT_SEQUENCE: SequenceConfig = {
     // ⚠️ RE-TUNED with the shader, like SHAFT_OPACITY before it. The owner's
     // 0.44 scaled an `ink * 1.9` term plus a separate haze; it now scales a
     // field that peaks at 1, so the same number is about half the brightness.
-    GLASS_OPACITY: 0.6,
+    GLASS_OPACITY: 0.59,
     SHAFT_COLOR: '#FFC547',
     // ⚠️ RE-TUNED with the shader, like SHAFT_SPREAD. The owner's 0.15 was set
     // against a solid wedge where every fragment was fully lit; the fan
     // multiplies this by the striation and the cone falloff, so the same
     // number reads as almost nothing.
-    SHAFT_OPACITY: 0.46,
+    SHAFT_OPACITY: 0.63,
     SHAFT_SPREAD: 3,
     // The owner's annotated target: edges up and out, not out sideways.
     SHAFT_HALF_DEG: 62,
     SHAFT_GUIDE: false,
-    SHAFT_REACH: 0.4,
+    SHAFT_REACH: 0.45,
     SHAFT_RAYS: 3.3,
     SHAFT_SPEED: 3.35,
     SHAFT_FADE: 1.35,

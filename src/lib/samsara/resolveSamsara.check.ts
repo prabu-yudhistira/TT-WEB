@@ -165,10 +165,20 @@ check(
     },
     IDLE_EYES: {
       WEIGHTS: Object.fromEntries(
-        // ⚠️ Offset well clear of any plausible default. At (i % 5) + 1 the
-        // third key landed on 3, and the day the owner tuned squint to 3 the
-        // perturbation silently stopped being one.
-        Object.keys(d.IDLE_EYES.WEIGHTS).map((k, i) => [k, (i % 7) + 11]),
+        /**
+         * ⚠️ DERIVED FROM THE DEFAULT, never a literal — this fixture has now
+         * collided with a tuned value TWICE. First at `(i % 5) + 1`, where the
+         * third key landed on 3 and the day the owner tuned squint to 3 the
+         * perturbation silently stopped being one. Then again at `(i % 7) + 11`,
+         * whose first key is 11, the day neutral was tuned to 11 (2026-09-05).
+         *
+         * Picking a literal "well clear of any plausible default" is the bug,
+         * not the offset: every literal is one tuning pass away from being
+         * plausible. Adding a non-zero amount to whatever the default IS cannot
+         * collide with it, for any tuning, ever. Weights are clamped at 0 from
+         * below and unbounded above (resolveSamsara), so this round-trips.
+         */
+        Object.entries(d.IDLE_EYES.WEIGHTS).map(([k, v], i) => [k, v + 11 + (i % 7)]),
       ),
       INTERVAL_MS: 3300,
       SMILE_SHAKE_PX: 14,
