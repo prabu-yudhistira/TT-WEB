@@ -318,30 +318,41 @@ if (orb) {
   /**
    * "Continuous... until release" (orbPoke.ts, and the owner's own 2026-09-05
    * decision recorded there) — so keep holding well past one FLICKER_MS
-   * (400ms default) and require an actual PEAK, then a TROUGH after it, then
-   * a second PEAK after that: proof the waveform keeps oscillating on its own
-   * while the press is still down, rather than firing once and settling.
+   * (400ms default) and require the screen to light, go dark, and light again
+   * WITHOUT the press changing: proof the waveform runs on its own rather than
+   * firing once and settling.
+   *
+   * ⚠️ Counted as ALTERNATIONS, not as two peaks over a threshold. The dip is
+   * two incommensurate sines, deliberately, "so the waveform never repeats
+   * over any realistic hold" — which means consecutive peaks are genuinely
+   * different heights. A first version demanded two samples above 0.35 and
+   * failed a perfectly good trace of 0.27 / 0.63 / 0.21 / 0.11: four clean
+   * oscillations, only one of which cleared the bar. Amplitude is the thing
+   * this waveform refuses to hold steady, so the check cannot rest on it.
+   *
+   * Zero is exact here (the rectifier clamps at 0), so lit-vs-dark needs no
+   * tolerance beyond floating-point noise.
    */
-  const track = []
-  {
-    const t0 = Date.now()
-    while (Date.now() - t0 < 1400) {
-      track.push(await poke().then((h) => h.poke.dip))
-      await sleep(30)
+  const track = await page.evaluate(async () => {
+    const out = []
+    const t0 = performance.now()
+    while (performance.now() - t0 < 1400) {
+      out.push(window.__ttHologram().poke.dip)
+      await new Promise((r) => setTimeout(r, 25))
     }
+    return out
+  })
+  // Collapse the trace to the runs it alternates between: lit, dark, lit, ...
+  const runs = []
+  for (const v of track) {
+    const lit = v > 0.01
+    if (runs.at(-1) !== lit) runs.push(lit)
   }
-  let peak1 = -1
-  let trough = -1
-  let peak2 = -1
-  for (let i = 0; i < track.length; i++) {
-    if (peak1 === -1 && track[i] > 0.35) peak1 = i
-    else if (peak1 !== -1 && trough === -1 && track[i] < 0.1) trough = i
-    else if (trough !== -1 && peak2 === -1 && track[i] > 0.35) peak2 = i
-  }
+  const litRuns = runs.filter(Boolean).length
   check(
-    'the flicker keeps oscillating (peak -> trough -> peak) while still held',
-    peak1 !== -1 && trough !== -1 && peak2 !== -1,
-    `dip trace: ${track.map((v) => v.toFixed(2)).join(' ')}`,
+    'the flicker keeps oscillating while still held — lit, dark, lit again',
+    litRuns >= 2 && runs.length >= 3,
+    `${litRuns} lit run(s) across ${runs.length} alternations — trace: ${track.map((v) => v.toFixed(2)).join(' ')}`,
   )
 
   // ── release: fades, does not cut ───────────────────────────────────
@@ -361,22 +372,74 @@ if (orb) {
    * once `fadeMs >= RELEASE_MS` clears `fired` — a real fade shows a clear peak
    * followed by a diminished tail; a cut shows near-zero everywhere.
    */
-  const releaseTrack = []
-  {
-    const t0 = Date.now()
-    while (Date.now() - t0 < 550) {
-      releaseTrack.push({ t: Date.now() - t0, ...(await poke()).poke })
-      await sleep(30)
+  /**
+   * ⚠️ Sampled INSIDE the page, in one call, on the page's own clock. Driving
+   * this loop from node costs a round-trip per sample, which stalls under load
+   * while `t` is measured on this side — the trace then drifts out of step
+   * with the release it describes. samsara-emitters.mjs caught that as a
+   * `0.00 -> 0.27` envelope: one that rose as it faded, which the fade cannot
+   * do. The release was fine; the clock reading it was not.
+   */
+  /**
+   * ⚠️ Sampled until the controller SAYS it is idle, not for a fixed duration
+   * — the same "wait for the condition" rule stated at the top of this file,
+   * and here it is load-bearing twice over.
+   *
+   * The fade advances on `dt` inside the frame loop, and that dt is CLAMPED at
+   * 100ms. Polling hard enough to starve rAF therefore dilates the
+   * controller's own clock: frames arrive further apart than 100ms, each one
+   * still credits at most 100ms, and a 420ms fade outlasts any wall-clock
+   * window you picked for it. A 750ms window measured "still flickering" on
+   * one run in six for exactly that reason — the release was fine, the
+   * observer was starving the thing it was observing.
+   *
+   * 30ms spacing rather than 20ms for the same reason: leave the renderer room.
+   */
+  const releaseTrack = await page.evaluate(async () => {
+    const out = []
+    const t0 = performance.now()
+    let dark = 0
+    while (performance.now() - t0 < 4000) {
+      const p = window.__ttHologram().poke
+      out.push(p.dip)
+      dark = p.dip <= 0.01 ? dark + 1 : 0
+      // Idle AND settled dark: the fade is over, not merely between beats.
+      if (p.phase === 'idle' && dark >= 6) break
+      await new Promise((r) => setTimeout(r, 30))
     }
-  }
-  const maxOver = (lo, hi, key) =>
-    Math.max(0, ...releaseTrack.filter((s) => s.t >= lo && s.t < hi).map((s) => s[key]))
-  const peakDuringRelease = maxOver(0, 420, 'dip')
-  const tailDip = maxOver(380, 550, 'dip')
+    return out
+  })
+  /**
+   * ⚠️ NO TIME WINDOWS. Two earlier versions used them and both were wrong for
+   * reasons that took a failure each to see:
+   *
+   *   - "max over [0,150) vs max over [320,500)" assumed the release lands at
+   *     a particular waveform phase. It does not, and a trough is ~150ms wide.
+   *   - "max over [0,420) vs max over [380,550)" OVERLAPS in 380-420, so a
+   *     release whose only lit moment fell in that sliver reported
+   *     `peak 0.17, tail 0.17` — a comparison it was arithmetically incapable
+   *     of passing.
+   *
+   * And both assumed this side's clock agrees with the controller's `fadeMs`.
+   * It does not: `mouse.up()` resolves when the event is dispatched, while the
+   * fade starts on the next frame — up to ~66ms later under software raster.
+   *
+   * So drop timing entirely and read the SHAPE, which needs no clock. Over a
+   * window comfortably past RELEASE_MS (420ms) plus a full FLICKER_MS:
+   *
+   *   cut at release   -> nothing lit anywhere        -> fails "it was lit"
+   *   fades properly   -> lit early, then exactly 0   -> passes
+   *   never fades      -> still oscillating at the end -> fails "ends dark"
+   *
+   * Past RELEASE_MS the controller clears `fired` and dip is EXACTLY 0 from
+   * then on, so the dark tail is unambiguous rather than a long trough.
+   */
+  const sawDip = releaseTrack.some((v) => v > 0.01)
+  const endedDark = releaseTrack.slice(-6).every((v) => v <= 0.01)
   check(
     'the dip FADES over RELEASE_MS rather than being cut at release',
-    peakDuringRelease > 0.15 && tailDip < peakDuringRelease * 0.5,
-    `peak during release ${peakDuringRelease.toFixed(2)}, tail ${tailDip.toFixed(2)}`,
+    sawDip && endedDark,
+    `lit after release: ${sawDip}; settled dark: ${endedDark} — trace: ${releaseTrack.map((v) => v.toFixed(2)).join(' ')}`,
   )
 
   await sleep(200)

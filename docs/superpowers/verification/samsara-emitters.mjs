@@ -297,10 +297,33 @@ if (orbs.length === 2) {
   // cycle and read backwards — the first version of this check did exactly
   // that, twice, on both orbs. Killing the amplitude removes the confound
   // rather than averaging around it.
+  //
+  // ⚠️ EXHAUST OFF for the same reason, and it took a second failure to see it.
+  // SAMSARA sheds its own continuous smoke from the same room, and after the
+  // owner took EXHAUST.RATE 10 -> 25 that plume drifts through these boxes in
+  // quantities that swamp the orbs': `on` measured anywhere from 16777 to
+  // 20997 across runs while `off` sat at 15531-16946 — two distributions that
+  // OVERLAP, so the check could no longer tell the two states apart at all. It
+  // is not the orbs' smoke and it does not answer to THRUST_RATE, so it is
+  // simply switched off while the orbs are being measured.
+  //
+  // ⚠️ AND THE SHAFTS, which was the one that actually mattered. The fan is
+  // ANIMATED — SHAFT_SPEED scrolls its striation continuously — and it
+  // radiates from the orb's own lens, straight through this box. Any single
+  // frame therefore samples a random phase of a moving bright pattern, and at
+  // the owner's SHAFT_OPACITY 0.63 that swing is larger than the whole smoke
+  // signal. Switching off the flicker and the exhaust alone left `off`
+  // landing ABOVE `on` on a third of runs; this is what closed it.
+  //
+  // The rule these three share: neutralise everything in the box that is not
+  // the thing under test, so THRUST_RATE is the only variable left.
   await page.evaluate(() => window.__ttSamsaraBench.set('EMITTERS.SHOW_PORTS', false))
   await page.evaluate(() => window.__ttSamsaraBench.set('HOLOGRAM.FLICKER_DEPTH', 0))
+  await page.evaluate(() => window.__ttSamsaraBench.set('EXHAUST.ENABLED', false))
+  await page.evaluate(() => window.__ttSamsaraBench.set('HOLOGRAM.SHAFT_OPACITY', 0))
   const defaultRate = await page.evaluate(() => window.__ttSamsaraBench.get().EMITTERS.THRUST_RATE)
-  await new Promise((r) => setTimeout(r, 300))
+  // Long enough for the exhaust already in flight to die (its PUFF_LIFE_MS).
+  await new Promise((r) => setTimeout(r, 1200))
 
   const bigBox = (o) => [o.x - 150, o.y - 150, o.x + 150, o.y + 150]
   const litAt = async (shot) => ({
@@ -321,8 +344,20 @@ if (orbs.length === 2) {
 
   // Back on — recovering proves this is a running emission the toggle can
   // start again, not the first capture happening to catch a one-off puff.
+  //
+  // ⚠️ A LONGER settle than the one above, and not symmetry for its own sake.
+  // Draining is bounded by PUFF_LIFE_MS (every puff is dead 1000ms after the
+  // rate hits zero); REFILLING has to build a whole standing population back
+  // up, and sampling at the same 1700ms caught it part-way — measured
+  // `off 16809 vs on 16956`, a 147px margin against a required 150, on a check
+  // whose healthy margin is ~4000. Nothing was wrong with the smoke.
+  //
+  // ⚠️ Time, not a lower threshold. The floor under this box roughly doubled
+  // when EXHAUST.RATE went 10 -> 25 (SAMSARA's own exhaust drifts through it,
+  // and has nothing to do with THRUST_RATE), so trimming MARGIN to make a
+  // half-refilled sample pass would just be tuning the check until it agreed.
   await page.evaluate((v) => window.__ttSamsaraBench.set('EMITTERS.THRUST_RATE', v), defaultRate)
-  await new Promise((r) => setTimeout(r, 1700))
+  await new Promise((r) => setTimeout(r, 3000))
   const onShot2 = await page.screenshot()
   await sharp(onShot2).toFile('samsarashots/emitters-thrust-on2.png')
   const on2 = await litAt(onShot2)
@@ -412,32 +447,63 @@ if (orbs.length === 2) {
    * that is fading shows early > late; one that was cut dead shows near-zero
    * in BOTH windows.
    */
-  const releaseTrack = []
-  {
-    const t0 = Date.now()
-    while (Date.now() - t0 < 550) {
-      releaseTrack.push({ t: Date.now() - t0, ...(await poke()) })
+  /**
+   * ⚠️ Sampled INSIDE the page, in one call, on the page's own clock.
+   *
+   * The first version drove this loop from node, one `page.evaluate` per
+   * sample. Each round-trip costs tens of ms and stalls under load, so the
+   * samples arrived late and sparse while `t` was measured HERE — the trace
+   * drifted out of step with the release it was describing, and reported
+   * `dip envelope 0.00 -> 0.27`: an envelope that supposedly rose as it faded,
+   * which is not a thing the fade can do. Nothing was wrong with the release;
+   * the clock reading it was wrong.
+   */
+  /**
+   * ⚠️ Polled until the controller says idle, NOT for a fixed number of ms.
+   *
+   * The fade advances on the frame loop's `dt`, which is CLAMPED at 100ms, so
+   * a poll tight enough to starve rAF dilates the controller's own clock and
+   * the fade outlasts whatever wall-clock window you chose. Fixed windows also
+   * assume the release lands at a particular waveform phase, which it does
+   * not. samsara-hologram.mjs paid for both of those separately.
+   */
+  const releaseTrack = await page.evaluate(async () => {
+    const out = []
+    const t0 = performance.now()
+    let dark = 0
+    while (performance.now() - t0 < 4000) {
+      const p = window.__ttHologram().poke
+      out.push({ shake: p.shake, dip: p.dip })
+      dark = p.dip <= 0.01 && p.shake <= 0.01 ? dark + 1 : 0
+      if (p.phase === 'idle' && dark >= 6) break
       await new Promise((r) => setTimeout(r, 30))
     }
-  }
-  const maxOver = (lo, hi, key) =>
-    Math.max(0, ...releaseTrack.filter((s) => s.t >= lo && s.t < hi).map((s) => s[key]))
-  const earlyShake = maxOver(0, 150, 'shake')
-  const lateShake = maxOver(320, 500, 'shake')
-  const earlyDip = maxOver(0, 150, 'dip')
-  const lateDip = maxOver(320, 500, 'dip')
+    return out
+  })
+  /**
+   * Read the SHAPE, which needs no clock.
+   *
+   * The shake decays smoothly from wherever the hold reached to zero, so a
+   * genuine decay passes THROUGH the middle; a release that stopped it dead
+   * would jump from full to 0 with nothing in between. The dip only has to
+   * prove it was still lit after the release and then went out — see
+   * samsara-hologram.mjs for why its magnitude cannot be asserted.
+   */
+  const midShake = releaseTrack.some((s) => s.shake > 0.05 && s.shake < 0.9)
+  const shakeEndedStill = releaseTrack.slice(-6).every((s) => s.shake <= 0.01)
+  const sawDip = releaseTrack.some((s) => s.dip > 0.01)
+  const dipEndedDark = releaseTrack.slice(-6).every((s) => s.dip <= 0.01)
   check(
-    'the shake decays rather than stopping dead on release',
-    earlyShake > 0.15 && lateShake < earlyShake * 0.7,
-    `shake envelope ${earlyShake.toFixed(2)} -> ${lateShake.toFixed(2)}`,
+    'the shake decays through the middle rather than stopping dead on release',
+    midShake && shakeEndedStill,
+    `passed through mid-amplitude: ${midShake}; settled still: ${shakeEndedStill}`,
   )
   check(
     'and the dip FADES over RELEASE_MS rather than being cut at release',
-    earlyDip > 0.05 && lateDip < earlyDip * 0.7,
-    `dip envelope ${earlyDip.toFixed(2)} -> ${lateDip.toFixed(2)}`,
+    sawDip && dipEndedDark,
+    `lit after release: ${sawDip}; settled dark: ${dipEndedDark}`,
   )
 
-  await new Promise((r) => setTimeout(r, 200))
   const settled = await poke()
   check('the shake and the flicker both settle back to idle', settled.phase === 'idle' && settled.shake === 0 && settled.dip === 0, JSON.stringify(settled))
 
